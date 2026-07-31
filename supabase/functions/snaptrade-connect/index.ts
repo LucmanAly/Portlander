@@ -19,7 +19,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { Snaptrade } from 'npm:snaptrade-typescript-sdk@11'
+import { Snaptrade, SnaptradeAuth } from 'npm:snaptrade-typescript-sdk@11'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -88,7 +88,9 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const snaptrade = new Snaptrade({ clientId, consumerKey })
+  const snaptrade = new Snaptrade({
+    auth: SnaptradeAuth.commercialApiKey({ clientId, consumerKey }),
+  })
 
   try {
     const { data: existing, error: fetchErr } = await sb

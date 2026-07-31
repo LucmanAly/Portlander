@@ -2,8 +2,10 @@
 
 Registers the calling user with SnapTrade (if not already) and returns a Connection Portal URL.
 
-**Status:** implemented (`index.ts`), **not yet click-tested against a real SnapTrade account**
-— that verification needs the owner's own session (see below).
+**Status:** implemented (`index.ts`). One real click-test caught a real bug (client
+construction, see "Fixed after first real click-test" below) — fixed and redeployed (v2).
+The full connect → sync happy-path against a live Fidelity account is still owner-verified,
+not agent-verified.
 
 ---
 
@@ -47,17 +49,33 @@ const { data, error } = await supabase.functions.invoke('snaptrade-connect', {
 window.open(data.redirectUrl, '_blank')
 ```
 
-## Implementation note — verify at deploy time
+## Implementation note
 
-This uses the official `snaptrade-typescript-sdk` via Deno's `npm:` specifier (Supabase Edge
-Runtime supports this directly — no esm.sh needed) rather than hand-rolling the HMAC request
-signing SnapTrade's raw REST API requires. Method/parameter names
-(`authentication.registerSnapTradeUser`, `authentication.loginSnapTradeUser`) are based on the
-SDK's documented resource-grouped structure, matching the same grouping (`AccountInformation`,
-`Connections`, `Authentication`) seen in SnapTrade's own docs. **This was not deployable-tested
-in this session** — the first real deploy + invoke is the actual verification; if the SDK's
-exact method signatures differ from what's coded here, TypeScript/runtime errors on first
-invoke will point at exactly where.
+Uses the official `snaptrade-typescript-sdk` via Deno's `npm:` specifier (Supabase Edge Runtime
+supports this directly — no esm.sh needed) rather than hand-rolling the HMAC request signing
+SnapTrade's raw REST API requires. Method/parameter names (`authentication.registerSnapTradeUser`,
+`authentication.loginSnapTradeUser`) were confirmed by downloading the real
+`snaptrade-typescript-sdk@11.0.4` tarball and reading its `.d.ts`/`.mjs` source directly — not
+guessed from docs.
+
+### Fixed after first real click-test (v2)
+
+The first deploy (v1) constructed the client as `new Snaptrade({ clientId, consumerKey })` —
+**wrong**. The SDK requires those wrapped in an `auth` object built via its own factory:
+
+```ts
+import { Snaptrade, SnaptradeAuth } from 'npm:snaptrade-typescript-sdk@11'
+
+const snaptrade = new Snaptrade({
+  auth: SnaptradeAuth.commercialApiKey({ clientId, consumerKey }),
+})
+```
+
+Without the `auth` wrapper, `configuration.authMode` stays `undefined`, so the SDK never attaches
+`clientId` or applies SnapTrade's required request signing (`PartnerSignature`/`PartnerTimestamp`)
+— every call went out unsigned and SnapTrade rejected it, surfacing to the owner as a generic
+"Edge Function returned a non-2xx status code". Confirmed against the SDK's real `Configuration`
+class and compiled `index.mjs` (the `authMode === "commercialApiKey"` branch that gates signing).
 
 ## RLS note
 

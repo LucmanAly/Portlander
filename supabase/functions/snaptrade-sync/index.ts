@@ -26,7 +26,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { Snaptrade } from 'npm:snaptrade-typescript-sdk@11'
+import { Snaptrade, SnaptradeAuth } from 'npm:snaptrade-typescript-sdk@11'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -97,7 +97,9 @@ Deno.serve(async (req) => {
 
   const snaptradeUserId = stUser.snaptrade_user_id as string
   const userSecret = stUser.user_secret as string
-  const snaptrade = new Snaptrade({ clientId, consumerKey })
+  const snaptrade = new Snaptrade({
+    auth: SnaptradeAuth.commercialApiKey({ clientId, consumerKey }),
+  })
 
   const startedAt = new Date().toISOString()
   const { data: runRow, error: runInsertErr } = await sb
@@ -121,7 +123,7 @@ Deno.serve(async (req) => {
     const authorizations = authRes.data ?? []
     for (const auth of authorizations) {
       const brokerageName =
-        auth.brokerage?.displayName ?? auth.brokerage?.name ?? auth.name ?? 'Connected brokerage'
+        auth.brokerage?.display_name ?? auth.brokerage?.name ?? auth.name ?? 'Connected brokerage'
       const { error: connErr } = await sb.from('snaptrade_connections').upsert(
         {
           user_id: userId,
@@ -151,7 +153,7 @@ Deno.serve(async (req) => {
           userId: snaptradeUserId,
           userSecret,
         })
-        for (const pos of posRes.data ?? []) {
+        for (const pos of posRes.data?.results ?? []) {
           const parsed = extractPosition(pos)
           if (!parsed) continue
           const entry = aggregated.get(parsed.ticker) ?? {
@@ -224,31 +226,29 @@ Deno.serve(async (req) => {
 })
 
 /**
- * SnapTrade's position schema varies by instrument kind and API version —
- * this defensively tries the known field shapes for the ticker symbol
- * rather than assuming one exact nesting. Verify against a real synced
- * account and adjust here if it doesn't match.
+ * AccountPosition shape confirmed against the real snaptrade-typescript-sdk
+ * (v11.0.4) type definitions: `instrument.symbol` is a flat ticker string
+ * for stock/etf/cef/adr/mutualfund kinds, `units` and `cost_basis` (the
+ * per-share average purchase price — NOT `average_purchase_price`) are
+ * numeric strings. Instrument kinds without a flat string symbol (options,
+ * crypto, futures) are skipped here, not mis-parsed.
  */
 function extractPosition(
   pos: unknown,
 ): { ticker: string; name?: string; units: number; avgPrice: number } | null {
   const p = pos as Record<string, unknown>
   const units = Number(p.units)
-  const avgPrice = Number(p.average_purchase_price ?? p.averagePurchasePrice)
   if (!Number.isFinite(units) || units === 0) return null
 
-  const instrument = (p.instrument ?? p.symbol) as Record<string, unknown> | undefined
-  const symbolField = (instrument?.symbol ?? instrument) as Record<string, unknown> | string | undefined
-  const ticker =
-    typeof symbolField === 'string'
-      ? symbolField
-      : (symbolField?.symbol as string | undefined) ?? (instrument?.symbol as string | undefined)
-  const name =
-    typeof symbolField === 'object' ? (symbolField?.description as string | undefined) : undefined
+  const instrument = p.instrument as Record<string, unknown> | undefined
+  const ticker = instrument?.symbol
+  if (typeof ticker !== 'string' || !ticker) return null
 
-  if (!ticker) return null
+  const avgPrice = Number(p.cost_basis)
+  const name = typeof instrument?.description === 'string' ? instrument.description : undefined
+
   return {
-    ticker: String(ticker).toUpperCase(),
+    ticker: ticker.toUpperCase(),
     name,
     units,
     avgPrice: Number.isFinite(avgPrice) ? avgPrice : 0,
