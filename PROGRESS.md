@@ -3,7 +3,7 @@
 **Last updated:** 2026-07-31  
 **Last agent:** claude-code  
 **Current phase:** Phase 1 — Foundation (cloud deploy underway) → Phase 1.5 SnapTrade scoping starting  
-**Phase 1 status:** 🟢 Cloud deploy essentially complete — Netlify live, Supabase schema + Edge Function + daily cron all live, `FINNHUB_API_KEY` set, owner signed in and real portfolio synced with real Finnhub data confirmed end-to-end. Only formal Phase 1 exit sign-off left.
+**Phase 1 status:** 🟢 Cloud deploy essentially complete — Netlify live, Supabase schema + Edge Function + daily cron all live, `FINNHUB_API_KEY` set, owner signed in and real portfolio synced with real Finnhub data confirmed end-to-end. Several owner-reported UI glitches (calendar ticker truncation, missing full dates, 30-day agenda bug) fixed same session, in PR #3 awaiting merge. Only formal Phase 1 exit sign-off left.
 
 > **Protocol:** Every agent must read `AGENTS.md` + this file before work, and update this file after work (session log + next up) without being asked.
 
@@ -66,19 +66,22 @@
 ### Phase 1 exit criteria
 - [x] Real portfolio loadable (40 real holdings imported into cloud Supabase, confirmed via DB query — session 6)
 - [x] Earnings from Finnhub (via sync file or Edge) not only demo offsets (34 real events with real dates/status confirmed live in `events` — session 6)
-- [ ] Weight ranking + exposure % sanity (not verified this session — was DB/infra work only, no UI walkthrough done)
-- [ ] Snappy UI (not verified this session)
+- [ ] Weight ranking + exposure % sanity (not yet formally verified by owner, though the impact-score math is unchanged and was already spot-checked in dev screenshots this session)
+- [ ] Snappy UI (owner flagged several concrete glitches this session — calendar ticker truncation, missing full dates, 30-day agenda only showing ~14 days — all fixed in PR #3; awaiting owner confirmation on the live site post-merge)
 - [ ] Used on a real morning once (owner to confirm after a real daily cron run)
 
 ---
 
 ## Next up (ordered)
 
-1. **Owner (optional):** the daily cron currently runs at `0 11 * * *` UTC (chosen arbitrarily as "a reasonable morning" — see Decisions). Adjust to taste with `select cron.alter_job(1, schedule => '<new cron expr>');` via the Supabase SQL editor or MCP `execute_sql` once a preferred local time is known.
-2. Mark Phase 1 exit criteria formally — functionally everything is confirmed working end-to-end on the live site now (real sign-in, real CSV import, real Finnhub sync all verified same-session); this is just the formal checkbox in the Phase 1 exit criteria section below.
-3. **Owner:** retry getting the SnapTrade app-level `clientId`/`consumerKey` from a desktop browser (mobile UI was unusable).
-4. Once SnapTrade keys are in hand: scope and build the actual integration (new Edge Function, new table, UI) — this is new work, not in the original Phase 1/2/3 plan in `AGENTS.md`.
-5. Phase 1 exit criteria → then Phase 2 (prep cards, journal, alerts) — SnapTrade work above is separate from and can proceed in parallel with this.
+1. **Owner:** pull PR #3 (`claude/portlander-cloud-handoff-eqnr94` → `develop`) live and confirm the Today sort toggle, full weekday date labels, calendar ticker visibility, BMO/AMC coloring, and 30-day agenda look right on the real site with real data.
+2. Once confirmed: merge PR #3 → `develop`, then `develop` → `main` when ready to spend a Netlify build (this PR *does* touch `src/`, unlike the infra-only work before it, so this merge actually needs a real deploy).
+3. **Owner (optional):** the daily cron currently runs at `0 11 * * *` UTC (chosen arbitrarily as "a reasonable morning" — see Decisions). Adjust to taste with `select cron.alter_job(1, schedule => '<new cron expr>');` via the Supabase SQL editor or MCP `execute_sql` once a preferred local time is known.
+4. Mark Phase 1 exit criteria formally — functionally everything is confirmed working end-to-end (real sign-in, real CSV import, real Finnhub sync, and now the UI glitches the owner flagged); this is just the formal checkbox in the Phase 1 exit criteria section below. "Snappy UI" criterion is now much closer given this session's fixes.
+5. **Discussion, not yet decided:** Finnhub free-tier rate-limit strategy for scaling beyond earnings-only sync (owner wants PE ratio, market cap, other fundamentals later). Current sync does one `/calendar/earnings` call per ticker with a 200ms pace; a same-session discussion covered switching to Finnhub's un-filtered (no `symbol` param) earnings-calendar call — believed to return ALL companies' earnings for a date range in a single call, which would need only 1 API call total instead of N — plus fetching future fundamentals (PE/market cap) weekly instead of daily to keep the added budget small, and per-ticker pacing (~1.1s) as a floor if per-symbol calls stay necessary. **Not implemented — owner has not decided on the approach yet.** Revisit before building any new Finnhub-backed metric.
+6. **Owner:** retry getting the SnapTrade app-level `clientId`/`consumerKey` from a desktop browser (mobile UI was unusable).
+7. Once SnapTrade keys are in hand: scope and build the actual integration (new Edge Function, new table, UI) — this is new work, not in the original Phase 1/2/3 plan in `AGENTS.md`.
+8. Phase 1 exit criteria → then Phase 2 (prep cards, journal, alerts) — SnapTrade work above is separate from and can proceed in parallel with this.
 
 ---
 
@@ -199,6 +202,66 @@
     live end-to-end. Only the formal Phase 1 exit-criteria checkbox remains (see Phase 1
     exit criteria section) — everything it requires has now actually been demonstrated
     working.
+- **Follow-up, same session — owner-reported UI glitches, fixed (first `src/` code changes
+  this session; everything above was infra-only):**
+  - **Today page:** added an Impact/Date sort toggle (`src/components/today/SortToggle.tsx`)
+    next to the event count, matching `FilterBar`'s visual language. Sort logic factored
+    into `scoring.ts` as `sortEventsByDate` (renamed the existing impact comparator to
+    `sortEventsByImpact` for symmetry), shared with the calendar agenda fix below.
+  - **Date formatting** (`format.ts`): `formatEventDay` previously returned a bare relative
+    label ("Thursday" with no date, or just "Aug 14" with no weekday past day 7). Owner
+    wanted the actual date always visible. Now always renders full weekday + date
+    ("Thursday, August 14"), keeping "Today"/"Tomorrow" prefixes (with date appended) for
+    near-term events.
+  - **Calendar cell ticker truncation — real bug, found and fixed**
+    (`MonthCalendar.tsx`): day cells were rendering tickers as a single letter + ellipsis
+    (owner's exact complaint). Root cause: `truncate` (`white-space: nowrap; overflow:
+    hidden; text-overflow: ellipsis`) was applied to the *outer* flex row rather than the
+    text itself — not meaningfully spec-supported on flex containers — while the inner
+    text span lacked `min-w-0`/`flex-1`, the standard fix needed for text truncation to
+    compute a sane bounded width inside a flex row. Moved `truncate` + `min-w-0 flex-1` to
+    the inner span only. Verified via Playwright screenshots + computed-style checks in a
+    local dev build (seeded with demo + injected test data) — full ticker names
+    (`MSFT`, `CRWD`, `PANW`, etc.) now render correctly.
+  - **BMO/AMC color coding** (`MonthCalendar.tsx`): earnings tickers now render
+    `text-ink-100` (bright) when `timing === 'bmo'` (reports before the open) and
+    `text-ink-400` (dim) when `timing === 'amc'` (reports after the close); non-earnings
+    types unchanged. Deliberately reused existing ink-scale tokens (brightness, not a new
+    hue) rather than introducing a new color, since a new hue risked visually colliding
+    with the existing type-color legend (amber/green/blue for earnings/dividends/macro) —
+    owner explicitly asked to avoid clutter. Verified via `getComputedStyle` in-browser:
+    BMO → `rgb(241,245,249)`, AMC → `rgb(148,163,184)`. Added one small legend line
+    explaining the convention.
+  - **Agenda "next 30 days" bug — real bug, found and fixed** (`CalendarPage.tsx`): the
+    agenda was sorting by impact score (like Today) and hard-capping at `.slice(0, 12)`.
+    Since events further out score lower on the recency component, the last ~2/3 of the
+    30-day window was silently invisible even though the section header said "next 30
+    days" — exactly the owner's complaint. Fixed by sorting chronologically
+    (`sortEventsByDate`) with no artificial cap; verified in-browser with test events
+    seeded out to day 28 — all now appear.
+  - **Portfolio page:** owner explicitly said no changes needed there; untouched.
+  - **Finnhub rate-limit scaling — discussed, not implemented.** Owner wants to add more
+    Finnhub-backed metrics later (PE ratio, market cap, etc.) without blowing the free-tier
+    rate limit as the sync already needs ~40+ calls (one per ticker) for earnings alone.
+    Discussed but did not build: (1) Finnhub's earnings-calendar endpoint called *without*
+    a `symbol` filter is believed to return all companies' earnings for a date range in one
+    call — would cut the earnings sync from N calls to ~1, worth verifying against current
+    Finnhub docs before relying on it; (2) fetch slower-changing fundamentals (PE, market
+    cap) weekly rather than daily to keep their added call budget small; (3) if per-symbol
+    calls stay necessary, pace at ~1.1s/call (≈54/min) as a hard floor rather than the
+    current 200ms, which is only safe today because the full sync finishes in one burst
+    under a 60s window. **No code changed for this — owner wants to decide the approach
+    first.**
+  - **Testing:** `npm install` was needed (`node_modules` wasn't present in this checkout);
+    `npm run build` and `npm run lint` both pass clean (the build's pre-existing warning
+    about a large chunk and the lint's pre-existing `PortfolioContext.tsx` fast-refresh
+    warning are both unrelated/unchanged). Also manually verified in a real browser via a
+    local dev server + Playwright (screenshots + computed-style checks), not just
+    build/lint — see above for what was checked.
+  - Opened as commits on the existing PR #3 (`claude/portlander-cloud-handoff-eqnr94` →
+    `develop`) rather than a new PR, since it's a continuation of the same session/branch.
+    **Unlike every other change this session, this one touches `src/`** — merging it will
+    actually need a real Netlify build, unlike the infra-only work above.
 
 ### 2026-07-31 — claude-code (session 5)
 - **Context:** owner decided to move Portlander from local-only to a real cloud deployment
