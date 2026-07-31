@@ -1,6 +1,7 @@
-import type { Holding, PortfolioEvent, WatchlistItem } from '@/types'
+import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
 import { getSupabase, isSupabaseConfigured, resolveBackend, type DataBackend } from '@/lib/supabase'
 import {
+  brokerageConnectionFromRow,
   eventFromRow,
   holdingFromRow,
   holdingToUpdate,
@@ -16,6 +17,7 @@ import {
   saveHoldings,
   saveWatchlist,
   setLastSync as localSetLastSync,
+  setQuotesLastSync as localSetQuotesLastSync,
 } from '@/lib/storage'
 
 export interface PortfolioBundle {
@@ -24,6 +26,7 @@ export interface PortfolioBundle {
   events: PortfolioEvent[]
   lastSyncAt: string | null
   backend: DataBackend
+  brokerageConnections: BrokerageConnection[]
 }
 
 export interface RepoError {
@@ -46,6 +49,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
       backend: 'local',
+      brokerageConnections: [],
     }
   }
 
@@ -57,10 +61,11 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
       backend: 'local',
+      brokerageConnections: [],
     }
   }
 
-  const [holdingsRes, watchRes, eventsRes, syncRes] = await Promise.all([
+  const [holdingsRes, watchRes, eventsRes, syncRes, connectionsRes] = await Promise.all([
     sb.from('holdings').select('*').eq('user_id', userId).order('ticker'),
     sb.from('watchlist').select('*').eq('user_id', userId).order('ticker'),
     sb
@@ -74,6 +79,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    sb.from('snaptrade_connections').select('*').eq('user_id', userId).order('connected_at'),
   ])
 
   if (holdingsRes.error) throw holdingsRes.error
@@ -83,6 +89,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
   const holdings = (holdingsRes.data ?? []).map(holdingFromRow)
   const watchlist = (watchRes.data ?? []).map(watchlistFromRow)
   const events = (eventsRes.data ?? []).map(eventFromRow)
+  const brokerageConnections = (connectionsRes.data ?? []).map(brokerageConnectionFromRow)
 
   // Mirror to local as offline cache
   saveHoldings(holdings)
@@ -100,6 +107,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
     events: events.length > 0 ? events : loadEvents(),
     lastSyncAt,
     backend: 'supabase',
+    brokerageConnections,
   }
 }
 
@@ -198,6 +206,77 @@ export async function persistWatchlistRemote(
   if (error) return { message: error.message, cause: error }
 
   return null
+}
+
+export interface QuoteRefreshResult {
+  ticker: string
+  lastPrice: number
+  dayChangeValue: number | null
+  dayChangePct: number | null
+}
+
+export interface QuoteRefreshOutcome {
+  results: QuoteRefreshResult[]
+  tickersAttempted: number
+  errors: string[]
+  finishedAt: string | null
+}
+
+/**
+ * Invokes the refresh-quotes Edge Function for the signed-in user's holdings.
+ * Deliberately does not touch events/watchlist — price-only, on-demand refresh.
+ */
+export async function refreshQuotesRemote(): Promise<{
+  error: RepoError | null
+  outcome: QuoteRefreshOutcome | null
+}> {
+  const sb = getSupabase()
+  if (!sb) return { error: { message: 'Supabase is not configured' }, outcome: null }
+
+  const { data, error } = await sb.functions.invoke('refresh-quotes', { method: 'POST' })
+  if (error) return { error: { message: error.message, cause: error }, outcome: null }
+  if (data?.status === 'error') {
+    return {
+      error: { message: data.errors?.[0] ?? 'Quote refresh failed', cause: data },
+      outcome: null,
+    }
+  }
+
+  const finishedAt = data?.finishedAt ?? null
+  if (finishedAt) localSetQuotesLastSync(finishedAt)
+
+  return {
+    error: null,
+    outcome: {
+      results: data?.results ?? [],
+      tickersAttempted: data?.tickers ?? 0,
+      errors: data?.errors ?? [],
+      finishedAt,
+    },
+  }
+}
+
+/** Patches only lastPrice/dayChange fields/updatedAt for matched tickers; mirrors to local cache. */
+export function applyQuoteResultsLocally(
+  current: Holding[],
+  results: QuoteRefreshResult[],
+): Holding[] {
+  if (results.length === 0) return current
+  const byTicker = new Map(results.map((r) => [r.ticker.toUpperCase(), r]))
+  const now = new Date().toISOString()
+  const next = current.map((h) => {
+    const r = byTicker.get(h.ticker.toUpperCase())
+    if (!r) return h
+    return {
+      ...h,
+      lastPrice: r.lastPrice,
+      dayChangeValue: r.dayChangeValue ?? undefined,
+      dayChangePct: r.dayChangePct ?? undefined,
+      updatedAt: now,
+    }
+  })
+  saveHoldings(next)
+  return next
 }
 
 export function resetLocalDemo(): void {

@@ -1,6 +1,6 @@
 import { MonthCalendar } from '@/components/calendar/MonthCalendar'
 import { usePortfolio } from '@/context/PortfolioContext'
-import { scoreAndFilterEvents } from '@/lib/scoring'
+import { scoreAndFilterEvents, sortEventsByDate } from '@/lib/scoring'
 import { addDays, startOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import { useMemo } from 'react'
 import { formatPct } from '@/lib/format'
@@ -16,15 +16,18 @@ export function CalendarPage() {
     return events.filter((e) => e.eventDate >= formatYmd(from) && e.eventDate <= formatYmd(to))
   }, [events, today])
 
-  const agenda = useMemo(
-    () =>
-      scoreAndFilterEvents(events, holdings, watchlist, {
-        fromDate: today,
-        toDate: addDays(today, 30),
-        today,
-      }).slice(0, 12),
-    [events, holdings, watchlist, today],
-  )
+  const agenda = useMemo(() => {
+    const scored = scoreAndFilterEvents(events, holdings, watchlist, {
+      fromDate: today,
+      toDate: addDays(today, 30),
+      today,
+    })
+    // Chronological, not impact-sorted — an "agenda" should walk the full 30-day
+    // window in order rather than cut off at a fixed count (impact-desc + a small
+    // slice used to silently hide most of days 15-30, since later events tend to
+    // score lower on recency).
+    return sortEventsByDate(scored)
+  }, [events, holdings, watchlist, today])
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,14 @@
-import type { EventStatus, EventTiming, EventType, Holding, PortfolioEvent, WatchlistItem } from '@/types'
-import type { EventRow, HoldingRow, WatchlistRow } from '@/types/database'
+import type {
+  BrokerageConnection,
+  EventStatus,
+  EventTiming,
+  EventType,
+  Holding,
+  HoldingSource,
+  PortfolioEvent,
+  WatchlistItem,
+} from '@/types'
+import type { EventRow, HoldingRow, SnaptradeConnectionRow, WatchlistRow } from '@/types/database'
 
 function num(v: number | string | null | undefined): number | undefined {
   if (v == null || v === '') return undefined
@@ -30,6 +39,10 @@ function asStatus(v: string): EventStatus {
   return v === 'confirmed' ? 'confirmed' : 'estimated'
 }
 
+function asHoldingSource(v: string): HoldingSource {
+  return v === 'csv' || v === 'snaptrade' ? v : 'manual'
+}
+
 export function holdingFromRow(row: HoldingRow): Holding {
   return {
     id: row.id,
@@ -38,9 +51,12 @@ export function holdingFromRow(row: HoldingRow): Holding {
     shares: num(row.shares) ?? 0,
     costBasis: num(row.cost_basis),
     lastPrice: num(row.last_price),
+    dayChangeValue: num(row.day_change_value),
+    dayChangePct: num(row.day_change_pct),
     weightOverridePct: num(row.weight_override_pct),
     tags: row.tags ?? undefined,
     notes: row.notes ?? undefined,
+    source: asHoldingSource(row.source),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -53,10 +69,22 @@ export function holdingToUpdate(h: Holding) {
     shares: h.shares,
     cost_basis: h.costBasis ?? null,
     last_price: h.lastPrice ?? null,
+    day_change_value: h.dayChangeValue ?? null,
+    day_change_pct: h.dayChangePct ?? null,
     weight_override_pct: h.weightOverridePct ?? null,
     tags: h.tags ?? [],
     notes: h.notes ?? null,
+    source: h.source,
     updated_at: h.updatedAt,
+  }
+}
+
+export function brokerageConnectionFromRow(row: SnaptradeConnectionRow): BrokerageConnection {
+  return {
+    id: row.id,
+    brokerageName: row.brokerage_name,
+    authorizationId: row.authorization_id,
+    connectedAt: row.connected_at,
   }
 }
 

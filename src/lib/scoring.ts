@@ -50,6 +50,24 @@ export function positionWeightPct(holding: Holding, totalValue: number): number 
   return (holdingMarketValue(holding) / totalValue) * 100
 }
 
+/** Today's dollar gain/loss for the position, from the last "Refresh prices" run. */
+export function holdingDayChange(h: Holding): number | undefined {
+  if (h.dayChangeValue == null) return undefined
+  return h.shares * h.dayChangeValue
+}
+
+/** Total unrealized gain/loss ($) since cost basis. Undefined if either input is missing. */
+export function holdingTotalGainLoss(h: Holding): number | undefined {
+  if (h.lastPrice == null || h.costBasis == null) return undefined
+  return (h.lastPrice - h.costBasis) * h.shares
+}
+
+/** Total unrealized gain/loss (%) since cost basis. Undefined if either input is missing/zero. */
+export function holdingTotalGainLossPct(h: Holding): number | undefined {
+  if (h.lastPrice == null || h.costBasis == null || h.costBasis === 0) return undefined
+  return ((h.lastPrice - h.costBasis) / h.costBasis) * 100
+}
+
 function recencyBoost(eventDate: string, today = startOfDay(new Date())): number {
   const days = differenceInCalendarDays(parseISO(eventDate), today)
   if (days < 0) return 0
@@ -143,9 +161,25 @@ export function scoreAndFilterEvents(
     )
   }
 
-  return scored.sort((a, b) => {
+  return sortEventsByImpact(scored)
+}
+
+export function sortEventsByImpact<T extends { eventDate: string; impactScore: number }>(
+  events: T[],
+): T[] {
+  return [...events].sort((a, b) => {
     if (b.impactScore !== a.impactScore) return b.impactScore - a.impactScore
     return a.eventDate.localeCompare(b.eventDate)
+  })
+}
+
+/** Chronological, nearest first; ties broken by impact so the more material event leads. */
+export function sortEventsByDate<T extends { eventDate: string; impactScore: number }>(
+  events: T[],
+): T[] {
+  return [...events].sort((a, b) => {
+    if (a.eventDate !== b.eventDate) return a.eventDate.localeCompare(b.eventDate)
+    return b.impactScore - a.impactScore
   })
 }
 

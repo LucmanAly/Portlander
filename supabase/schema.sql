@@ -13,6 +13,11 @@ create table if not exists public.holdings (
   weight_override_pct numeric,
   tags text[] default '{}',
   notes text,
+  -- 'snaptrade' rows are authoritative live-brokerage data; 'manual'/'csv' are
+  -- owner-entered fallbacks for tickers no connected brokerage covers.
+  source text not null default 'manual' check (source in ('manual', 'csv', 'snaptrade')),
+  day_change_value numeric,
+  day_change_pct numeric,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, ticker)
@@ -72,6 +77,28 @@ create index if not exists events_ticker_date_idx on public.events (ticker, even
 create index if not exists events_natural_lookup_idx
   on public.events (ticker, event_type, event_date);
 
+-- SnapTrade per-user secret. As sensitive as a password — RLS is enabled
+-- with zero client-facing policies, so only the service-role key (used
+-- exclusively inside Edge Functions) can ever read or write it.
+create table if not exists public.snaptrade_users (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  snaptrade_user_id text not null,
+  user_secret text not null,
+  created_at timestamptz not null default now()
+);
+
+-- SnapTrade connection metadata — safe for the client to read (no secrets),
+-- powers the "Connected: Fidelity" UI. Refreshed by snaptrade-sync on every
+-- run; only the service role writes to it.
+create table if not exists public.snaptrade_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  brokerage_name text not null,
+  authorization_id text not null,
+  connected_at timestamptz not null default now(),
+  unique (user_id, authorization_id)
+);
+
 -- Sync run log
 create table if not exists public.sync_runs (
   id uuid primary key default gen_random_uuid(),
@@ -89,6 +116,8 @@ alter table public.holdings enable row level security;
 alter table public.watchlist enable row level security;
 alter table public.events enable row level security;
 alter table public.sync_runs enable row level security;
+alter table public.snaptrade_users enable row level security;
+alter table public.snaptrade_connections enable row level security;
 
 create policy "holdings_select_own" on public.holdings
   for select using (auth.uid() = user_id);
@@ -121,6 +150,13 @@ create policy "events_delete_own" on public.events
 -- sync_runs: service role only in production; allow read for authenticated for now
 create policy "sync_runs_select_auth" on public.sync_runs
   for select to authenticated using (true);
+
+-- snaptrade_users: intentionally NO policies for `authenticated`/`anon` — RLS
+-- with zero permissive policies means only the service role (bypasses RLS)
+-- can touch this table. The client must never read the secret directly.
+
+create policy "snaptrade_connections_select_own" on public.snaptrade_connections
+  for select using (auth.uid() = user_id);
 
 -- Phase 2 reserved (do not use in Phase 1 UI unless exit criteria met)
 -- create table journal_entries (...);
