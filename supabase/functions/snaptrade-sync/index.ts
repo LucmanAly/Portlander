@@ -216,13 +216,20 @@ Deno.serve(async (req) => {
         ? (e as { toJSON: () => unknown }).toJSON()
         : e
     console.error('[snaptrade-sync] failed:', JSON.stringify(detail, null, 2))
+    // axios's e.message is generic and never includes SnapTrade's actual JSON
+    // rejection reason — surface responseBody directly, same as snaptrade-connect.
+    const responseBody =
+      e && typeof e === 'object' && 'responseBody' in e
+        ? (e as { responseBody: unknown }).responseBody
+        : undefined
+    const bodySuffix = responseBody ? ` — ${JSON.stringify(responseBody)}` : ''
     await finishRun(sb, runId, {
       status: 'error',
       tickers_count: 0,
       events_upserted: 0,
-      error: msg,
+      error: `${msg}${bodySuffix}`,
     })
-    return json({ error: `SnapTrade sync failed: ${msg}` }, 500)
+    return json({ error: `SnapTrade sync failed: ${msg}${bodySuffix}` }, 500)
   }
 })
 
