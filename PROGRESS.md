@@ -3,7 +3,7 @@
 **Last updated:** 2026-07-31  
 **Last agent:** claude-code  
 **Current phase:** Phase 1 — Foundation (cloud deploy underway) → Phase 1.5 SnapTrade scoping starting  
-**Phase 1 status:** 🟡 In progress — local app done; **owner now actively deploying cloud** (Netlify live, Supabase schema + Edge Function deployed, secret + cron pending)
+**Phase 1 status:** 🟡 In progress — local app done; **owner now actively deploying cloud** (Netlify live, Supabase schema + Edge Function + daily cron all live; `FINNHUB_API_KEY` secret still pending)
 
 > **Protocol:** Every agent must read `AGENTS.md` + this file before work, and update this file after work (session log + next up) without being asked.
 
@@ -24,7 +24,7 @@
 | **Supabase schema applied** | ✅ Done | `holdings`/`watchlist`/`events`/`sync_runs` live, RLS on all 4, 0 security advisories |
 | **Netlify production deploy** | ✅ Live | `https://portlander.netlify.app` — Git-linked to `main`, confirmed working by owner |
 | `FINNHUB_API_KEY` Edge secret | ⏳ Owner action | Owner has the key; needs to paste into Supabase Dashboard → Project Settings → Edge Functions → Secrets |
-| Daily cron for sync-events | ⏳ Owner action | Owner couldn't find "Schedules" tab under the function page as this file's README suggested — likely needs Database → Cron Jobs (`pg_cron`) instead; unresolved when session ended |
+| Daily cron for sync-events | ✅ Done | `pg_cron` job `daily-sync-events` (jobid 1) live, runs `0 11 * * *` UTC, calls `net.http_post` against the Edge Function with the anon key as bearer auth. Set directly via `execute_sql`/`apply_migration` through the Supabase MCP connector — the dashboard "Schedules" tab this file used to point to doesn't exist; `Database → Cron Jobs` UI was never actually used either, SQL was more reliable. See session 6 log. |
 | Phase 1 exit criteria / dogfood | ⏳ Next | Real portfolio imported and app confirmed working; formal sign-off not yet marked |
 | **SnapTrade (Fidelity) integration** | 🆕 New scope, not started | Owner wants live read-only Fidelity holdings via SnapTrade. Not in original AGENTS.md stack. See Decisions + Session log below. |
 
@@ -46,7 +46,7 @@
 - [x] Supabase schema applied to project `vvstmdnnpjnfvueoecwl`
 - [x] `sync-events` Edge Function deployed
 - [ ] `FINNHUB_API_KEY` secret set on the Edge Function (owner has the key, hasn't pasted it in yet)
-- [ ] Daily cron wired up to invoke `sync-events` (blocked — see Blockers)
+- [x] Daily cron wired up to invoke `sync-events` (`pg_cron` + `pg_net`, `0 11 * * *` UTC — see Decisions/session 6)
 - [ ] Owner signs in via magic link on the live site once cron/secret are done — note: local holdings do **not** auto-migrate to Supabase on first sign-in, owner will need to re-import CSV once signed in (see `PortfolioContext.tsx` boot logic)
 
 ### Not started / owner
@@ -72,9 +72,9 @@
 
 ## Next up (ordered)
 
-1. **Owner:** set `FINNHUB_API_KEY` as an Edge Function secret in the Supabase dashboard (Project Settings → Edge Functions → Secrets) — key already obtained.
-2. **Owner + agent:** resolve where to actually configure the daily cron — likely Database → Cron Jobs (`pg_cron`) rather than a per-function "Schedules" tab; try setting it directly via SQL (`cron.schedule` + `net.http_post`) through the Supabase MCP connector next time it's connected, rather than dashboard-hunting further.
-3. **Owner:** sign in via magic link on the live Netlify site once cron is confirmed working; re-import holdings CSV post-sign-in (local→cloud doesn't auto-migrate).
+1. **Owner:** set `FINNHUB_API_KEY` as an Edge Function secret in the Supabase dashboard (Project Settings → Edge Functions → Secrets) — key already obtained. This is now the **only** remaining blocker before the cron actually produces fresh data (the cron itself is live and will call the function on schedule regardless, it'll just fail/no-op server-side until the secret is set).
+2. **Owner (optional):** the daily cron currently runs at `0 11 * * *` UTC (chosen arbitrarily as "a reasonable morning" — see Decisions). Adjust to taste with `select cron.alter_job(1, schedule => '<new cron expr>');` via the Supabase SQL editor or MCP `execute_sql` once a preferred local time is known.
+3. **Owner:** sign in via magic link on the live Netlify site once the secret is set; re-import holdings CSV post-sign-in (local→cloud doesn't auto-migrate).
 4. Mark Phase 1 exit criteria formally once the above is confirmed working end-to-end on the live site.
 5. **Owner:** retry getting the SnapTrade app-level `clientId`/`consumerKey` from a desktop browser (mobile UI was unusable).
 6. Once SnapTrade keys are in hand: scope and build the actual integration (new Edge Function, new table, UI) — this is new work, not in the original Phase 1/2/3 plan in `AGENTS.md`.
@@ -86,8 +86,9 @@
 
 | Blocker | Impact | Resolution |
 |---------|--------|------------|
-| Can't find Supabase "Schedules" tab under Edge Functions → sync-events | Daily sync cron not yet configured | Likely under Database → Cron Jobs (`pg_cron`) instead — unverified live; try via Supabase MCP `execute_sql` next session |
-| Supabase/Netlify MCP connectors intermittently disconnect mid-session | Can't always verify/act live | Ambient session issue, not project-side; retry when reconnected |
+| ~~Can't find Supabase "Schedules" tab under Edge Functions → sync-events~~ | ~~Daily sync cron not yet configured~~ | **Resolved 2026-07-31 (session 6):** the dashboard tab doesn't exist; cron configured directly via SQL (`pg_cron` + `pg_net`) through the Supabase MCP connector instead. See Decisions/session log. |
+| `FINNHUB_API_KEY` not yet set as an Edge Function secret | Cron will invoke `sync-events` on schedule, but the function will fail (no Finnhub key) until owner pastes it into Project Settings → Edge Functions → Secrets — no MCP tool exposes secrets management, confirmed again this session, so this is owner-only | Owner action, see Next up #1 |
+| Supabase/Netlify/SnapTrade MCP connectors intermittently disconnect and reconnect (with new internal tool IDs) mid-session | Can't always verify/act live; happened again this session | Ambient session issue, not project-side; retry when reconnected |
 | SnapTrade app-level dev keys incomplete | Can't build the real integration yet | Owner has one of two keys; retry getting the other from a desktop browser, not mobile |
 
 ---
@@ -105,10 +106,58 @@
 | 2026-07-31 | **Cloud mode un-deferred** — owner explicitly requested Netlify + Supabase deployment | Owner has accounts for both, wants a real production deployment now, not just local dogfood. Supersedes the 2026-03-25 "cloud deferred" decision. |
 | 2026-07-31 | New `develop` branch created (mirrors `main` at merge of PR #1) | Owner has limited Netlify build minutes; Netlify's production branch is `main`, and pushing to `develop` triggers no build (branch deploys off by default). New workflow: push/review on `develop`, only merge to `main` when ready to actually ship, since that's the only push that costs a build. Agents should target PRs at `develop`, not `main`, going forward, unless told otherwise. |
 | 2026-07-31 | SnapTrade added as new planned scope (read-only Fidelity holdings sync) | Owner's explicit request, confirmed as read-only (not trading — stays consistent with `AGENTS.md`'s brokerage-trading non-goal). Not yet in `AGENTS.md`'s locked stack — should be added there once the integration is actually built, per the file's own rule about not changing stack silently. |
+| 2026-07-31 | Daily cron configured via `pg_cron` + `pg_net` (SQL), not a dashboard "Schedules" tab | The tab this file previously pointed to doesn't exist in the current Supabase dashboard — confirmed stale. `execute_sql`/`apply_migration` through the Supabase MCP connector applied it directly: enabled both extensions, then `cron.schedule('daily-sync-events', '0 11 * * *', ...)` wrapping `net.http_post` against the Edge Function URL with the anon key as `Authorization: Bearer`. Anon key was used (not service role) since `verify_jwt: true` only requires *a* valid Supabase-issued JWT, and the anon key is already public in the deployed frontend bundle — no new secret exposure. |
+| 2026-07-31 | Cron schedule set to `0 11 * * *` UTC (arbitrary default) | No owner timezone was on record; picked a plausible "morning somewhere in the US" slot rather than blocking on it. Owner should adjust via `cron.alter_job` once a preferred local time is confirmed — see Next up. |
 
 ---
 
 ## Session log
+
+### 2026-07-31 — claude-code (session 6)
+- **Context:** picked up the session 5 handoff. The one concrete unresolved item was the
+  daily cron for `sync-events` — session 5 suspected `Database → Cron Jobs` (`pg_cron`)
+  was the real mechanism (not the "Schedules" tab the function README pointed to) and
+  recommended trying it via the Supabase MCP connector directly if available this session.
+  It was available.
+- **Branch note:** this session's designated branch
+  (`claude/portlander-cloud-handoff-eqnr94`) had fallen behind `develop` (missing the
+  session-5 `PROGRESS.md` handoff commit `576ca3f`). Fast-forwarded it to `develop`'s tip
+  before starting so nothing from session 5 was lost.
+- **Cron — resolved.** Via the Supabase MCP connector against project `vvstmdnnpjnfvueoecwl`:
+  - `list_extensions` confirmed `pg_cron` and `pg_net` were available but not installed.
+  - `apply_migration` enabled both (`create extension if not exists pg_cron;` /
+    `pg_net;`).
+  - `apply_migration` scheduled the job:
+    `cron.schedule('daily-sync-events', '0 11 * * *', $$ select net.http_post(url :=
+    '.../functions/v1/sync-events', headers := ..., body := '{}'::jsonb) $$)`. The
+    Authorization header uses the project's legacy anon JWT (via `get_publishable_keys`) —
+    `verify_jwt: true` on the function just needs a valid Supabase-issued JWT, and the anon
+    key is already public in the shipped frontend, so this doesn't introduce a new secret.
+  - Verified via `execute_sql` against `cron.job`: job id 1, `daily-sync-events`, schedule
+    `0 11 * * *`, `active: true`.
+  - `get_advisors` (security) flagged one WARN after enabling `pg_net`: extension installed
+    in the `public` schema. Attempted `alter extension pg_net set schema extensions;` to
+    clean it up — **pg_net does not support `SET SCHEMA`** (Postgres error 0A000). Left as
+    is; this is a known/cosmetic lint for `pg_net` specifically on Supabase-managed
+    projects, not a real exposure, and not worth dropping/recreating the extension (which
+    would risk the cron job's dependency) to silence.
+  - **Not done, still owner-only:** the cron will fire on schedule but the function itself
+    will fail server-side until `FINNHUB_API_KEY` is pasted into Project Settings → Edge
+    Functions → Secrets — confirmed again this session that no tool on this MCP surface
+    exposes secrets management, so this genuinely can't be done by an agent.
+  - **Schedule time (`0 11 * * *` UTC) was picked arbitrarily** — no owner timezone was on
+    record and blocking on that felt worse than shipping a sane default. Owner can retune
+    with `select cron.alter_job(1, schedule => '<cron expr>');` at any time; documented in
+    Next up.
+- **MCP connector instability, again:** the Supabase (and Netlify/SnapTrade) connectors
+  disconnected and reconnected mid-session with new internal tool IDs, exactly as session 5
+  flagged. Didn't lose any in-progress work this time since the cron setup completed before
+  the reconnect.
+- **Files touched this session:** none in app code — this was all live Supabase
+  infrastructure (two `apply_migration` calls: extensions + cron schedule) plus this
+  `PROGRESS.md` update. No frontend/build changes, so no `npm run build`/`lint` needed.
+- **Owner:** cron is live and will start actually populating fresh data as soon as the
+  Finnhub secret is set (Next up #1). Everything else from session 5's list is unchanged.
 
 ### 2026-07-31 — claude-code (session 5)
 - **Context:** owner decided to move Portlander from local-only to a real cloud deployment
@@ -222,8 +271,9 @@
 
 1. **Cloud mode is now active** (owner explicitly requested it 2026-07-31 — the old "do
    not push cloud mode" guidance is superseded, see Decisions). Netlify + Supabase are both
-   live; Edge Function is deployed. What's left: `FINNHUB_API_KEY` secret + cron (owner
-   action / blocked, see Blockers), then owner sign-in + re-import CSV on the live site.
+   live; Edge Function is deployed; daily `pg_cron` job is live (session 6). What's left:
+   `FINNHUB_API_KEY` secret (owner action, genuinely can't be done via any available tool),
+   then owner sign-in + re-import CSV on the live site.
 2. **Branch workflow changed**: push/PR to `develop` (not `main`) for review; only merge
    `develop` → `main` when ready to actually trigger a Netlify production deploy — owner
    has limited build minutes. Ask before pushing directly to `main`.
