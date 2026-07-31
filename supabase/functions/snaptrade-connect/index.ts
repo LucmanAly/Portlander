@@ -19,7 +19,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
-import { Snaptrade } from 'npm:snaptrade-typescript-sdk@11'
+import { Snaptrade, SnaptradeAuth } from 'npm:snaptrade-typescript-sdk@11'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -42,6 +42,13 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
   if (!clientId || !consumerKey || !supabaseUrl || !anonKey || !serviceKey) {
+    console.error('[snaptrade-connect] missing secrets:', {
+      clientId: !!clientId,
+      consumerKey: !!consumerKey,
+      supabaseUrl: !!supabaseUrl,
+      anonKey: !!anonKey,
+      serviceKey: !!serviceKey,
+    })
     return json(
       {
         error: 'Missing secrets',
@@ -88,7 +95,9 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const snaptrade = new Snaptrade({ clientId, consumerKey })
+  const snaptrade = new Snaptrade({
+    auth: SnaptradeAuth.commercialApiKey({ clientId, consumerKey }),
+  })
 
   try {
     const { data: existing, error: fetchErr } = await sb
@@ -127,6 +136,14 @@ Deno.serve(async (req) => {
     return json({ ok: true, redirectUrl })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    // SnaptradeError (the SDK's own error class) carries responseBody/status/code —
+    // log the full detail server-side since the client only ever sees a generic
+    // "non-2xx status code" message, not this response body.
+    const detail =
+      e && typeof e === 'object' && 'toJSON' in e && typeof (e as { toJSON: unknown }).toJSON === 'function'
+        ? (e as { toJSON: () => unknown }).toJSON()
+        : e
+    console.error('[snaptrade-connect] failed:', JSON.stringify(detail, null, 2))
     return json({ error: `SnapTrade connect failed: ${msg}` }, 500)
   }
 })

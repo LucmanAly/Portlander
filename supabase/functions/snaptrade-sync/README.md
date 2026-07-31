@@ -2,8 +2,10 @@
 
 Pulls the calling user's live brokerage positions from SnapTrade into `public.holdings`.
 
-**Status:** implemented (`index.ts`), **not yet run against a real connected account** — needs
-the owner to connect a brokerage via `snaptrade-connect` first, then click "Sync now".
+**Status:** implemented (`index.ts`), fixed after `snaptrade-connect`'s first real click-test
+surfaced a client-construction bug shared by both functions (see below) — v2 redeployed. Still
+**not yet run against a real connected account** — needs the owner to connect a brokerage via
+`snaptrade-connect` first, then click "Sync now".
 
 ---
 
@@ -16,7 +18,8 @@ the owner to connect a brokerage via `snaptrade-connect` first, then click "Sync
    user_id,authorization_id`) — this is how the "Connected: Fidelity" UI metadata stays fresh,
    no separate write path needed.
 4. List accounts, fetch positions per account, aggregate **by ticker across all accounts**
-   (sum units → `shares`; cost-weighted average of `average_purchase_price` → `cost_basis`).
+   (sum units → `shares`; cost-weighted average of `cost_basis` — SnapTrade's per-share average
+   purchase price field — → our `cost_basis`).
 5. Upsert into `holdings` (`onConflict: user_id,ticker`) with `source = 'snaptrade'`. The upsert
    payload deliberately omits `last_price`/`day_change_value`/`day_change_pct` — Postgres
    `ON CONFLICT DO UPDATE` only touches columns present in the payload, so those stay exactly
@@ -57,13 +60,29 @@ supabase functions deploy snaptrade-sync
 await supabase.functions.invoke('snaptrade-sync', { method: 'POST' })
 ```
 
-## Implementation note — verify at deploy time
+## Implementation note
 
-Same caveat as `snaptrade-connect`: uses the official SDK via `npm:snaptrade-typescript-sdk`,
-method names (`connections.listBrokerageAuthorizations`, `accountInformation.listUserAccounts`,
-`accountInformation.getAllAccountPositions`) matched against the resource-grouped structure
-observed directly from a SnapTrade MCP connector available earlier in this project's session
-history, not just documentation. The position-field extraction (`extractPosition` in `index.ts`)
-is written defensively against a couple of known possible field shapes, since SnapTrade's
-position schema varies by instrument kind — if a real sync doesn't populate holdings correctly,
-start there.
+Uses the official SDK via `npm:snaptrade-typescript-sdk`. All method names, request-parameter
+shapes, and response field names were confirmed by downloading the real
+`snaptrade-typescript-sdk@11.0.4` tarball and reading its `.d.ts`/`.mjs` source directly.
+
+### Fixed after first real click-test (v2)
+
+Same client-construction bug as `snaptrade-connect` (see that README) — fixed here too. Three
+more real bugs were caught in the same pass, all confirmed against the real SDK types:
+
+1. **`auth.brokerage?.displayName`** (camelCase) doesn't exist on the wire — the real field is
+   `display_name` (snake_case). Fixed.
+2. **`extractPosition()` read `p.average_purchase_price`** — that field doesn't exist on
+   `AccountPosition` at all. The real per-share cost field is `cost_basis` (a numeric string).
+   Fixed, and the ticker/name extraction was simplified: `instrument.symbol` and
+   `instrument.description` are flat fields on the instrument object for stock/etf/cef/adr/
+   mutualfund kinds — no nested unwrapping needed, unlike what was originally guessed.
+3. **`getAllAccountPositions` does not return a plain array.** It returns
+   `{ results: AccountPosition[], data_freshness }`. The code was iterating `posRes.data`
+   directly — this would have silently produced zero parsed positions on every sync (caught by
+   the per-account `try/catch`, not a hard failure, so it would never have surfaced as an error —
+   holdings just would never have synced). Fixed to `posRes.data.results`.
+
+`extractPosition()` still intentionally skips instrument kinds without a flat string `symbol`
+(options, crypto, futures) rather than mis-parsing them — out of scope for v1.
