@@ -1,4 +1,4 @@
-import { format, parseISO, isToday, isTomorrow, differenceInCalendarDays } from 'date-fns'
+import { format, parseISO, isToday, isTomorrow } from 'date-fns'
 
 export function formatMoney(n: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -14,11 +14,9 @@ export function formatPct(n: number, digits = 1): string {
 
 export function formatEventDay(isoDate: string): string {
   const d = parseISO(isoDate)
-  if (isToday(d)) return 'Today'
-  if (isTomorrow(d)) return 'Tomorrow'
-  const days = differenceInCalendarDays(d, new Date())
-  if (days > 0 && days < 7) return format(d, 'EEEE')
-  return format(d, 'MMM d')
+  if (isToday(d)) return `Today · ${format(d, 'EEE, MMM d')}`
+  if (isTomorrow(d)) return `Tomorrow · ${format(d, 'EEE, MMM d')}`
+  return format(d, 'EEEE, MMMM d')
 }
 
 export function formatFullDate(isoDate: string): string {
@@ -29,4 +27,16 @@ export function formatRelativeSync(iso: string | null): string {
   if (!iso) return 'Never synced'
   const d = new Date(iso)
   return `Synced ${format(d, 'MMM d · HH:mm')}`
+}
+
+/** Compact ticking caption for the manual price-refresh button. */
+export function formatRelativeShort(iso: string | null): string {
+  if (!iso) return 'Not refreshed yet'
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.round(diffMs / 60000)
+  if (mins < 1) return 'Updated just now'
+  if (mins < 60) return `Updated ${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `Updated ${hours}h ago`
+  return `Updated ${format(new Date(iso), 'MMM d')}`
 }

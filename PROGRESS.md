@@ -1,96 +1,89 @@
 # PROGRESS.md — Portlander live status
 
-**Last updated:** 2026-07-31  
-**Last agent:** claude-code  
-**Current phase:** Phase 1 — Foundation (cloud deploy underway) → Phase 1.5 SnapTrade scoping starting  
-**Phase 1 status:** 🟢 Cloud deploy essentially complete — Netlify live, Supabase schema + Edge Function + daily cron all live, `FINNHUB_API_KEY` set, owner signed in and real portfolio synced with real Finnhub data confirmed end-to-end. Only formal Phase 1 exit sign-off left.
+**Last updated:** 2026-07-31
+**Last agent:** claude-code
+**Current phase:** Phase 1 — Foundation, cloud deploy complete → Phase 1.5 SnapTrade scoping
+**Phase 1 status:** 🟢 Cloud deploy live and verified end-to-end. UI fixes + a new manual "Refresh prices" feature are built but **unmerged** — in **PR #4**, not PR #3 (see PR state below). Only formal Phase 1 exit sign-off left.
 
-> **Protocol:** Every agent must read `AGENTS.md` + this file before work, and update this file after work (session log + next up) without being asked.
+> **Protocol:** Every agent must read `AGENTS.md` + this file before work, and update this file after work without being asked. See `AGENTS.md`'s "Keep PROGRESS.md lean" section — this file was rewritten 2026-07-31 to cut session-log bloat; keep it that way.
 
 ---
 
 ## Snapshot
 
+Single source of truth for current state. If it's here, don't re-explain it elsewhere in this file.
+
 | Area | Status | Notes |
 |------|--------|-------|
-| Agent protocol | ✅ Done | AGENTS.md + PROGRESS.md |
-| UI shell + Today/Calendar/Portfolio | ✅ Done | Premium dark local app |
-| Local holdings + CSV | ✅ Done | localStorage |
-| Impact score v0 + exposure strip | ✅ Done | |
-| Supabase client (optional) | ✅ Done | **Cloud mode now active by owner request** (was deferred, see 2026-07-31 decision) |
-| **Local Finnhub sync** `npm run sync:events` | ✅ Done | Writes `public/data/events-sync.json` |
-| **App merge of sync file** | ✅ Done | Boot + Settings Reload |
-| **Edge Function sync-events** | ✅ Deployed | Live on Supabase project `vvstmdnnpjnfvueoecwl` (`ref` = project id), `verify_jwt: true` |
-| **Supabase schema applied** | ✅ Done | `holdings`/`watchlist`/`events`/`sync_runs` live, RLS on all 4, 0 security advisories |
-| **Netlify production deploy** | ✅ Live | `https://portlander.netlify.app` — Git-linked to `main`, confirmed working by owner |
-| `FINNHUB_API_KEY` Edge secret | ✅ Done | Owner pasted it into Supabase Dashboard → Project Settings → Edge Functions → Secrets. Confirmed working: a manual sync trigger reached Finnhub and returned real data, not the "Missing secrets" 500 the function returns when unset. |
-| Daily cron for sync-events | ✅ Done | `pg_cron` job `daily-sync-events` (jobid 1) live, runs `0 11 * * *` UTC, calls `net.http_post` against the Edge Function with the anon key as bearer auth, `timeout_milliseconds := 60000` (bumped from the 5s default — see session 6 log). Set directly via `execute_sql`/`apply_migration` through the Supabase MCP connector — the dashboard "Schedules" tab this file used to point to doesn't exist; `Database → Cron Jobs` UI was never actually used either, SQL was more reliable. |
-| Owner sign-in + real sync | ✅ Done | Owner signed in via magic link (after fixing a Supabase Auth Site URL misconfiguration — see session 6 log), re-imported CSV (40 holdings), and a manually-triggered sync confirmed 34 real Finnhub earnings events landed in `events` with correct `confirmed`/`estimated` status and real dates. |
-| Phase 1 exit criteria / dogfood | 🟡 Nearly there | Real portfolio imported, real Finnhub data confirmed live end-to-end; formal sign-off not yet marked (see Phase 1 exit criteria checklist) |
-| **SnapTrade (Fidelity) integration** | 🆕 New scope, not started | Owner wants live read-only Fidelity holdings via SnapTrade. Not in original AGENTS.md stack. See Decisions + Session log below. |
+| Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings |
+| Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`, RLS on all 4) applied, 0 security advisories |
+| Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main`. Owner is on limited build minutes — see Decisions for the `develop` workflow |
+| `sync-events` Edge Function | ✅ Live | Global/unscoped (writes shared `events` rows), `verify_jwt: true`, `FINNHUB_API_KEY` set and confirmed working |
+| Daily cron | ✅ Live | `pg_cron` job `daily-sync-events`, `0 11 * * *` UTC, 60s `pg_net` timeout. Owner can retune the time via `select cron.alter_job(1, schedule => '<expr>');` |
+| Owner sign-in + real sync | ✅ Confirmed | Magic-link auth works (after an Auth Site URL fix), 40 real holdings imported, 34 real Finnhub earnings events confirmed live in `events` |
+| `refresh-quotes` Edge Function | ✅ Deployed | First **user-scoped** function in the project — see Decisions. Powers a new manual "Refresh prices" UI control. Auth boundary verified (anon-key-only request correctly 401s); full authenticated click-through still needs the owner's own test |
+| Calendar/Today UI fixes | ✅ Built | Sort toggle, full date labels, ticker-truncation bug, BMO/AMC coloring, 30-day agenda bug — all fixed, see PR #4 |
+| SnapTrade integration | 🟡 Keys obtained, nothing built | Owner has `clientId`/`consumerKey`, not yet stored as Edge secrets. New table + 2 Edge Functions + UI + a holdings-merge decision all still needed |
+| Phase 1 exit criteria | 🟡 2 of 5 met | See checklist below |
+
+### PR state (check before trusting any PR number in this file)
+
+- PR #1, #2: merged.
+- **PR #3: merged early** by the owner, right after opening — only captured the first of five commits on the branch (the cloud-sync-confirmed writeup).
+- **PR #4** (same branch `claude/portlander-cloud-handoff-eqnr94` → `develop`): carries the four commits PR #3 missed — UI fixes, Finnhub research docs, the `refresh-quotes` feature. **Currently open, unmerged.** This is the one to review.
 
 ---
 
 ## Phase 1 checklist
 
-### Completed
-- [x] Scaffold, UI, scoring, local data, agent docs
-- [x] Supabase client + mappers + repository (optional; cloud deferred)
-- [x] Edge Function implementation (Finnhub → events + sync_runs)
-- [x] Local `scripts/sync-events.mjs` + `npm run sync:events`
-- [x] App loads/merges `/data/events-sync.json` without cloud
-- [x] Settings docs for local sync path
-- [x] Build passes
-
-### Cloud deploy (active now — was deferred, owner requested it)
-- [x] Netlify site live, Git-linked to `main`, `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` env vars set
-- [x] Supabase schema applied to project `vvstmdnnpjnfvueoecwl`
-- [x] `sync-events` Edge Function deployed
-- [x] `FINNHUB_API_KEY` secret set on the Edge Function
-- [x] Daily cron wired up to invoke `sync-events` (`pg_cron` + `pg_net`, `0 11 * * *` UTC, 60s timeout — see Decisions/session 6)
-- [x] Owner signs in via magic link on the live site — hit and fixed a Supabase Auth Site URL misconfig along the way (was still default `localhost:3000`, see session 6); re-imported CSV post-sign-in (40 holdings landed in Supabase)
-
-### Not started / owner
-- [x] Finnhub API key obtained + first real `npm run sync:events` (done earlier this session)
-- [x] Real portfolio CSV dogfood (done)
-- [x] Cloud sync end-to-end confirmed with real data (34 events, real dates/status — session 6)
-- [ ] Phase 1 exit criteria sign-off (functionally complete, not formally marked)
-
-### SnapTrade (new, not in original scope — see Decisions)
-- [ ] Owner to get app-level SnapTrade `clientId` + `consumerKey` from SnapTrade's developer dashboard (attempted on mobile, UI was unusable — retry on desktop)
-- [ ] Build new Edge Function for the Fidelity connection-portal + webhook flow
-- [ ] New Supabase table for linked SnapTrade accounts/tokens, RLS-scoped by `user_id`
-- [ ] Decide how synced SnapTrade positions map into `holdings`
-- Note: a **personal** SnapTrade MCP connector was available in-session with the owner's real Fidelity account already linked (2 accounts, live balances) — this is scoped to chat access only and is **not** reusable as the app's credentials; the app-level integration above is still fully unbuilt
+- [x] Scaffold, UI, scoring, local data, agent docs, build passes
+- [x] Cloud deploy: Netlify + Supabase schema + `sync-events` + secret + daily cron, all live
+- [x] Owner signed in, real CSV imported, real Finnhub sync confirmed (34 events)
+- [x] Calendar/Today UI fixes built (PR #4, unmerged)
+- [x] Manual "Refresh prices" feature built (PR #4, unmerged)
+- [ ] PR #4 merged and confirmed live by owner
+- [ ] Phase 1 exit criteria formally signed off (see below)
 
 ### Phase 1 exit criteria
-- [x] Real portfolio loadable (40 real holdings imported into cloud Supabase, confirmed via DB query — session 6)
-- [x] Earnings from Finnhub (via sync file or Edge) not only demo offsets (34 real events with real dates/status confirmed live in `events` — session 6)
-- [ ] Weight ranking + exposure % sanity (not verified this session — was DB/infra work only, no UI walkthrough done)
-- [ ] Snappy UI (not verified this session)
-- [ ] Used on a real morning once (owner to confirm after a real daily cron run)
+- [x] Real portfolio loadable
+- [x] Earnings from Finnhub, not only demo offsets
+- [ ] Weight ranking + exposure % sanity (math unchanged, not yet formally owner-verified)
+- [ ] Snappy UI (fixes are built, awaiting owner confirmation on live site post-merge)
+- [ ] Used on a real morning once
+
+### SnapTrade (new scope, not in original `AGENTS.md` plan)
+- [x] Owner obtained app-level `clientId` + `consumerKey`
+- [ ] Store as Supabase Edge secrets `SNAPTRADE_CLIENT_ID` / `SNAPTRADE_CONSUMER_KEY` (owner action — no MCP tool can do this)
+- [ ] New `snaptrade_connections` table (RLS-locked, service-role-write-only — stores SnapTrade's per-user `userSecret`, as sensitive as a password)
+- [ ] New Edge Function: register user + generate Connection Portal link
+- [ ] New Edge Function: pull holdings once connected
+- [ ] "Connect Fidelity" UI (likely Settings)
+- [ ] Decide how synced positions map into `holdings` (overwrite vs. `source`-tagged coexistence with manual/CSV holdings)
+
+Note: a **personal** SnapTrade MCP connector has appeared in some sessions with the owner's real Fidelity account already linked — that's chat-scoped only, not reusable as the app's own credentials. Verified real API flow (SnapTrade's docs, not memory): `registerUser` → `userSecret`, then `loginSnapTradeUser` → a 5-minute Connection Portal URL. This integration is bigger/higher-stakes than `refresh-quotes` (external OAuth-like flow, a second per-user secret, a real holdings-merge decision) — plan it with the same rigor before writing code.
 
 ---
 
 ## Next up (ordered)
 
-1. **Owner (optional):** the daily cron currently runs at `0 11 * * *` UTC (chosen arbitrarily as "a reasonable morning" — see Decisions). Adjust to taste with `select cron.alter_job(1, schedule => '<new cron expr>');` via the Supabase SQL editor or MCP `execute_sql` once a preferred local time is known.
-2. Mark Phase 1 exit criteria formally — functionally everything is confirmed working end-to-end on the live site now (real sign-in, real CSV import, real Finnhub sync all verified same-session); this is just the formal checkbox in the Phase 1 exit criteria section below.
-3. **Owner:** retry getting the SnapTrade app-level `clientId`/`consumerKey` from a desktop browser (mobile UI was unusable).
-4. Once SnapTrade keys are in hand: scope and build the actual integration (new Edge Function, new table, UI) — this is new work, not in the original Phase 1/2/3 plan in `AGENTS.md`.
-5. Phase 1 exit criteria → then Phase 2 (prep cards, journal, alerts) — SnapTrade work above is separate from and can proceed in parallel with this.
+1. **Owner:** review and merge **PR #4** (not #3), then `develop` → `main` when ready to spend a Netlify build.
+2. **Owner:** click-test "Refresh prices" live while signed in — confirm a holding's price updates. Not verified from the agent sandbox (no real user session available; deliberately didn't try to mint one).
+3. **Owner:** paste SnapTrade keys into Supabase secrets (names above).
+4. **Owner (optional):** retune the `11:00 UTC` cron time to your actual timezone.
+5. **Owner (still unaddressed since session 5):** check Netlify → Site configuration → Build & deploy → Deploy contexts — Deploy Previews for PRs may be consuming build minutes separately from `main` pushes, worth confirming given the limited-minutes plan.
+6. Mark Phase 1 exit criteria formally once #1-2 are confirmed.
+7. Once SnapTrade secrets are stored: scope and build the integration (see checklist above).
+8. Phase 2 (prep cards, journal, alerts) — separate from SnapTrade work, can proceed in parallel once Phase 1 is signed off.
+
+**Open discussion, not a task yet:** Finnhub rate-limit strategy for adding PE ratio/market cap later. Verified (not memory): 60 calls/min free-tier limit, no daily cap; the earnings-calendar endpoint has a bulk mode (omit `symbol`, get all companies in one call); PE/market cap are price-derived and should refresh 2-3x/day, not weekly (corrected an earlier wrong suggestion); Netlify/Supabase costs are a non-issue at this scale — Finnhub's per-minute limit is the only real constraint. Proposed shape if built: daily bulk earnings call + a 2-3x/day PE/market-cap sync paced ~1.1s/ticker. **Owner hasn't decided whether to build this yet.**
+
+**Advisory, not a task:** owner asked for an opinion on page architecture as the app scales into Phase 2/3. Recommendation: dedicated pages for major new concerns (journal, daily briefing, risk radar), but keep single-item detail (a prep card, notes on one holding) as inline/modal content rather than a new page per item.
 
 ---
 
 ## Blockers
 
-| Blocker | Impact | Resolution |
-|---------|--------|------------|
-| ~~Can't find Supabase "Schedules" tab under Edge Functions → sync-events~~ | ~~Daily sync cron not yet configured~~ | **Resolved 2026-07-31 (session 6):** the dashboard tab doesn't exist; cron configured directly via SQL (`pg_cron` + `pg_net`) through the Supabase MCP connector instead. See Decisions/session log. |
-| ~~`FINNHUB_API_KEY` not yet set as an Edge Function secret~~ | ~~Cron would invoke `sync-events` but the function would fail~~ | **Resolved 2026-07-31 (session 6):** owner set it; confirmed working via manual trigger (real Finnhub data returned, not the "Missing secrets" error). |
-| ~~Supabase Auth "Site URL" was default `http://localhost:3000`~~ | ~~Magic-link emails redirected to a dead `localhost:3000` link instead of the live site~~ | **Resolved 2026-07-31 (session 6):** owner updated Site URL + Redirect URLs in Supabase Dashboard → Authentication → URL Configuration to `https://portlander.netlify.app`. Not fixable via any available MCP tool (no Auth-config tool exists) — owner-only dashboard setting. |
-| Supabase/Netlify/SnapTrade MCP connectors intermittently disconnect and reconnect (with new internal tool IDs) mid-session | Can't always verify/act live; happened repeatedly again this session | Ambient session issue, not project-side; retry when reconnected |
-| SnapTrade app-level dev keys incomplete | Can't build the real integration yet | Owner has one of two keys; retry getting the other from a desktop browser, not mobile |
+None currently active. (Resolved blockers are deleted, not kept — see `AGENTS.md`'s lean-file protocol. Ambient MCP-connector disconnects/reconnects are not a project blocker, just expect them.)
 
 ---
 
@@ -98,235 +91,50 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-03-25 | Cloud mode deferred | Owner request — focus local dogfood |
-| 2026-03-25 | Dual sync paths: local script + Edge Function | Local now; cloud later without rewrite |
-| 2026-03-25 | Deterministic event UUIDs | Stable upserts by id |
-| 2026-03-25 | Browser never calls Finnhub | Key stays in env / Edge secrets only |
-| 2026-03-25 | `events-sync.json` gitignored | Generated artifact |
-| 2026-07-31 | `mergeEvents` dedups by ticker, not ticker+date, when purging stale demo/local earnings | Demo seed dates are arbitrary "today+N" offsets that (almost) never equal the real Finnhub calendar date, so the old ticker+date match silently never fired — owner ran a real sync and still saw wrong dates because stale demo entries kept coexisting with real ones. Ticker-level purge (still source-gated: only non-Finnhub entries are dropped, existing Finnhub-sourced entries are left alone) fixes it without touching historical Finnhub data. |
-| 2026-07-31 | **Cloud mode un-deferred** — owner explicitly requested Netlify + Supabase deployment | Owner has accounts for both, wants a real production deployment now, not just local dogfood. Supersedes the 2026-03-25 "cloud deferred" decision. |
-| 2026-07-31 | New `develop` branch created (mirrors `main` at merge of PR #1) | Owner has limited Netlify build minutes; Netlify's production branch is `main`, and pushing to `develop` triggers no build (branch deploys off by default). New workflow: push/review on `develop`, only merge to `main` when ready to actually ship, since that's the only push that costs a build. Agents should target PRs at `develop`, not `main`, going forward, unless told otherwise. |
-| 2026-07-31 | SnapTrade added as new planned scope (read-only Fidelity holdings sync) | Owner's explicit request, confirmed as read-only (not trading — stays consistent with `AGENTS.md`'s brokerage-trading non-goal). Not yet in `AGENTS.md`'s locked stack — should be added there once the integration is actually built, per the file's own rule about not changing stack silently. |
-| 2026-07-31 | Daily cron configured via `pg_cron` + `pg_net` (SQL), not a dashboard "Schedules" tab | The tab this file previously pointed to doesn't exist in the current Supabase dashboard — confirmed stale. `execute_sql`/`apply_migration` through the Supabase MCP connector applied it directly: enabled both extensions, then `cron.schedule('daily-sync-events', '0 11 * * *', ...)` wrapping `net.http_post` against the Edge Function URL with the anon key as `Authorization: Bearer`. Anon key was used (not service role) since `verify_jwt: true` only requires *a* valid Supabase-issued JWT, and the anon key is already public in the deployed frontend bundle — no new secret exposure. |
-| 2026-07-31 | Cron schedule set to `0 11 * * *` UTC (arbitrary default) | No owner timezone was on record; picked a plausible "morning somewhere in the US" slot rather than blocking on it. Owner should adjust via `cron.alter_job` once a preferred local time is confirmed — see Next up. |
-| 2026-07-31 | Cron job's `net.http_post` given `timeout_milliseconds := 60000` (up from `pg_net`'s 5000ms default) | A real 40-ticker sync took ~16s server-side (sequential per-ticker Finnhub calls with a 200ms pacing delay each), which blew past the 5s default and made `pg_net` log a client-side timeout even though the Edge Function ran to full completion regardless (confirmed via `sync_runs.finished_at`). 60s gives headroom as the holdings list grows and makes `pg_net`'s logged response accurate instead of a misleading timeout. |
+| 2026-03-25 | Dual sync paths (local script + Edge Function); deterministic event UUIDs; browser never calls Finnhub; `events-sync.json` gitignored | Local dogfood now, cloud later without rewrite; stable upserts; API keys stay server-side; generated artifact shouldn't be committed |
+| 2026-07-31 | `mergeEvents` dedups stale demo/local earnings by ticker, not ticker+date | Demo seed dates are arbitrary offsets that never matched real Finnhub dates, so stale placeholders kept coexisting with real data. Ticker-level purge (Finnhub-sourced rows never purged by this path) fixed it. Known gap: doesn't handle a real earnings date getting *rescheduled* between two Finnhub syncs — would need date-aware purging of future/estimated rows if that shows up in practice. |
+| 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Owner requested real deployment. Netlify's production branch is `main`; pushing to `develop` costs no build minutes (owner is on a limited plan), so PRs target `develop` and only merge to `main` when ready to actually ship. |
+| 2026-07-31 | SnapTrade added as new scope (read-only Fidelity sync) | Owner's explicit request, read-only only (no trading — consistent with `AGENTS.md`'s brokerage non-goal). Not yet added to `AGENTS.md`'s locked stack — do that once actually built. |
+| 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The "Schedules" tab this file used to reference doesn't exist in the current dashboard. Configured directly via `execute_sql`/`apply_migration`. Timeout bumped from `pg_net`'s 5s default because a real 40-ticker sync takes ~16s server-side and was logging a misleading client-side timeout even though the function completed fine. `pg_net`'s public-schema security lint is a known cosmetic issue for that extension (doesn't support `ALTER EXTENSION ... SET SCHEMA`) — left as-is. |
+| 2026-07-31 | Added `refresh-quotes`, the project's first **user-scoped** Edge Function | Owner wanted a persistent, click-only "Refresh prices" control (never auto-fires on page load) for live `holdings.last_price`, fully decoupled from the daily earnings cron. Unlike `sync-events` (deliberately global — writes shared rows, safe for any authenticated caller), this does privileged per-user writes: resolves the caller's `user_id` from their JWT (anon-key client's `.auth.getUser()`), then a service-role client scoped to just that user — never iterates all users. Writes via partial `.update({last_price, updated_at})`, never a full-row upsert, so other holding fields are untouched. `verify_jwt: true` is mandatory here (tolerable either way on `sync-events`). Reuses `sync_runs` columns (`provider='finnhub-quotes'`) rather than a migration. |
+| 2026-07-31 | Gated (signed-out/local-mode) UI states stay clickable-but-muted, not hard `disabled` | A true `disabled` button has no tap affordance for a `title` tooltip on mobile — muted-but-clickable keeps the explanation reachable everywhere. `disabled` is reserved for genuine in-flight state, to block double-click spam. |
 
 ---
 
 ## Session log
 
+Keep entries short — a few bullets, key files, pointer to the PR/commit for full detail. Don't re-narrate git history here.
+
 ### 2026-07-31 — claude-code (session 6)
-- **Context:** picked up the session 5 handoff. The one concrete unresolved item was the
-  daily cron for `sync-events` — session 5 suspected `Database → Cron Jobs` (`pg_cron`)
-  was the real mechanism (not the "Schedules" tab the function README pointed to) and
-  recommended trying it via the Supabase MCP connector directly if available this session.
-  It was available.
-- **Branch note:** this session's designated branch
-  (`claude/portlander-cloud-handoff-eqnr94`) had fallen behind `develop` (missing the
-  session-5 `PROGRESS.md` handoff commit `576ca3f`). Fast-forwarded it to `develop`'s tip
-  before starting so nothing from session 5 was lost.
-- **Cron — resolved.** Via the Supabase MCP connector against project `vvstmdnnpjnfvueoecwl`:
-  - `list_extensions` confirmed `pg_cron` and `pg_net` were available but not installed.
-  - `apply_migration` enabled both (`create extension if not exists pg_cron;` /
-    `pg_net;`).
-  - `apply_migration` scheduled the job:
-    `cron.schedule('daily-sync-events', '0 11 * * *', $$ select net.http_post(url :=
-    '.../functions/v1/sync-events', headers := ..., body := '{}'::jsonb) $$)`. The
-    Authorization header uses the project's legacy anon JWT (via `get_publishable_keys`) —
-    `verify_jwt: true` on the function just needs a valid Supabase-issued JWT, and the anon
-    key is already public in the shipped frontend, so this doesn't introduce a new secret.
-  - Verified via `execute_sql` against `cron.job`: job id 1, `daily-sync-events`, schedule
-    `0 11 * * *`, `active: true`.
-  - `get_advisors` (security) flagged one WARN after enabling `pg_net`: extension installed
-    in the `public` schema. Attempted `alter extension pg_net set schema extensions;` to
-    clean it up — **pg_net does not support `SET SCHEMA`** (Postgres error 0A000). Left as
-    is; this is a known/cosmetic lint for `pg_net` specifically on Supabase-managed
-    projects, not a real exposure, and not worth dropping/recreating the extension (which
-    would risk the cron job's dependency) to silence.
-  - **Not done, still owner-only:** the cron will fire on schedule but the function itself
-    will fail server-side until `FINNHUB_API_KEY` is pasted into Project Settings → Edge
-    Functions → Secrets — confirmed again this session that no tool on this MCP surface
-    exposes secrets management, so this genuinely can't be done by an agent.
-  - **Schedule time (`0 11 * * *` UTC) was picked arbitrarily** — no owner timezone was on
-    record and blocking on that felt worse than shipping a sane default. Owner can retune
-    with `select cron.alter_job(1, schedule => '<cron expr>');` at any time; documented in
-    Next up.
-- **MCP connector instability, again:** the Supabase (and Netlify/SnapTrade) connectors
-  disconnected and reconnected mid-session with new internal tool IDs, exactly as session 5
-  flagged. Didn't lose any in-progress work this time since the cron setup completed before
-  the reconnect.
-- **Files touched this session:** none in app code — this was all live Supabase
-  infrastructure (two `apply_migration` calls: extensions + cron schedule) plus this
-  `PROGRESS.md` update. No frontend/build changes, so no `npm run build`/`lint` needed.
-- **Owner:** cron is live and will start actually populating fresh data as soon as the
-  Finnhub secret is set (Next up #1). Everything else from session 5's list is unchanged.
-- **Follow-up, same session — full cloud sync verified end-to-end:**
-  - Owner set `FINNHUB_API_KEY` in Project Settings → Edge Functions → Secrets. Verified
-    it took effect by manually triggering the function (`net.http_post` via `execute_sql`,
-    same call the cron uses) and confirming it did **not** return the function's
-    `{"error": "Missing secrets", ...}` 500 — it returned `200 {"ok": true, "tickers": 0,
-    "upserted": 0, "note": "No tickers"}` instead, i.e. it got past the secrets check.
-  - "No tickers" was correct at that point: `auth.users` had 0 rows — owner hadn't
-    actually completed magic-link sign-in yet, so the earlier CSV import had only ever
-    written to browser localStorage, not Supabase's `holdings`/`watchlist` tables (exactly
-    the caveat this file already had noted).
-  - Owner attempted magic-link sign-in and hit a dead end: the email link redirected to
-    `http://localhost:3000/#error=access_denied&error_code=otp_expired...`. Diagnosed via
-    Supabase's own docs (`search_docs`): the project's Auth **Site URL** was still the
-    default `http://localhost:3000`, and Supabase only honors `emailRedirectTo` requests
-    that match an allow-listed Redirect URL — otherwise it silently falls back to the
-    (broken, non-existent) default. **No MCP tool exposes Auth URL configuration** — this
-    is dashboard-only. Owner fixed it themselves: Authentication → URL Configuration → Site
-    URL set to `https://portlander.netlify.app`, same URL added to Redirect URLs.
-  - Owner then successfully signed in and re-imported their CSV (40 holdings landed in
-    Supabase — confirmed via `execute_sql`). A second manual trigger of `sync-events`
-    processed all 40 tickers: **34 events upserted**, `status: partial` with one
-    expected/benign failure — `SPAXX` (a money-market/cash position, not a stock) got a
-    Finnhub 403, which is correct behavior since Finnhub's earnings calendar doesn't cover
-    mutual funds. Spot-checked `events` directly: real tickers, real dates in the
-    `2026-07-29`–`2026-08-06` range, correct `confirmed`/`estimated` split. This is genuine
-    live Finnhub data, not demo placeholders — full pipeline (Auth → holdings → Edge
-    Function → Finnhub → `events`) confirmed working.
-  - That same manual trigger surfaced a real (if minor) issue: `pg_net`'s default 5000ms
-    timeout is too short for a 40-ticker sync (~16s server-side, due to the function's
-    intentional 200ms per-ticker pacing plus real Finnhub latency) — the request timed out
-    client-side even though the Edge Function ran to full completion regardless (proven via
-    `sync_runs.finished_at` showing a clean completion). Fixed for the **cron job**
-    specifically via `cron.alter_job(1, command => ...)`, adding `timeout_milliseconds :=
-    60000` to its `net.http_post` call, so future scheduled runs get an accurate logged
-    response instead of a misleading timeout as the holdings list grows.
-  - **State as of end of session:** cloud deploy is functionally complete and verified
-    live end-to-end. Only the formal Phase 1 exit-criteria checkbox remains (see Phase 1
-    exit criteria section) — everything it requires has now actually been demonstrated
-    working.
+- Resolved the daily cron (`pg_cron`/`pg_net`), confirmed `FINNHUB_API_KEY` works, fixed a Supabase Auth Site URL misconfig blocking magic-link sign-in, and confirmed a real end-to-end sync (34 real Finnhub events). All infra-only, no `src/` changes — see Decisions for specifics.
+- Fixed four owner-reported UI issues (Today sort toggle, full date labels, a real calendar-ticker-truncation CSS bug, BMO/AMC coloring, a real 30-day-agenda bug that was silently capping at ~14 days) and built a new manual "Refresh prices" feature (first user-scoped Edge Function — see Decisions). Verified via `npm run build`/`lint`, Playwright screenshots + computed-style checks, and a live post-deploy auth-boundary test. Key files: `src/pages/{Today,Calendar}Page.tsx`, `src/components/calendar/MonthCalendar.tsx`, `src/lib/{format,scoring}.ts`, `src/context/PortfolioContext.tsx`, `src/lib/portfolioRepository.ts`, `src/components/layout/{AppShell,RefreshQuotesButton}.tsx`, `supabase/functions/refresh-quotes/`.
+- Researched (verified against Finnhub's docs, not memory) rate-limit/bulk-call strategy for future PE/market-cap metrics — discussion only, not built. See Next up.
+- Discovered PR #3 was merged early and only carried one of five commits; opened **PR #4** for the rest. All stale PR #3 references in this file corrected.
+- Owner obtained SnapTrade `clientId`/`consumerKey` and pasted them in chat; talked through where they go and what building the integration needs (verified against SnapTrade's docs), but didn't store or build anything — owner action first.
+- Owner asked for a session handoff to paste into a new session — provided in chat, and this file was rewritten to cut accumulated bloat (see `AGENTS.md`'s lean-file protocol, added this session).
 
 ### 2026-07-31 — claude-code (session 5)
-- **Context:** owner decided to move Portlander from local-only to a real cloud deployment
-  (Netlify + Supabase), and separately wants to add live read-only Fidelity holdings via
-  SnapTrade. This session did the deployment legwork and hit a couple of real gaps.
-- **Netlify:** owner connected the GitHub repo via Netlify's own Import-from-Git flow
-  (proper continuous deployment, not a one-off push). Confirmed live at
-  `https://portlander.netlify.app`, matches local `npm run dev` output. `VITE_SUPABASE_URL`
-  and `VITE_SUPABASE_ANON_KEY` env vars set (values from the Supabase project below).
-- **Netlify build-minute conservation:** owner is on a limited-credit plan. Established
-  workflow: create/push to `develop` (mirrors `main`, created this session), only merge to
-  `main` when ready to actually deploy — see Decisions. Also flagged: Deploy Previews for
-  PRs may still be consuming minutes separately from `main` pushes; owner should check
-  Site configuration → Build & deploy → Deploy contexts and disable/restrict if unwanted.
-- **Supabase — a real MCP connector (`mcp__Supabase__*`) became available mid-session**,
-  giving direct project access (distinct from the CLI-based instructions given earlier).
-  Used it to:
-  - Confirm the project (`Portlander`, id/ref `vvstmdnnpjnfvueoecwl`) existed but was
-    **completely empty** — the owner's earlier attempt to paste the schema into the SQL
-    Editor hadn't actually taken.
-  - Apply the full `supabase/schema.sql` via `apply_migration` — all 4 tables now live,
-    RLS enabled on all of them, confirmed via `list_tables` + `get_advisors` (0 lints).
-  - Deploy `supabase/functions/sync-events/index.ts` via `deploy_edge_function`.
-    **Caught and fixed a mistake**: first deploy used `verify_jwt: false`, which would have
-    let anyone who found the URL trigger the sync and burn Finnhub quota, since the
-    function has no auth logic of its own — redeployed immediately with `verify_jwt: true`
-    (function is now version 2).
-  - **Could not** set the `FINNHUB_API_KEY` Edge Function secret or a cron schedule —
-    this MCP tool surface has no secrets-management or cron tool exposed. Owner has the
-    Finnhub key in hand, needs to paste it into Project Settings → Edge Functions →
-    Secrets themselves.
-  - Owner then couldn't find the "Schedules" tab under Edge Functions → sync-events that
-    this repo's own function README describes — that instruction may be stale (dashboard
-    UI likely moved). Best current guess, unverified live: Database → Cron Jobs
-    (`pg_cron`), not nested under the function page. Left unresolved at session end —
-    **next agent: try setting this via `execute_sql` with `cron.schedule(...)` +
-    `net.http_post(...)` directly through the Supabase MCP connector if it's available**,
-    rather than continuing to guess at dashboard navigation.
-- **SnapTrade — clarified real scope.** Owner's actual intent: link their real Fidelity
-  account read-only so SnapTrade supplies live portfolio holdings while Finnhub supplies
-  market/earnings data, for analysis — not trading (consistent with `AGENTS.md`'s
-  brokerage non-goal). A **SnapTrade MCP connector** (`mcp__Snaptarde__*`) also became
-  available mid-session and turned out to already have the owner's real Fidelity account
-  linked (`getPartnerInfo` showed `is_personal: true` — a personal connection scoped to
-  this chat). Important distinction documented for future agents: **this chat-level access
-  does not give the deployed Portlander website that ability.** The website needs its own
-  separate SnapTrade developer registration (`clientId` + `consumerKey`), which is what the
-  owner was originally trying to obtain. Owner got one of the two keys via mobile, couldn't
-  get the second (mobile UI issues) — advised to retry on desktop. No SnapTrade integration
-  code has been written yet; this is a new, unscoped feature, not part of original Phase
-  1/2/3 plan in `AGENTS.md`.
-- **MCP connector instability:** Supabase/Netlify/SnapTrade connectors disconnected and
-  reconnected several times throughout this session (ambient, not project-related) —
-  several steps had to be retried or deferred because a needed connector was temporarily
-  unavailable. Worth expecting the same next session.
-- **Files touched this session:** none in the app code — all changes were live
-  infrastructure (Supabase project, Netlify site config, new `develop` git branch) plus
-  this `PROGRESS.md` update.
-- **Owner is moving to a new chat session** — this entry is the handoff.
+- Netlify connected via Git-linked continuous deployment, confirmed live. Established the `develop`-branch build-minute-conservation workflow (see Decisions).
+- Applied schema + deployed `sync-events` to a previously-empty Supabase project via the Supabase MCP connector. Caught and fixed a real mistake: first deploy had `verify_jwt: false`, which would have let anyone burn Finnhub quota — redeployed correctly.
+- Couldn't set secrets or cron (no MCP tool exposes either) — left for session 6, along with a stale "Schedules" tab reference in the function README that turned out not to exist.
+- Clarified SnapTrade scope: owner wants read-only live Fidelity holdings, needs the app's own SnapTrade dev registration (distinct from a personal chat-scoped connector that happened to be available). Owner got one of two keys this session.
 
 ### 2026-07-31 — claude-code (session 4)
-- **Bug reported by owner:** after running a real `npm run sync:events` + importing a real
-  holdings CSV, earnings dates shown in the app for some tickers were wrong.
-- **Root cause found:** `mergeEvents` (`src/lib/eventSync.ts`) only dropped a stale
-  demo/local earnings row when it matched an incoming Finnhub row on *both* ticker and
-  exact `eventDate`. Demo seed dates (`src/data/demo.ts`) are arbitrary "today + N day"
-  placeholders unrelated to the real earnings calendar, so that match essentially never
-  fires — the old placeholder date and the new real Finnhub date ended up coexisting in
-  `localStorage`, and the placeholder (usually sooner-looking) is what surfaced on
-  Today/Calendar for any ticker overlapping the built-in demo set (MSFT, NVDA, META,
-  CRWD, PANW, FTNT, ZS).
-- **Fix:** `mergeEvents` now purges stale non-Finnhub earnings for a ticker whenever *any*
-  real Finnhub earnings row exists for that ticker in the incoming sync, regardless of
-  date. Finnhub-sourced entries are still never purged by this path (deliberately — see
-  follow-up note below), so historical/past confirmed data isn't affected.
-- **Verified:** `npm run build` (`tsc -b && vite build`) and `npm run lint` (`oxlint`) both
-  pass clean (one pre-existing unrelated warning in `PortfolioContext.tsx`). Also wrote a
-  standalone before/after repro (old logic vs. new logic against the exact reported
-  scenario) confirming the old code produces 2 conflicting MSFT entries and the new code
-  produces 1 correct one, with an unrelated ticker's demo entry left untouched when no
-  Finnhub data exists for it yet.
-- **Files:** `src/lib/eventSync.ts` only.
-- **Follow-up (not fixed, noted for next agent):** the same staleness pattern can in
-  theory recur *between* two real Finnhub syncs — if a ticker's earnings date gets
-  rescheduled, the old (now-wrong) Finnhub-sourced row isn't purged either, since this fix
-  intentionally only targets non-Finnhub rows (to avoid deleting legitimate past/historical
-  Finnhub data that falls outside the current sync's lookback window). If this shows up in
-  practice, the right fix is date-aware — purge old *future/estimated* Finnhub rows for a
-  ticker not present in the new sync, but keep past ones — not a blanket ticker purge.
-- **Owner:** should re-run `npm run sync:events` (or click Settings → Reload data) and
-  confirm the previously-wrong tickers now show a single correct date.
+- Bug: earnings dates shown for some tickers were wrong after a real sync. Root cause + fix: see the `mergeEvents` Decisions row above. Files: `src/lib/eventSync.ts`. Verified via build/lint + a standalone before/after repro.
 
-### 2026-03-25 — grok-build (session 3)
-- Implemented `supabase/functions/sync-events/index.ts` (Finnhub earnings + macro seed + sync_runs).
-- Implemented local `scripts/sync-events.mjs`, `scripts/tickers.txt`, `npm run sync:events`.
-- Added `src/lib/eventSync.ts`; boot + Reload merge `/data/events-sync.json`.
-- Settings: local sync instructions; cloud marked deferred.
-- README / .env.example / .gitignore / function README updated.
-- **Build:** OK.
-- **Follow-up:** Owner runs Finnhub sync; agents polish only if asked; cloud deploy later.
-
-### 2026-03-25 — grok-build (session 2)
-- Supabase client + repository + magic-link Settings (cloud optional).
-
-### 2026-03-25 — grok-build (session 1)
-- Phase 1 scaffold + UI + local demo.
+### 2026-03-25 — grok-build (sessions 1-3)
+- Session 1: Phase 1 scaffold, UI, local demo data.
+- Session 2: Supabase client + repository + magic-link Settings (cloud made optional/deferred).
+- Session 3: `sync-events` Edge Function, local `scripts/sync-events.mjs`, `eventSync.ts` merge logic, docs.
 
 ---
 
 ## Notes for the next agent
 
-1. **Cloud mode is now active** (owner explicitly requested it 2026-07-31 — the old "do
-   not push cloud mode" guidance is superseded, see Decisions). Netlify + Supabase are both
-   live; Edge Function is deployed; daily `pg_cron` job is live (session 6). What's left:
-   `FINNHUB_API_KEY` secret (owner action, genuinely can't be done via any available tool),
-   then owner sign-in + re-import CSV on the live site.
-2. **Branch workflow changed**: push/PR to `develop` (not `main`) for review; only merge
-   `develop` → `main` when ready to actually trigger a Netlify production deploy — owner
-   has limited build minutes. Ask before pushing directly to `main`.
-3. Local sync command still works as a fallback: `npm run sync:events` (needs
-   `FINNHUB_API_KEY` in your shell env, separate from the Supabase Edge secret above).
-4. Demo events use relative dates; after sync, Finnhub rows replace *any* stale demo/local
-   earnings for that ticker (ticker-level match, not ticker+date — see 2026-07-31 decision).
-5. **SnapTrade is new, unscoped work** — see the SnapTrade checklist above and the session
-   5 log entry for full context before starting on it. Don't assume any code exists yet.
-6. If a Supabase MCP connector (`mcp__Supabase__*`) is available, prefer it over asking the
-   owner to click through the dashboard — it can apply schema/deploy functions directly,
-   and likely `execute_sql` for the still-unresolved cron setup. Same for Netlify
-   (`mcp__Netlify__*`) and SnapTrade (`mcp__Snaptarde__*`) if present — check via ToolSearch
-   before assuming they're unavailable, they were intermittent this session.
-7. Update this file after your session.
+1. **Cloud mode is fully live and verified end-to-end.** Nothing left to set up infra-wise — remaining Phase 1 work is UI polish + formal sign-off.
+2. **Never trust a PR number in this file without checking.** PR #3 got merged early mid-session and only carried one of five commits. Use `list_pull_requests`/`pull_request_read` before assuming what's merged.
+3. **No tool on the Supabase MCP surface exposes secrets management or Auth URL config** — confirmed repeatedly across sessions. Any new secret always needs the owner to paste it into the dashboard themselves.
+4. **`sync-events` is deliberately global/unscoped** (writes shared rows, safe for any caller). **`refresh-quotes` is user-scoped** (privileged per-user writes). Don't copy the wrong pattern when adding a new Edge Function — check which shape the new function actually needs.
+5. **SnapTrade: keys obtained, nothing built.** Check the checklist above before assuming secrets are stored or any code exists.
+6. If a Supabase/Netlify/SnapTrade MCP connector is available, prefer it over asking the owner to click through a dashboard for anything it can do — they reconnect with new internal tool IDs frequently in this project, check via ToolSearch rather than assuming unavailability.
+7. **Keep this file lean** — see `AGENTS.md`'s protocol section. Short session-log entries, delete resolved blockers, edit Decisions rows in place rather than layering corrections on top.

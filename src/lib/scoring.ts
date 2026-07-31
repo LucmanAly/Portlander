@@ -143,9 +143,25 @@ export function scoreAndFilterEvents(
     )
   }
 
-  return scored.sort((a, b) => {
+  return sortEventsByImpact(scored)
+}
+
+export function sortEventsByImpact<T extends { eventDate: string; impactScore: number }>(
+  events: T[],
+): T[] {
+  return [...events].sort((a, b) => {
     if (b.impactScore !== a.impactScore) return b.impactScore - a.impactScore
     return a.eventDate.localeCompare(b.eventDate)
+  })
+}
+
+/** Chronological, nearest first; ties broken by impact so the more material event leads. */
+export function sortEventsByDate<T extends { eventDate: string; impactScore: number }>(
+  events: T[],
+): T[] {
+  return [...events].sort((a, b) => {
+    if (a.eventDate !== b.eventDate) return a.eventDate.localeCompare(b.eventDate)
+    return b.impactScore - a.impactScore
   })
 }
 

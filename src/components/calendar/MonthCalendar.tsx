@@ -31,6 +31,14 @@ function dotColor(e: PortfolioEvent): string {
   return 'bg-ink-500'
 }
 
+/** Earnings only: bright = reports before the open, dim = reports after the close. */
+function timingTextTone(e: PortfolioEvent): string {
+  if (e.eventType !== 'earnings') return 'text-ink-200'
+  if (e.timing === 'bmo') return 'text-ink-100'
+  if (e.timing === 'amc') return 'text-ink-400'
+  return 'text-ink-200'
+}
+
 export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
 
@@ -121,15 +129,15 @@ export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
               >
                 {format(day, 'd')}
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex min-w-0 flex-col gap-0.5">
                 {dayEvents.slice(0, 3).map((e) => (
                   <div
                     key={e.id}
-                    className="flex items-center gap-1 truncate rounded px-1 py-0.5 text-[10px] text-ink-200"
+                    className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
                     title={e.title}
                   >
                     <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', dotColor(e))} />
-                    <span className="truncate">
+                    <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
                   </div>
@@ -148,6 +156,10 @@ export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
         <Legend color="bg-dividend" label="Dividends" />
         <Legend color="bg-macro" label="Macro" />
       </div>
+      <p className="mt-2 text-[11px] text-ink-600">
+        Earnings ticker: <span className="text-ink-100">bright</span> reports before the open ·{' '}
+        <span className="text-ink-400">dim</span> reports after the close
+      </p>
     </div>
   )
 }

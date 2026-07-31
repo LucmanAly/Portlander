@@ -7,6 +7,7 @@ const KEYS = {
   watchlist: 'portlander.watchlist.v1',
   events: 'portlander.events.v1',
   lastSync: 'portlander.lastSync.v1',
+  quotesLastSync: 'portlander.quotesLastSync.v1',
   seeded: 'portlander.seeded.v1',
 } as const
 
@@ -74,6 +75,15 @@ export function loadLastSync(): string | null {
 
 export function setLastSync(iso: string): void {
   localStorage.setItem(KEYS.lastSync, iso)
+}
+
+/** Separate from events lastSync — tracks the manual "Refresh prices" action only. */
+export function loadQuotesLastSync(): string | null {
+  return localStorage.getItem(KEYS.quotesLastSync)
+}
+
+export function setQuotesLastSync(iso: string): void {
+  localStorage.setItem(KEYS.quotesLastSync, iso)
 }
 
 /** Reset demo data (Settings). */
