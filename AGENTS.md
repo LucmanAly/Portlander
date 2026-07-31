@@ -51,8 +51,17 @@ Update **`PROGRESS.md`**:
 2. Move finished items to **Completed**.
 3. Update **In progress** / **Blocked**.
 4. Refresh **Next up** (ordered, concrete).
-5. Add a short entry to **Session log** (what changed, key files, decisions, follow-ups).
-6. If you change architecture or phase scope, note it under **Decisions**.
+5. Add a short entry to **Session log** — a **hard cap of ~10-15 lines**: what changed, key files, one-line pointer to the PR/commit for anyone who needs the full story. Git commit messages and PR descriptions are the permanent detailed record; don't re-narrate them here. If a fact belongs in Snapshot/Decisions/Blockers, put it there once — don't also restate it at length in the session log.
+6. If you change architecture or phase scope, note it under **Decisions** — one row, 1-3 sentences of rationale, not a paragraph.
+
+### Keep PROGRESS.md lean (every session, not just when asked)
+
+This file is read in full by every future agent before it does anything — treat it as a budget, not an append-only log.
+
+- **When a Blocker resolves, delete the row.** Don't strike it through and leave it — the resolution belongs in Decisions if it has lasting relevance, or nowhere if it doesn't.
+- **When a Decision gets refined or corrected, edit the existing row** instead of adding a new one that references the old one.
+- **Snapshot is the single source of truth for current state.** If Snapshot says it, don't also re-explain it in Next up, Blockers, and the session log.
+- Session log entries older than ~5 sessions back are fair game to compress further (a few bullets) once their content is no longer actively relevant — the git history never loses this, PROGRESS.md doesn't need to keep carrying it at full length.
 
 If you cannot finish a task, still update PROGRESS with partial state and blockers.
 
