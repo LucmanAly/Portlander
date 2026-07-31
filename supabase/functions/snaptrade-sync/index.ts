@@ -49,6 +49,13 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
   if (!clientId || !consumerKey || !supabaseUrl || !anonKey || !serviceKey) {
+    console.error('[snaptrade-sync] missing secrets:', {
+      clientId: !!clientId,
+      consumerKey: !!consumerKey,
+      supabaseUrl: !!supabaseUrl,
+      anonKey: !!anonKey,
+      serviceKey: !!serviceKey,
+    })
     return json(
       {
         error: 'Missing secrets',
@@ -215,6 +222,11 @@ Deno.serve(async (req) => {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const detail =
+      e && typeof e === 'object' && 'toJSON' in e && typeof (e as { toJSON: unknown }).toJSON === 'function'
+        ? (e as { toJSON: () => unknown }).toJSON()
+        : e
+    console.error('[snaptrade-sync] failed:', JSON.stringify(detail, null, 2))
     await finishRun(sb, runId, {
       status: 'error',
       tickers_count: 0,
