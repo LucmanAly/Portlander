@@ -1,0 +1,10 @@
+# Tickers for local `npm run sync:events` (one per line)
+# Used when no CLI args are passed.
+CRWD
+PANW
+FTNT
+MSFT
+NVDA
+META
+ZS
+NET
