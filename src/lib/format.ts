@@ -28,3 +28,15 @@ export function formatRelativeSync(iso: string | null): string {
   const d = new Date(iso)
   return `Synced ${format(d, 'MMM d · HH:mm')}`
 }
+
+/** Compact ticking caption for the manual price-refresh button. */
+export function formatRelativeShort(iso: string | null): string {
+  if (!iso) return 'Not refreshed yet'
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.round(diffMs / 60000)
+  if (mins < 1) return 'Updated just now'
+  if (mins < 60) return `Updated ${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `Updated ${hours}h ago`
+  return `Updated ${format(new Date(iso), 'MMM d')}`
+}

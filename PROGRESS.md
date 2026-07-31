@@ -3,7 +3,7 @@
 **Last updated:** 2026-07-31  
 **Last agent:** claude-code  
 **Current phase:** Phase 1 — Foundation (cloud deploy underway) → Phase 1.5 SnapTrade scoping starting  
-**Phase 1 status:** 🟢 Cloud deploy essentially complete — Netlify live, Supabase schema + Edge Function + daily cron all live, `FINNHUB_API_KEY` set, owner signed in and real portfolio synced with real Finnhub data confirmed end-to-end. Several owner-reported UI glitches (calendar ticker truncation, missing full dates, 30-day agenda bug) fixed same session, in PR #3 awaiting merge. Only formal Phase 1 exit sign-off left.
+**Phase 1 status:** 🟢 Cloud deploy essentially complete — Netlify live, Supabase schema + Edge Function + daily cron all live, `FINNHUB_API_KEY` set, owner signed in and real portfolio synced with real Finnhub data confirmed end-to-end. Several owner-reported UI glitches (calendar ticker truncation, missing full dates, 30-day agenda bug) fixed, plus a new manual "Refresh prices" control (live quotes, on-demand only) — all in PR #3 awaiting merge. Only formal Phase 1 exit sign-off left.
 
 > **Protocol:** Every agent must read `AGENTS.md` + this file before work, and update this file after work (session log + next up) without being asked.
 
@@ -67,14 +67,14 @@
 - [x] Real portfolio loadable (40 real holdings imported into cloud Supabase, confirmed via DB query — session 6)
 - [x] Earnings from Finnhub (via sync file or Edge) not only demo offsets (34 real events with real dates/status confirmed live in `events` — session 6)
 - [ ] Weight ranking + exposure % sanity (not yet formally verified by owner, though the impact-score math is unchanged and was already spot-checked in dev screenshots this session)
-- [ ] Snappy UI (owner flagged several concrete glitches this session — calendar ticker truncation, missing full dates, 30-day agenda only showing ~14 days — all fixed in PR #3; awaiting owner confirmation on the live site post-merge)
+- [ ] Snappy UI (owner flagged several concrete glitches this session — calendar ticker truncation, missing full dates, 30-day agenda only showing ~14 days, plus a new manual live-price refresh control — all fixed/built in PR #3; awaiting owner confirmation on the live site post-merge)
 - [ ] Used on a real morning once (owner to confirm after a real daily cron run)
 
 ---
 
 ## Next up (ordered)
 
-1. **Owner:** pull PR #3 (`claude/portlander-cloud-handoff-eqnr94` → `develop`) live and confirm the Today sort toggle, full weekday date labels, calendar ticker visibility, BMO/AMC coloring, and 30-day agenda look right on the real site with real data.
+1. **Owner:** pull PR #3 (`claude/portlander-cloud-handoff-eqnr94` → `develop`) live and confirm the Today sort toggle, full weekday date labels, calendar ticker visibility, BMO/AMC coloring, 30-day agenda, and the new "Refresh prices" button all look right on the real site with real data. **Refresh-prices in particular needs a real click-test with your real signed-in session** — this agent verified the deploy, the gated/local-mode UI state, and the security-rejection path (anon key alone correctly gets 401), but could not exercise the full authenticated happy-path from this sandbox (no real user session available, and deliberately did not attempt to mint one via admin APIs). Click it live and confirm a holding's price actually updates.
 2. Once confirmed: merge PR #3 → `develop`, then `develop` → `main` when ready to spend a Netlify build (this PR *does* touch `src/`, unlike the infra-only work before it, so this merge actually needs a real deploy).
 3. **Owner (optional):** the daily cron currently runs at `0 11 * * *` UTC (chosen arbitrarily as "a reasonable morning" — see Decisions). Adjust to taste with `select cron.alter_job(1, schedule => '<new cron expr>');` via the Supabase SQL editor or MCP `execute_sql` once a preferred local time is known.
 4. Mark Phase 1 exit criteria formally — functionally everything is confirmed working end-to-end (real sign-in, real CSV import, real Finnhub sync, and now the UI glitches the owner flagged); this is just the formal checkbox in the Phase 1 exit criteria section below. "Snappy UI" criterion is now much closer given this session's fixes.
@@ -119,6 +119,7 @@
 | 2026-07-31 | Daily cron configured via `pg_cron` + `pg_net` (SQL), not a dashboard "Schedules" tab | The tab this file previously pointed to doesn't exist in the current Supabase dashboard — confirmed stale. `execute_sql`/`apply_migration` through the Supabase MCP connector applied it directly: enabled both extensions, then `cron.schedule('daily-sync-events', '0 11 * * *', ...)` wrapping `net.http_post` against the Edge Function URL with the anon key as `Authorization: Bearer`. Anon key was used (not service role) since `verify_jwt: true` only requires *a* valid Supabase-issued JWT, and the anon key is already public in the deployed frontend bundle — no new secret exposure. |
 | 2026-07-31 | Cron schedule set to `0 11 * * *` UTC (arbitrary default) | No owner timezone was on record; picked a plausible "morning somewhere in the US" slot rather than blocking on it. Owner should adjust via `cron.alter_job` once a preferred local time is confirmed — see Next up. |
 | 2026-07-31 | Cron job's `net.http_post` given `timeout_milliseconds := 60000` (up from `pg_net`'s 5000ms default) | A real 40-ticker sync took ~16s server-side (sequential per-ticker Finnhub calls with a 200ms pacing delay each), which blew past the 5s default and made `pg_net` log a client-side timeout even though the Edge Function ran to full completion regardless (confirmed via `sync_runs.finished_at`). 60s gives headroom as the holdings list grows and makes `pg_net`'s logged response accurate instead of a misleading timeout. |
+| 2026-07-31 | Added `refresh-quotes`, the project's first **user-scoped** Edge Function | Owner wanted a persistent, manual-only "Refresh prices" control (no auto-fetch on dashboard open) updating live `holdings.last_price`, decoupled from the daily earnings cron. Unlike `sync-events` (deliberately global/unscoped — only writes shared macro/earnings rows, safe for any authenticated caller), this function does privileged per-user writes, so it resolves the calling user's id via an anon-key client's `.auth.getUser()` against the forwarded `Authorization` JWT, then uses a service-role client scoped by that `user_id` for the actual read/update — never iterates all users like `sync-events` does. `verify_jwt: true` is mandatory here (tolerable either way on `sync-events`). Writes via per-row `.update({last_price, updated_at})` rather than `persistHoldingsRemote`'s delete-diff-upsert, so `shares`/`cost_basis`/`notes`/`tags`/`weight_override_pct` are never touched. Reuses `sync_runs.tickers_count`/`events_upserted` columns (`provider='finnhub-quotes'` distinguishes the rows from the daily cron's `provider='finnhub'`) rather than a migration. Verified post-deploy: a request bearing only the anon key (not a real user session) is correctly rejected with `401 Unauthorized` — confirms the function doesn't just trust any valid Supabase JWT. PE ratio / market cap remain explicitly out of scope (no column/UI exists yet, per the earlier same-session discussion). |
 
 ---
 
@@ -268,6 +269,59 @@
     `develop`) rather than a new PR, since it's a continuation of the same session/branch.
     **Unlike every other change this session, this one touches `src/`** — merging it will
     actually need a real Netlify build, unlike the infra-only work above.
+
+- **Follow-up, same session — manual "Refresh prices" control built.** Owner wanted a
+  persistent control, reachable from every page, that refreshes live ticker prices only on
+  click — never automatically on dashboard open — explicitly decoupled from the daily
+  earnings cron. Also asked for and got: an opinion on page architecture as the app scales
+  into Phase 2/3 (recommendation: dedicated pages for major new concerns — journal, daily
+  briefing, risk radar — but keep anything tied to a single event/holding as inline/modal
+  content, not a new page per item; not yet acted on, advisory only).
+  - Went through full plan-mode: two Explore/Plan subagents scoped the design (data-layer
+    patterns in `PortfolioContext`/`portfolioRepository`, then the actual implementation
+    plan) before writing any code, given this touches auth, a new Edge Function, and a
+    new UI surface simultaneously.
+  - **New Edge Function `supabase/functions/refresh-quotes/index.ts`** — the project's
+    first **user-scoped** Edge Function. `sync-events` is deliberately global/unscoped
+    (writes shared `events` rows, safe for any authenticated caller); this one does
+    privileged per-user writes to `holdings.last_price`, so it resolves the calling user's
+    id from their JWT (anon-key client's `.auth.getUser()` against the forwarded
+    `Authorization` header) before doing any read/write, and every query is explicitly
+    scoped to that `user_id` — never iterates all users. Writes via a partial
+    `.update({last_price, updated_at})`, not a full-row upsert, so `shares`/`cost_basis`/
+    `notes`/`tags`/`weight_override_pct` are never touched. Logs to `sync_runs` with
+    `provider: 'finnhub-quotes'` (vs. the daily cron's `provider: 'finnhub'`) — reused the
+    existing columns rather than a migration. Deployed with `verify_jwt: true` (mandatory
+    here, unlike `sync-events`).
+  - **Frontend:** `refreshQuotesRemote()` + `applyQuoteResultsLocally()` added to
+    `portfolioRepository.ts` (first client-side use of `supabase.functions.invoke` in this
+    codebase); `quotesSyncing`/`quotesLastSyncedAt`/`quotesError`/`refreshQuotes()` added to
+    `PortfolioContext`; new `RefreshQuotesButton` component (sidebar + compact mobile
+    variants) wired into `AppShell` above the existing Book Value card and into the mobile
+    header — reachable from every page automatically via the existing `<Outlet/>` wrapping,
+    no per-page changes needed. Deliberately does **not** call `refreshFromBackend()` after
+    a refresh (that also re-merges the local Finnhub file and reloads events/watchlist,
+    which would blur the "price-only, never touches events" boundary) — the Edge Function's
+    own response already carries the new prices.
+  - **Gating UX decision:** when signed out / in local-demo mode, the button stays
+    clickable-but-muted (not hard `disabled`) so its "Sign in to refresh live prices"
+    explanation is reachable on mobile too (a true `disabled` button has no tap affordance
+    for a `title` tooltip). True `disabled` is reserved for the actual in-flight state, to
+    prevent double-click spam.
+  - **Verified:** `npm run build`/`npm run lint` clean; in a local dev build (Playwright),
+    confirmed the gated state renders correctly on both desktop sidebar and mobile header
+    variants and that clicking it while gated fires **zero** network requests. Post-deploy,
+    confirmed via a direct `net.http_post` test that a request bearing only the anon key
+    (not a real signed-in user) is correctly rejected `401 Unauthorized` — proves the
+    function doesn't just trust any valid Supabase JWT, only a real user session. **Could
+    not** exercise the full authenticated happy-path (real signed-in user clicking the
+    button) from this sandbox — no real user session available, and deliberately did not
+    attempt to obtain one via Supabase's admin APIs. Owner needs to click-test this live —
+    see Next up #1.
+  - **Files:** `supabase/functions/refresh-quotes/index.ts` + `README.md` (new),
+    `src/lib/portfolioRepository.ts`, `src/context/PortfolioContext.tsx`,
+    `src/lib/format.ts`, `src/lib/storage.ts`, `src/components/layout/RefreshQuotesButton.tsx`
+    (new), `src/components/layout/AppShell.tsx`.
 
 ### 2026-07-31 — claude-code (session 5)
 - **Context:** owner decided to move Portlander from local-only to a real cloud deployment

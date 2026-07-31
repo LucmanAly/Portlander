@@ -16,6 +16,7 @@ import {
   saveHoldings,
   saveWatchlist,
   setLastSync as localSetLastSync,
+  setQuotesLastSync as localSetQuotesLastSync,
 } from '@/lib/storage'
 
 export interface PortfolioBundle {
@@ -198,6 +199,63 @@ export async function persistWatchlistRemote(
   if (error) return { message: error.message, cause: error }
 
   return null
+}
+
+export interface QuoteRefreshOutcome {
+  results: { ticker: string; lastPrice: number }[]
+  tickersAttempted: number
+  errors: string[]
+  finishedAt: string | null
+}
+
+/**
+ * Invokes the refresh-quotes Edge Function for the signed-in user's holdings.
+ * Deliberately does not touch events/watchlist — price-only, on-demand refresh.
+ */
+export async function refreshQuotesRemote(): Promise<{
+  error: RepoError | null
+  outcome: QuoteRefreshOutcome | null
+}> {
+  const sb = getSupabase()
+  if (!sb) return { error: { message: 'Supabase is not configured' }, outcome: null }
+
+  const { data, error } = await sb.functions.invoke('refresh-quotes', { method: 'POST' })
+  if (error) return { error: { message: error.message, cause: error }, outcome: null }
+  if (data?.status === 'error') {
+    return {
+      error: { message: data.errors?.[0] ?? 'Quote refresh failed', cause: data },
+      outcome: null,
+    }
+  }
+
+  const finishedAt = data?.finishedAt ?? null
+  if (finishedAt) localSetQuotesLastSync(finishedAt)
+
+  return {
+    error: null,
+    outcome: {
+      results: data?.results ?? [],
+      tickersAttempted: data?.tickers ?? 0,
+      errors: data?.errors ?? [],
+      finishedAt,
+    },
+  }
+}
+
+/** Patches only lastPrice/updatedAt for matched tickers; mirrors to local cache. */
+export function applyQuoteResultsLocally(
+  current: Holding[],
+  results: { ticker: string; lastPrice: number }[],
+): Holding[] {
+  if (results.length === 0) return current
+  const priceByTicker = new Map(results.map((r) => [r.ticker.toUpperCase(), r.lastPrice]))
+  const now = new Date().toISOString()
+  const next = current.map((h) => {
+    const price = priceByTicker.get(h.ticker.toUpperCase())
+    return price == null ? h : { ...h, lastPrice: price, updatedAt: now }
+  })
+  saveHoldings(next)
+  return next
 }
 
 export function resetLocalDemo(): void {

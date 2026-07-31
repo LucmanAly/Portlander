@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { CalendarDays, LayoutDashboard, Briefcase, Settings } from 'lucide-react'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney, formatRelativeSync } from '@/lib/format'
+import { RefreshQuotesButton } from '@/components/layout/RefreshQuotesButton'
 
 const nav = [
   { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
@@ -58,15 +59,18 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="surface mt-auto rounded-xl p-3">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-ink-500">
-            Book value
-          </div>
-          <div className="tabular mt-1 text-lg font-semibold text-ink-100">
-            {formatMoney(exposure.totalPortfolioValue)}
-          </div>
-          <div className="mt-1 text-xs text-ink-500">
-            {holdings.length} holdings · {formatRelativeSync(lastSyncAt)}
+        <div className="mt-auto">
+          <RefreshQuotesButton variant="sidebar" />
+          <div className="surface rounded-xl p-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-ink-500">
+              Book value
+            </div>
+            <div className="tabular mt-1 text-lg font-semibold text-ink-100">
+              {formatMoney(exposure.totalPortfolioValue)}
+            </div>
+            <div className="mt-1 text-xs text-ink-500">
+              {holdings.length} holdings · {formatRelativeSync(lastSyncAt)}
+            </div>
           </div>
         </div>
       </aside>
@@ -80,9 +84,12 @@ export function AppShell() {
             </div>
             <span className="text-sm font-semibold">Portlander</span>
           </div>
-          <span className="tabular text-xs text-ink-400">
-            {formatMoney(exposure.totalPortfolioValue)}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className="tabular text-xs text-ink-400">
+              {formatMoney(exposure.totalPortfolioValue)}
+            </span>
+            <RefreshQuotesButton variant="compact" />
+          </div>
         </header>
 
         <main className="scrollbar-thin flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">

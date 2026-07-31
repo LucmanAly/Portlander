@@ -11,13 +11,16 @@ import type { Holding, PortfolioEvent, WatchlistItem } from '@/types'
 import type { EventFilter } from '@/types'
 import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
 import {
+  applyQuoteResultsLocally,
   loadPortfolioBundle,
   markLocalSynced,
   persistHoldingsRemote,
   persistWatchlistRemote,
+  refreshQuotesRemote,
   resetLocalDemo,
 } from '@/lib/portfolioRepository'
 import { applyLocalEventsSync } from '@/lib/eventSync'
+import { loadQuotesLastSync } from '@/lib/storage'
 import {
   getSupabase,
   isSupabaseConfigured,
@@ -57,6 +60,11 @@ interface PortfolioContextValue {
   refreshFromBackend: () => Promise<void>
   signInWithMagicLink: (email: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  /** Manual, on-demand live price refresh — never runs automatically, never touches events. */
+  quotesSyncing: boolean
+  quotesLastSyncedAt: string | null
+  quotesError: string | null
+  refreshQuotes: () => Promise<void>
 }
 
 const PortfolioContext = createContext<PortfolioContextValue | null>(null)
@@ -76,6 +84,11 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [remoteError, setRemoteError] = useState<string | null>(null)
   const [backend, setBackend] = useState<DataBackend>('local')
+  const [quotesSyncing, setQuotesSyncing] = useState(false)
+  const [quotesLastSyncedAt, setQuotesLastSyncedAt] = useState<string | null>(() =>
+    loadQuotesLastSync(),
+  )
+  const [quotesError, setQuotesError] = useState<string | null>(null)
 
   const config = useMemo(() => supabaseConfigSummary(), [])
 
@@ -117,6 +130,37 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       applyBundle(bundle)
     }
   }, [applyBundle])
+
+  // Manual, on-demand live price refresh — never runs automatically, never
+  // touches events/watchlist. Deliberately doesn't call refreshFromBackend()
+  // afterward: that also re-merges the local Finnhub file and reloads
+  // events/watchlist, which would blur the "price-only" boundary this is
+  // scoped to. The Edge Function's response already carries the new prices.
+  const refreshQuotes = useCallback(async () => {
+    if (quotesSyncing) return
+    if (backend !== 'supabase') {
+      setQuotesError('Sign in to refresh live prices')
+      return
+    }
+    setQuotesSyncing(true)
+    setQuotesError(null)
+    try {
+      const { error, outcome } = await refreshQuotesRemote()
+      if (error || !outcome) {
+        setQuotesError(error?.message ?? 'Refresh failed')
+        return
+      }
+      setHoldings((prev) => applyQuoteResultsLocally(prev, outcome.results))
+      setQuotesLastSyncedAt(outcome.finishedAt ?? new Date().toISOString())
+      if (outcome.errors.length > 0) {
+        setQuotesError(`${outcome.results.length}/${outcome.tickersAttempted} prices updated`)
+      }
+    } catch (e) {
+      setQuotesError(e instanceof Error ? e.message : 'Refresh failed')
+    } finally {
+      setQuotesSyncing(false)
+    }
+  }, [quotesSyncing, backend])
 
   // Boot: local immediately, then Supabase session + remote if configured
   useEffect(() => {
@@ -367,6 +411,10 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     refreshFromBackend,
     signInWithMagicLink,
     signOut,
+    quotesSyncing,
+    quotesLastSyncedAt,
+    quotesError,
+    refreshQuotes,
   }
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>
