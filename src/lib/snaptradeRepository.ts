@@ -2,6 +2,25 @@ import { getSupabase } from '@/lib/supabase'
 import type { RepoError } from '@/lib/portfolioRepository'
 
 /**
+ * supabase-js's FunctionsHttpError only carries a generic "Edge Function
+ * returned a non-2xx status code" message — the actual JSON body our
+ * functions return (with the real error detail) is on error.context, a raw
+ * Response object that has to be read separately.
+ */
+async function describeFunctionError(error: { message: string; context?: unknown }): Promise<string> {
+  const context = error.context
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json()
+      if (body && typeof body.error === 'string') return body.error
+    } catch {
+      // Body wasn't JSON or already consumed — fall through to the generic message.
+    }
+  }
+  return error.message
+}
+
+/**
  * Invokes snaptrade-connect. Registers the user with SnapTrade on first call
  * (server-side, userSecret never reaches the browser) and returns a
  * Connection Portal URL — expires in ~5 minutes, open it immediately.
@@ -17,7 +36,7 @@ export async function connectBrokerage(broker?: string): Promise<{
     method: 'POST',
     body: broker ? { broker } : {},
   })
-  if (error) return { error: { message: error.message, cause: error }, redirectUrl: null }
+  if (error) return { error: { message: await describeFunctionError(error), cause: error }, redirectUrl: null }
   if (!data?.redirectUrl) {
     return { error: { message: data?.error ?? 'No connection URL returned', cause: data }, redirectUrl: null }
   }
@@ -41,7 +60,7 @@ export async function syncBrokerage(): Promise<{
   if (!sb) return { error: { message: 'Supabase is not configured' }, outcome: null }
 
   const { data, error } = await sb.functions.invoke('snaptrade-sync', { method: 'POST' })
-  if (error) return { error: { message: error.message, cause: error }, outcome: null }
+  if (error) return { error: { message: await describeFunctionError(error), cause: error }, outcome: null }
   if (data?.status === 'error') {
     return {
       error: { message: data.errors?.[0] ?? 'Brokerage sync failed', cause: data },
