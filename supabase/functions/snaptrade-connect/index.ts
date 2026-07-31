@@ -133,7 +133,16 @@ Deno.serve(async (req) => {
         ? (e as { toJSON: () => unknown }).toJSON()
         : e
     console.error('[snaptrade-connect] failed:', JSON.stringify(detail, null, 2))
-    return json({ error: `SnapTrade connect failed: ${msg}` }, 500)
+    // axios's e.message is generic ("Request failed with status code 401") and
+    // never includes SnapTrade's actual JSON rejection reason — surface
+    // responseBody directly since we have no working channel to read
+    // console.error output back out of Supabase's logs.
+    const responseBody =
+      e && typeof e === 'object' && 'responseBody' in e
+        ? (e as { responseBody: unknown }).responseBody
+        : undefined
+    const bodySuffix = responseBody ? ` — ${JSON.stringify(responseBody)}` : ''
+    return json({ error: `SnapTrade connect failed: ${msg}${bodySuffix}` }, 500)
   }
 })
 
