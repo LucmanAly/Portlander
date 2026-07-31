@@ -49,26 +49,15 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
   if (!clientId || !consumerKey || !supabaseUrl || !anonKey || !serviceKey) {
-    console.error('[snaptrade-sync] missing secrets:', {
-      clientId: !!clientId,
-      consumerKey: !!consumerKey,
-      supabaseUrl: !!supabaseUrl,
-      anonKey: !!anonKey,
-      serviceKey: !!serviceKey,
-    })
-    return json(
-      {
-        error: 'Missing secrets',
-        need: [
-          'SNAPTRADE_CLIENT_ID',
-          'SNAPTRADE_CONSUMER_KEY',
-          'SUPABASE_URL',
-          'SUPABASE_ANON_KEY',
-          'SUPABASE_SERVICE_ROLE_KEY',
-        ],
-      },
-      500,
-    )
+    const missing = [
+      !clientId && 'SNAPTRADE_CLIENT_ID',
+      !consumerKey && 'SNAPTRADE_CONSUMER_KEY',
+      !supabaseUrl && 'SUPABASE_URL',
+      !anonKey && 'SUPABASE_ANON_KEY',
+      !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY',
+    ].filter((v): v is string => Boolean(v))
+    console.error('[snaptrade-sync] missing secrets:', missing)
+    return json({ error: `Missing secrets: ${missing.join(', ')}`, need: missing }, 500)
   }
 
   const authHeader = req.headers.get('Authorization')
