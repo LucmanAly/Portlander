@@ -1,14 +1,10 @@
 import { usePortfolio } from '@/context/PortfolioContext'
-import { formatMoney, formatPct } from '@/lib/format'
-import {
-  holdingMarketValue,
-  portfolioTotalValue,
-  positionWeightPct,
-} from '@/lib/scoring'
+import { formatMoney } from '@/lib/format'
+import { portfolioTotalValue, positionWeightPct } from '@/lib/scoring'
 import { holdingsToCsv, parseHoldingsCsv } from '@/lib/csv'
+import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Trash2, Upload } from 'lucide-react'
-import type { Holding } from '@/types'
 
 export function PortfolioPage() {
   const {
@@ -48,6 +44,7 @@ export function PortfolioPage() {
       name: name.trim() || undefined,
       shares: s,
       lastPrice: price ? Number(price) : undefined,
+      source: 'manual',
     })
     setTicker('')
     setShares('')
@@ -188,42 +185,7 @@ export function PortfolioPage() {
         </div>
       </form>
 
-      {/* Table */}
-      <div className="surface overflow-hidden rounded-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-ink-500">
-                <th className="px-4 py-3 font-medium">Ticker</th>
-                <th className="px-4 py-3 font-medium">Shares</th>
-                <th className="px-4 py-3 font-medium">Price</th>
-                <th className="px-4 py-3 font-medium">Value</th>
-                <th className="px-4 py-3 font-medium">Weight</th>
-                <th className="px-4 py-3 font-medium">Tags</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {sorted.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-ink-500">
-                    No holdings yet.
-                  </td>
-                </tr>
-              ) : (
-                sorted.map((h) => (
-                  <HoldingRow
-                    key={h.id}
-                    holding={h}
-                    total={total}
-                    onRemove={() => removeHolding(h.id)}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <PortfolioTable holdings={sorted} total={total} onRemove={removeHolding} />
 
       {/* Watchlist */}
       <section className="space-y-3">
@@ -276,66 +238,6 @@ export function PortfolioPage() {
         </div>
       </section>
     </div>
-  )
-}
-
-function HoldingRow({
-  holding: h,
-  total,
-  onRemove,
-}: {
-  holding: Holding
-  total: number
-  onRemove: () => void
-}) {
-  const weight = positionWeightPct(h, total)
-  const value = holdingMarketValue(h)
-
-  return (
-    <tr className="hover:bg-ink-800/30">
-      <td className="px-4 py-3">
-        <div className="font-semibold text-accent-400">{h.ticker}</div>
-        {h.name ? <div className="text-xs text-ink-500">{h.name}</div> : null}
-      </td>
-      <td className="tabular px-4 py-3 text-ink-200">{h.shares}</td>
-      <td className="tabular px-4 py-3 text-ink-300">
-        {h.lastPrice != null ? formatMoney(h.lastPrice) : '—'}
-      </td>
-      <td className="tabular px-4 py-3 font-medium text-ink-100">{formatMoney(value)}</td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-ink-800">
-            <div
-              className="h-full rounded-full bg-accent-500"
-              style={{ width: `${Math.min(100, weight * 3)}%` }}
-            />
-          </div>
-          <span className="tabular text-ink-200">{formatPct(weight)}</span>
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap gap-1">
-          {(h.tags ?? []).map((t) => (
-            <span
-              key={t}
-              className="rounded bg-ink-800 px-1.5 py-0.5 text-[10px] text-ink-400 ring-1 ring-border"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-right">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="focus-ring rounded-lg p-2 text-ink-500 hover:bg-ink-800 hover:text-critical"
-          aria-label={`Remove ${h.ticker}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </td>
-    </tr>
   )
 }
 

@@ -19,6 +19,12 @@ export function SettingsPage() {
     signInWithMagicLink,
     signOut,
     booting,
+    brokerageConnections,
+    brokerageConnecting,
+    brokerageSyncing,
+    brokerageError,
+    connectBrokerage,
+    syncBrokerage,
   } = usePortfolio()
 
   const [email, setEmail] = useState('')
@@ -201,6 +207,60 @@ export function SettingsPage() {
               ) : null}
             </form>
           )}
+        </section>
+      ) : null}
+
+      {supabaseConfigured && user ? (
+        <section className="surface-elevated space-y-4 rounded-2xl p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
+            Brokerage
+          </h2>
+          <p className="text-sm text-ink-400">
+            Connect a brokerage via SnapTrade to sync real positions into Portfolio. CSV/manual
+            entries stay available for any ticker your brokerage doesn't cover.
+          </p>
+
+          {brokerageConnections.length > 0 ? (
+            <ul className="space-y-1.5">
+              {brokerageConnections.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between rounded-lg bg-ink-850 px-3 py-2 text-sm ring-1 ring-border"
+                >
+                  <span className="font-medium text-ink-100">{c.brokerageName}</span>
+                  <span className="text-xs text-ink-500">
+                    Connected {formatRelativeSync(c.connectedAt)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-500">No brokerage connected yet.</p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void connectBrokerage()}
+              disabled={brokerageConnecting}
+              className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750 disabled:opacity-50"
+            >
+              {brokerageConnecting
+                ? 'Opening…'
+                : brokerageConnections.length > 0
+                  ? 'Connect another brokerage'
+                  : 'Connect brokerage'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void syncBrokerage()}
+              disabled={brokerageSyncing}
+              className="focus-ring rounded-xl bg-accent-500 px-3 py-2 text-sm font-semibold text-ink-950 hover:bg-accent-400 disabled:opacity-50"
+            >
+              {brokerageSyncing ? 'Syncing…' : 'Sync now'}
+            </button>
+          </div>
+          {brokerageError ? <p className="text-sm text-critical">{brokerageError}</p> : null}
         </section>
       ) : null}
 

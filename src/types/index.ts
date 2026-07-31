@@ -4,6 +4,8 @@ export type EventTiming = 'bmo' | 'amc' | 'unknown'
 export type EventStatus = 'confirmed' | 'estimated'
 export type EventFilter = 'all' | 'earnings' | 'dividends' | 'macro' | 'holdings'
 
+export type HoldingSource = 'manual' | 'csv' | 'snaptrade'
+
 export interface Holding {
   id: string
   ticker: string
@@ -14,10 +16,23 @@ export interface Holding {
   costBasis?: number
   /** Last price for market value; demo/mock until EOD sync */
   lastPrice?: number
+  /** Absolute day change in price, from the last "Refresh prices" run */
+  dayChangeValue?: number
+  /** Day change in price as a percent, from the last "Refresh prices" run */
+  dayChangePct?: number
   tags?: string[]
   notes?: string
+  /** 'snaptrade' rows are authoritative live-brokerage data; 'manual'/'csv' are fallbacks. */
+  source: HoldingSource
   createdAt: string
   updatedAt: string
+}
+
+export interface BrokerageConnection {
+  id: string
+  brokerageName: string
+  authorizationId: string
+  connectedAt: string
 }
 
 export interface WatchlistItem {

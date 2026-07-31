@@ -17,9 +17,12 @@ sync stays entirely on `sync-events` + `pg_cron`.
 2. Load that user's `holdings` tickers only — never other users' (unlike `sync-events`, which
    is deliberately global since it only writes shared macro/earnings rows).
 3. For each ticker, call Finnhub `GET /quote?symbol&token`.
-4. Partial `update` of `holdings.last_price` + `updated_at`, scoped by `user_id` + `ticker` —
-   never a full-row upsert, so `shares`/`cost_basis`/`notes`/`tags`/`weight_override_pct` are
-   never touched.
+4. Partial `update` of `holdings.last_price` + `day_change_value` + `day_change_pct` +
+   `updated_at`, scoped by `user_id` + `ticker` — never a full-row upsert, so
+   `shares`/`cost_basis`/`notes`/`tags`/`weight_override_pct`/`source` are never touched. This
+   is also how SnapTrade-synced holdings (`source = 'snaptrade'`) get their live price and day
+   change — this function doesn't care which `source` a holding has, it refreshes every ticker
+   in the user's `holdings` table the same way.
 5. Write `sync_runs` with `provider = 'finnhub-quotes'` (distinct from `sync-events`'s
    `provider = 'finnhub'`), status `ok` | `partial` | `error`.
 

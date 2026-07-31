@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Holding, PortfolioEvent, WatchlistItem } from '@/types'
+import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
 import type { EventFilter } from '@/types'
 import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
 import {
@@ -19,6 +19,7 @@ import {
   refreshQuotesRemote,
   resetLocalDemo,
 } from '@/lib/portfolioRepository'
+import { connectBrokerage as connectBrokerageRemote, syncBrokerage as syncBrokerageRemote } from '@/lib/snaptradeRepository'
 import { applyLocalEventsSync } from '@/lib/eventSync'
 import { loadQuotesLastSync } from '@/lib/storage'
 import {
@@ -65,6 +66,13 @@ interface PortfolioContextValue {
   quotesLastSyncedAt: string | null
   quotesError: string | null
   refreshQuotes: () => Promise<void>
+  /** SnapTrade brokerage connection + live position sync — both manual, click-only. */
+  brokerageConnections: BrokerageConnection[]
+  brokerageConnecting: boolean
+  brokerageSyncing: boolean
+  brokerageError: string | null
+  connectBrokerage: (broker?: string) => Promise<void>
+  syncBrokerage: () => Promise<void>
 }
 
 const PortfolioContext = createContext<PortfolioContextValue | null>(null)
@@ -89,6 +97,10 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     loadQuotesLastSync(),
   )
   const [quotesError, setQuotesError] = useState<string | null>(null)
+  const [brokerageConnections, setBrokerageConnections] = useState<BrokerageConnection[]>([])
+  const [brokerageConnecting, setBrokerageConnecting] = useState(false)
+  const [brokerageSyncing, setBrokerageSyncing] = useState(false)
+  const [brokerageError, setBrokerageError] = useState<string | null>(null)
 
   const config = useMemo(() => supabaseConfigSummary(), [])
 
@@ -99,6 +111,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setEvents(bundle.events)
       setLastSyncAt(bundle.lastSyncAt)
       setBackend(bundle.backend)
+      setBrokerageConnections(bundle.brokerageConnections)
     },
     [],
   )
@@ -161,6 +174,61 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setQuotesSyncing(false)
     }
   }, [quotesSyncing, backend])
+
+  // Registers with SnapTrade (if needed) and opens a Connection Portal link.
+  // Manual, click-only — never fires automatically.
+  const connectBrokerage = useCallback(
+    async (broker?: string) => {
+      if (brokerageConnecting) return
+      if (backend !== 'supabase') {
+        setBrokerageError('Sign in to connect a brokerage')
+        return
+      }
+      setBrokerageConnecting(true)
+      setBrokerageError(null)
+      try {
+        const { error, redirectUrl } = await connectBrokerageRemote(broker)
+        if (error || !redirectUrl) {
+          setBrokerageError(error?.message ?? 'Could not start brokerage connection')
+          return
+        }
+        window.open(redirectUrl, '_blank', 'noopener,noreferrer')
+      } catch (e) {
+        setBrokerageError(e instanceof Error ? e.message : 'Could not start brokerage connection')
+      } finally {
+        setBrokerageConnecting(false)
+      }
+    },
+    [brokerageConnecting, backend],
+  )
+
+  // Pulls live positions from SnapTrade into holdings. Unlike refreshQuotes,
+  // this can add/update whole holdings rows, so it reloads from the backend
+  // afterward rather than patching state in place.
+  const syncBrokerage = useCallback(async () => {
+    if (brokerageSyncing) return
+    if (backend !== 'supabase') {
+      setBrokerageError('Sign in to sync a brokerage')
+      return
+    }
+    setBrokerageSyncing(true)
+    setBrokerageError(null)
+    try {
+      const { error, outcome } = await syncBrokerageRemote()
+      if (error || !outcome) {
+        setBrokerageError(error?.message ?? 'Sync failed')
+        return
+      }
+      await refreshFromBackend()
+      if (outcome.errors.length > 0) {
+        setBrokerageError(`Synced with ${outcome.errors.length} issue(s) — see Settings`)
+      }
+    } catch (e) {
+      setBrokerageError(e instanceof Error ? e.message : 'Sync failed')
+    } finally {
+      setBrokerageSyncing(false)
+    }
+  }, [brokerageSyncing, backend, refreshFromBackend])
 
   // Boot: local immediately, then Supabase session + remote if configured
   useEffect(() => {
@@ -415,6 +483,12 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     quotesLastSyncedAt,
     quotesError,
     refreshQuotes,
+    brokerageConnections,
+    brokerageConnecting,
+    brokerageSyncing,
+    brokerageError,
+    connectBrokerage,
+    syncBrokerage,
   }
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>
