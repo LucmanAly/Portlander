@@ -35,8 +35,10 @@ export async function fetchLocalEventsSync(
 /**
  * Merge Finnhub/local-sync events over existing ones by id.
  * Prefer sync file for same id; keep manual/demo events not present in sync.
- * When sync has earnings for a ticker+date, drop older demo earnings with different ids
- * for the same ticker on that date.
+ * Once a real Finnhub earnings row exists for a ticker, drop *all* older
+ * demo/local earnings for that ticker — matching by ticker+date alone
+ * misses them, since demo dates are arbitrary "today + N" offsets that
+ * essentially never land on the real calendar date.
  */
 export function mergeEvents(
   existing: PortfolioEvent[],
@@ -45,18 +47,17 @@ export function mergeEvents(
   const byId = new Map<string, PortfolioEvent>()
   for (const e of existing) byId.set(e.id, e)
 
-  const incomingKeys = new Set(
+  const syncedTickers = new Set(
     incoming
-      .filter((e) => e.eventType === 'earnings' && e.ticker)
-      .map((e) => `${e.ticker!.toUpperCase()}|${e.eventDate}`),
+      .filter((e) => e.eventType === 'earnings' && e.ticker && e.source === 'finnhub')
+      .map((e) => e.ticker!.toUpperCase()),
   )
 
-  // Drop demo/local earnings that match a synced ticker+date (avoid duplicates)
+  // Drop demo/local earnings for any ticker now covered by a real Finnhub sync
   for (const [id, e] of [...byId.entries()]) {
     if (e.eventType !== 'earnings' || !e.ticker) continue
     if (e.source === 'finnhub') continue
-    const key = `${e.ticker.toUpperCase()}|${e.eventDate}`
-    if (incomingKeys.has(key)) byId.delete(id)
+    if (syncedTickers.has(e.ticker.toUpperCase())) byId.delete(id)
   }
 
   for (const e of incoming) {
