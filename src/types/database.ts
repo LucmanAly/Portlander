@@ -19,6 +19,9 @@ export interface Database {
           weight_override_pct: number | string | null
           tags: string[] | null
           notes: string | null
+          source: string
+          day_change_value: number | string | null
+          day_change_pct: number | string | null
           created_at: string
           updated_at: string
         }
@@ -33,6 +36,9 @@ export interface Database {
           weight_override_pct?: number | null
           tags?: string[] | null
           notes?: string | null
+          source?: string
+          day_change_value?: number | null
+          day_change_pct?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -47,6 +53,9 @@ export interface Database {
           weight_override_pct?: number | null
           tags?: string[] | null
           notes?: string | null
+          source?: string
+          day_change_value?: number | null
+          day_change_pct?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -166,6 +175,30 @@ export interface Database {
         }
         Relationships: []
       }
+      snaptrade_connections: {
+        Row: {
+          id: string
+          user_id: string
+          brokerage_name: string
+          authorization_id: string
+          connected_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          brokerage_name: string
+          authorization_id: string
+          connected_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          brokerage_name?: string
+          authorization_id?: string
+          connected_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -177,3 +210,4 @@ export interface Database {
 export type HoldingRow = Database['public']['Tables']['holdings']['Row']
 export type WatchlistRow = Database['public']['Tables']['watchlist']['Row']
 export type EventRow = Database['public']['Tables']['events']['Row']
+export type SnaptradeConnectionRow = Database['public']['Tables']['snaptrade_connections']['Row']

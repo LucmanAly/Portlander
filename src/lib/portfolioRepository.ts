@@ -1,6 +1,7 @@
-import type { Holding, PortfolioEvent, WatchlistItem } from '@/types'
+import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
 import { getSupabase, isSupabaseConfigured, resolveBackend, type DataBackend } from '@/lib/supabase'
 import {
+  brokerageConnectionFromRow,
   eventFromRow,
   holdingFromRow,
   holdingToUpdate,
@@ -25,6 +26,7 @@ export interface PortfolioBundle {
   events: PortfolioEvent[]
   lastSyncAt: string | null
   backend: DataBackend
+  brokerageConnections: BrokerageConnection[]
 }
 
 export interface RepoError {
@@ -47,6 +49,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
       backend: 'local',
+      brokerageConnections: [],
     }
   }
 
@@ -58,10 +61,11 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
       backend: 'local',
+      brokerageConnections: [],
     }
   }
 
-  const [holdingsRes, watchRes, eventsRes, syncRes] = await Promise.all([
+  const [holdingsRes, watchRes, eventsRes, syncRes, connectionsRes] = await Promise.all([
     sb.from('holdings').select('*').eq('user_id', userId).order('ticker'),
     sb.from('watchlist').select('*').eq('user_id', userId).order('ticker'),
     sb
@@ -75,6 +79,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    sb.from('snaptrade_connections').select('*').eq('user_id', userId).order('connected_at'),
   ])
 
   if (holdingsRes.error) throw holdingsRes.error
@@ -84,6 +89,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
   const holdings = (holdingsRes.data ?? []).map(holdingFromRow)
   const watchlist = (watchRes.data ?? []).map(watchlistFromRow)
   const events = (eventsRes.data ?? []).map(eventFromRow)
+  const brokerageConnections = (connectionsRes.data ?? []).map(brokerageConnectionFromRow)
 
   // Mirror to local as offline cache
   saveHoldings(holdings)
@@ -101,6 +107,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
     events: events.length > 0 ? events : loadEvents(),
     lastSyncAt,
     backend: 'supabase',
+    brokerageConnections,
   }
 }
 
@@ -201,8 +208,15 @@ export async function persistWatchlistRemote(
   return null
 }
 
+export interface QuoteRefreshResult {
+  ticker: string
+  lastPrice: number
+  dayChangeValue: number | null
+  dayChangePct: number | null
+}
+
 export interface QuoteRefreshOutcome {
-  results: { ticker: string; lastPrice: number }[]
+  results: QuoteRefreshResult[]
   tickersAttempted: number
   errors: string[]
   finishedAt: string | null
@@ -242,17 +256,24 @@ export async function refreshQuotesRemote(): Promise<{
   }
 }
 
-/** Patches only lastPrice/updatedAt for matched tickers; mirrors to local cache. */
+/** Patches only lastPrice/dayChange fields/updatedAt for matched tickers; mirrors to local cache. */
 export function applyQuoteResultsLocally(
   current: Holding[],
-  results: { ticker: string; lastPrice: number }[],
+  results: QuoteRefreshResult[],
 ): Holding[] {
   if (results.length === 0) return current
-  const priceByTicker = new Map(results.map((r) => [r.ticker.toUpperCase(), r.lastPrice]))
+  const byTicker = new Map(results.map((r) => [r.ticker.toUpperCase(), r]))
   const now = new Date().toISOString()
   const next = current.map((h) => {
-    const price = priceByTicker.get(h.ticker.toUpperCase())
-    return price == null ? h : { ...h, lastPrice: price, updatedAt: now }
+    const r = byTicker.get(h.ticker.toUpperCase())
+    if (!r) return h
+    return {
+      ...h,
+      lastPrice: r.lastPrice,
+      dayChangeValue: r.dayChangeValue ?? undefined,
+      dayChangePct: r.dayChangePct ?? undefined,
+      updatedAt: now,
+    }
   })
   saveHoldings(next)
   return next

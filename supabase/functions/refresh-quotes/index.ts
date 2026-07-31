@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     return json({ ok: true, status: 'ok', tickers: 0, results: [], errors: [], runId, finishedAt: new Date().toISOString() })
   }
 
-  const results: { ticker: string; lastPrice: number }[] = []
+  const results: { ticker: string; lastPrice: number; dayChangeValue: number | null; dayChangePct: number | null }[] = []
   const errors: string[] = []
 
   for (const ticker of tickers) {
@@ -133,14 +133,24 @@ Deno.serve(async (req) => {
       } else {
         const { data: updated, error: updErr } = await sb
           .from('holdings')
-          .update({ last_price: quote.c, updated_at: new Date().toISOString() })
+          .update({
+            last_price: quote.c,
+            day_change_value: quote.d ?? null,
+            day_change_pct: quote.dp ?? null,
+            updated_at: new Date().toISOString(),
+          })
           .eq('user_id', userId)
           .eq('ticker', ticker)
           .select('ticker')
         if (updErr) {
           errors.push(`${ticker}: ${updErr.message}`)
         } else if (updated && updated.length > 0) {
-          results.push({ ticker, lastPrice: quote.c })
+          results.push({
+            ticker,
+            lastPrice: quote.c,
+            dayChangeValue: quote.d ?? null,
+            dayChangePct: quote.dp ?? null,
+          })
         }
       }
     } catch (e) {

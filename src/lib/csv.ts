@@ -77,6 +77,7 @@ export function parseHoldingsCsv(text: string): { holdings: Holding[]; errors: s
       costBasis: Number.isFinite(costBasis) ? costBasis : undefined,
       lastPrice: Number.isFinite(lastPrice) ? lastPrice : undefined,
       weightOverridePct: Number.isFinite(weightOverridePct) ? weightOverridePct : undefined,
+      source: 'csv',
       createdAt: now,
       updatedAt: now,
     })
