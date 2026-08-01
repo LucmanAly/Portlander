@@ -2,48 +2,57 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Holding } from '@/types'
 
 /**
- * Characterization tests for `persistHoldingsRemote`.
- *
- * PR 5 of docs/PLAN-2026-08.md replaces its select-all → delete-missing →
- * upsert-all shape with per-row writes under an explicit authority model. These
- * pin what it does today so that rewrite is provably behaviour-preserving except
- * where it is meant to change. Where a test documents behaviour that is a known
- * defect rather than a requirement, it says so.
+ * Characterization tests for the per-row write primitives PR 5 introduced,
+ * replacing `persistHoldingsRemote`'s select-all → delete-missing →
+ * upsert-all shape. Local caching (`saveHoldings`) moved to the caller
+ * (`PortfolioContext`) as part of that split, so it's no longer exercised
+ * here — these test the remote write only.
  */
 
 interface RecordedOp {
-  op: 'select' | 'delete' | 'upsert'
+  op: 'upsert' | 'delete'
   table: string
   ids?: string[]
   rows?: Record<string, unknown>[]
 }
 
 let ops: RecordedOp[] = []
-let existingRows: { id: string; ticker: string; source: string }[] = []
+let existingRows: { id: string; source: string }[] = []
 
+/**
+ * Simulates the DB-level guard in `deleteHoldingsRemote`'s
+ * `.neq('source', 'snaptrade')`: only ids that exist and aren't
+ * source='snaptrade' are actually removed, exactly like Postgres would filter
+ * the WHERE clause — this lets tests prove the guard holds even when the
+ * caller passes a snaptrade id, not just when it politely omits one.
+ */
 function fakeClient() {
   return {
     from(table: string) {
       return {
-        select(_cols: string) {
-          return {
-            eq(_col: string, _val: string) {
-              ops.push({ op: 'select', table })
-              return Promise.resolve({ data: existingRows, error: null })
-            },
-          }
-        },
-        delete() {
-          return {
-            in(_col: string, ids: string[]) {
-              ops.push({ op: 'delete', table, ids })
-              return Promise.resolve({ error: null })
-            },
-          }
-        },
         upsert(rows: Record<string, unknown>[], _opts: unknown) {
           ops.push({ op: 'upsert', table, rows })
           return Promise.resolve({ error: null })
+        },
+        delete() {
+          return {
+            eq(_col: string, _val: string) {
+              return {
+                in(_col2: string, ids: string[]) {
+                  return {
+                    neq(_col3: string, guardVal: string) {
+                      const affected = ids.filter((id) => {
+                        const row = existingRows.find((r) => r.id === id)
+                        return !row || row.source !== guardVal
+                      })
+                      ops.push({ op: 'delete', table, ids: affected })
+                      return Promise.resolve({ error: null })
+                    },
+                  }
+                },
+              }
+            },
+          }
         },
       }
     },
@@ -56,8 +65,7 @@ vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => true,
 }))
 
-const { persistHoldingsRemote } = await import('@/lib/portfolioRepository')
-const { setStorageNamespace } = await import('@/lib/storage')
+const { upsertHoldingsRemote, deleteHoldingsRemote } = await import('@/lib/portfolioRepository')
 
 function holding(partial: Partial<Holding> & Pick<Holding, 'ticker' | 'source'>): Holding {
   return {
@@ -74,74 +82,36 @@ const USER = 'user-a'
 beforeEach(() => {
   ops = []
   existingRows = []
-  localStorage.clear()
-  setStorageNamespace(USER)
 })
 
-describe('persistHoldingsRemote', () => {
-  it('is a local-only write when signed out', async () => {
-    await persistHoldingsRemote([holding({ ticker: 'AAA', source: 'manual' })], null)
+describe('upsertHoldingsRemote', () => {
+  it('is a no-op when signed out', async () => {
+    await upsertHoldingsRemote([holding({ ticker: 'AAA', source: 'manual' })], null)
     expect(ops).toEqual([])
   })
 
-  it('deletes remote manual rows absent from the client list', async () => {
-    existingRows = [
-      { id: 'db-1', ticker: 'GONE', source: 'manual' },
-      { id: 'db-2', ticker: 'KEPT', source: 'manual' },
-    ]
-
-    await persistHoldingsRemote([holding({ ticker: 'KEPT', source: 'manual' })], USER)
-
-    expect(ops.find((o) => o.op === 'delete')?.ids).toEqual(['db-1'])
+  it('skips the upsert entirely for an empty rows list', async () => {
+    await upsertHoldingsRemote([], USER)
+    expect(ops).toEqual([])
   })
 
-  // The guard added in PR 1. Only snaptrade-sync may remove a synced row,
-  // because only it can tell "sold at the brokerage" from "this client is not
-  // holding a complete list right now".
-  it('never deletes a brokerage-synced row, however short the client list', async () => {
-    existingRows = [
-      { id: 'db-1', ticker: 'SYNC1', source: 'snaptrade' },
-      { id: 'db-2', ticker: 'SYNC2', source: 'snaptrade' },
-      { id: 'db-3', ticker: 'MANUAL', source: 'manual' },
-    ]
-
-    await persistHoldingsRemote([], USER)
-
-    expect(ops.find((o) => o.op === 'delete')?.ids).toEqual(['db-3'])
-  })
-
-  it('issues no delete when every remote row is still present', async () => {
-    existingRows = [{ id: 'db-1', ticker: 'AAA', source: 'manual' }]
-
-    await persistHoldingsRemote([holding({ ticker: 'AAA', source: 'manual' })], USER)
-
-    expect(ops.some((o) => o.op === 'delete')).toBe(false)
-  })
-
-  it('matches remote rows case-insensitively', async () => {
-    existingRows = [{ id: 'db-1', ticker: 'aaa', source: 'manual' }]
-
-    await persistHoldingsRemote([holding({ ticker: 'AAA', source: 'manual' })], USER)
-
-    expect(ops.some((o) => o.op === 'delete')).toBe(false)
-  })
-
-  it('skips the upsert entirely for an empty client list', async () => {
-    existingRows = [{ id: 'db-1', ticker: 'GONE', source: 'manual' }]
-
-    await persistHoldingsRemote([], USER)
-
-    expect(ops.some((o) => o.op === 'upsert')).toBe(false)
+  it('upserts exactly the given rows — nothing else', async () => {
+    await upsertHoldingsRemote(
+      [holding({ ticker: 'AAA', source: 'manual' }), holding({ ticker: 'BBB', source: 'csv' })],
+      USER,
+    )
+    expect(ops).toHaveLength(1)
+    expect(ops[0].op).toBe('upsert')
+    expect(ops[0].rows?.map((r) => r.ticker)).toEqual(['AAA', 'BBB'])
   })
 
   it('uppercases tickers on the way out', async () => {
-    await persistHoldingsRemote([holding({ ticker: 'aaa', source: 'manual' })], USER)
-
-    expect(ops.find((o) => o.op === 'upsert')?.rows?.[0].ticker).toBe('AAA')
+    await upsertHoldingsRemote([holding({ ticker: 'aaa', source: 'manual' })], USER)
+    expect(ops[0].rows?.[0].ticker).toBe('AAA')
   })
 
   it('preserves each row source', async () => {
-    await persistHoldingsRemote(
+    await upsertHoldingsRemote(
       [
         holding({ ticker: 'AAA', source: 'manual' }),
         holding({ ticker: 'BBB', source: 'csv' }),
@@ -149,30 +119,62 @@ describe('persistHoldingsRemote', () => {
       ],
       USER,
     )
-
-    const rows = ops.find((o) => o.op === 'upsert')?.rows ?? []
-    expect(rows.map((r) => r.source)).toEqual(['manual', 'csv', 'snaptrade'])
+    expect(ops[0].rows?.map((r) => r.source)).toEqual(['manual', 'csv', 'snaptrade'])
   })
 
-  // KNOWN DEFECT, pinned rather than endorsed. last_price and day_change_* are
-  // refresh-quotes's fields, but the browser sends them on every write, so a
-  // client holding a stale price can overwrite a fresher one. PR 5 stops the
-  // client sending them at all — update this test then.
-  it('currently sends price fields the browser has no authority over', async () => {
-    await persistHoldingsRemote(
-      [holding({ ticker: 'AAA', source: 'snaptrade', lastPrice: 1, dayChangePct: 2 })],
+  // Fixed in PR 5. Previously the client sent last_price/day_change_* (Finnhub's
+  // fields) and created_at (the DB default's field) on every write.
+  it('never sends last_price, day_change_*, or created_at — those belong to refresh-quotes and the DB default', async () => {
+    await upsertHoldingsRemote(
+      [
+        holding({
+          ticker: 'AAA',
+          source: 'snaptrade',
+          lastPrice: 1,
+          dayChangeValue: 2,
+          dayChangePct: 3,
+          createdAt: '2020-01-01T00:00:00.000Z',
+        }),
+      ],
       USER,
     )
+    const row = ops[0].rows?.[0] ?? {}
+    expect(row).not.toHaveProperty('last_price')
+    expect(row).not.toHaveProperty('day_change_value')
+    expect(row).not.toHaveProperty('day_change_pct')
+    expect(row).not.toHaveProperty('created_at')
+  })
+})
 
-    const row = ops.find((o) => o.op === 'upsert')?.rows?.[0] ?? {}
-    expect(row).toHaveProperty('last_price', 1)
-    expect(row).toHaveProperty('day_change_pct', 2)
+describe('deleteHoldingsRemote', () => {
+  it('is a no-op when signed out', async () => {
+    await deleteHoldingsRemote(['db-1'], null)
+    expect(ops).toEqual([])
   })
 
-  it('writes the local cache even when the remote write is skipped', async () => {
-    setStorageNamespace(null)
-    await persistHoldingsRemote([holding({ ticker: 'AAA', source: 'manual' })], null)
+  it('skips the delete entirely for an empty ids list', async () => {
+    await deleteHoldingsRemote([], USER)
+    expect(ops).toEqual([])
+  })
 
-    expect(localStorage.getItem('portlander.holdings.v1')).toContain('AAA')
+  it('deletes exactly the given ids', async () => {
+    existingRows = [
+      { id: 'db-1', source: 'manual' },
+      { id: 'db-2', source: 'manual' },
+    ]
+    await deleteHoldingsRemote(['db-1'], USER)
+    expect(ops[0]).toMatchObject({ op: 'delete', ids: ['db-1'] })
+  })
+
+  // The guard added in PR 1, moved to the query itself in PR 5. Only
+  // snaptrade-sync may remove a synced row — enforced by the DB filter, not
+  // by trusting every call site to pre-filter its id list correctly.
+  it('never deletes a row whose source is snaptrade, even if its id is explicitly requested', async () => {
+    existingRows = [
+      { id: 'db-1', source: 'snaptrade' },
+      { id: 'db-2', source: 'manual' },
+    ]
+    await deleteHoldingsRemote(['db-1', 'db-2'], USER)
+    expect(ops[0]).toMatchObject({ op: 'delete', ids: ['db-2'] })
   })
 })

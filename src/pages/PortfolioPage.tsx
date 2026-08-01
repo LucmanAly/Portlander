@@ -1,10 +1,11 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import { portfolioTotalValue, positionWeightPct } from '@/lib/scoring'
-import { holdingsToCsv, parseHoldingsCsv, planCsvImport } from '@/lib/csv'
+import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Trash2, Upload } from 'lucide-react'
+import type { Holding } from '@/types'
 
 export function PortfolioPage() {
   const {
@@ -12,7 +13,7 @@ export function PortfolioPage() {
     watchlist,
     addHolding,
     removeHolding,
-    replaceHoldings,
+    applyCsvImport,
     addWatchlist,
     removeWatchlist,
   } = usePortfolio()
@@ -33,6 +34,15 @@ export function PortfolioPage() {
   const [csvError, setCsvError] = useState<string | null>(null)
   const [csvInfo, setCsvInfo] = useState<string | null>(null)
   const [watchTicker, setWatchTicker] = useState('')
+  const [pendingCsv, setPendingCsv] = useState<{ parsed: Holding[]; errors: string[] } | null>(
+    null,
+  )
+  const [csvMode, setCsvMode] = useState<CsvImportMode>('merge')
+
+  const csvPlan = useMemo(
+    () => (pendingCsv ? planCsvImport(holdings, pendingCsv.parsed, csvMode) : null),
+    [pendingCsv, holdings, csvMode],
+  )
 
   function onAdd(e: FormEvent) {
     e.preventDefault()
@@ -63,23 +73,39 @@ export function PortfolioPage() {
         setCsvError(errors[0] ?? 'No holdings parsed')
         return
       }
-      const plan = planCsvImport(holdings, parsed)
-      replaceHoldings(plan.next)
-      setCsvInfo(
-        [
-          `Imported ${plan.imported} holdings`,
-          plan.protectedSynced ? `${plan.protectedSynced} brokerage-synced rows protected` : null,
-          plan.skipped
-            ? `${plan.skipped} row(s) skipped — already synced from your brokerage`
-            : null,
-          errors.length ? `${errors.length} warnings` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-      )
-      if (errors.length) setCsvError(errors.slice(0, 3).join('; '))
+      setCsvMode('merge')
+      setPendingCsv({ parsed, errors })
     }
     reader.readAsText(file)
+  }
+
+  function confirmCsvImport() {
+    if (!pendingCsv || !csvPlan) return
+    if (csvPlan.replaced > 0 && !confirm(`Replace will remove ${csvPlan.replaced} existing holding(s) not in this CSV. Continue?`)) {
+      return
+    }
+    applyCsvImport(csvPlan)
+    setCsvInfo(
+      [
+        `${csvMode === 'replace' ? 'Replaced with' : 'Merged'} ${csvPlan.imported} holdings`,
+        csvPlan.replaced ? `${csvPlan.replaced} row(s) removed` : null,
+        csvPlan.protectedSynced
+          ? `${csvPlan.protectedSynced} brokerage-synced rows protected`
+          : null,
+        csvPlan.skipped
+          ? `${csvPlan.skipped} row(s) skipped — already synced from your brokerage`
+          : null,
+        pendingCsv.errors.length ? `${pendingCsv.errors.length} warnings` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    )
+    if (pendingCsv.errors.length) setCsvError(pendingCsv.errors.slice(0, 3).join('; '))
+    setPendingCsv(null)
+  }
+
+  function cancelCsvImport() {
+    setPendingCsv(null)
   }
 
   function exportCsv() {
@@ -141,6 +167,71 @@ export function PortfolioPage() {
       <p className="text-xs text-ink-500">
         CSV headers: <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
       </p>
+
+      {pendingCsv && csvPlan ? (
+        <div className="surface-elevated space-y-4 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-100">Import preview</h2>
+            <div className="flex gap-1 rounded-lg bg-ink-900 p-1">
+              {(['merge', 'replace'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setCsvMode(mode)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                    csvMode === mode
+                      ? 'bg-accent-500 text-ink-950'
+                      : 'text-ink-400 hover:text-ink-200'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-ink-500">
+            {csvMode === 'merge'
+              ? 'Adds/updates CSV rows by ticker. Existing rows the CSV doesn’t mention are left alone.'
+              : 'CSV rows replace every existing manual/CSV row. Any manual/CSV ticker the CSV doesn’t mention is removed.'}
+          </p>
+          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div>
+              <dt className="text-ink-500">Imported</dt>
+              <dd className="tabular font-medium text-ink-100">{csvPlan.imported}</dd>
+            </div>
+            <div>
+              <dt className="text-ink-500">Removed</dt>
+              <dd className={`tabular font-medium ${csvPlan.replaced ? 'text-critical' : 'text-ink-100'}`}>
+                {csvPlan.replaced}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-ink-500">Synced protected</dt>
+              <dd className="tabular font-medium text-ink-100">{csvPlan.protectedSynced}</dd>
+            </div>
+            <div>
+              <dt className="text-ink-500">Skipped</dt>
+              <dd className="tabular font-medium text-ink-100">{csvPlan.skipped}</dd>
+            </div>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={confirmCsvImport}
+              className="focus-ring rounded-xl bg-accent-500 px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-accent-400"
+            >
+              Confirm {csvMode}
+            </button>
+            <button
+              type="button"
+              onClick={cancelCsvImport}
+              className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Add form */}
       <form

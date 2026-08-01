@@ -46,7 +46,7 @@ describe('parseHoldingsCsv', () => {
   })
 })
 
-describe('planCsvImport', () => {
+describe('planCsvImport — replace mode', () => {
   // The regression this exists for: onCsv used to hand the parsed rows straight
   // to replaceHoldings, which propagated a remote delete of every row the CSV
   // didn't mention — all 40 brokerage-synced positions, on one click.
@@ -58,11 +58,13 @@ describe('planCsvImport', () => {
     ]
     const parsed = [holding({ ticker: 'NEW', source: 'csv' })]
 
-    const plan = planCsvImport(existing, parsed)
+    const plan = planCsvImport(existing, parsed, 'replace')
 
     expect(plan.next.map((h) => h.ticker).sort()).toEqual(['NEW', 'SYNC1', 'SYNC2'])
     expect(plan.protectedSynced).toBe(2)
     expect(plan.imported).toBe(1)
+    expect(plan.toDeleteIds).toEqual(['id-OLDMANUAL'])
+    expect(plan.replaced).toBe(1)
   })
 
   it('replaces manual and csv rows the import does not carry forward', () => {
@@ -70,26 +72,71 @@ describe('planCsvImport', () => {
       holding({ ticker: 'OLDMANUAL', source: 'manual' }),
       holding({ ticker: 'OLDCSV', source: 'csv' }),
     ]
-    const plan = planCsvImport(existing, [holding({ ticker: 'NEW', source: 'csv' })])
+    const plan = planCsvImport(existing, [holding({ ticker: 'NEW', source: 'csv' })], 'replace')
 
     expect(plan.next.map((h) => h.ticker)).toEqual(['NEW'])
+    expect(plan.toDeleteIds.sort()).toEqual(['id-OLDCSV', 'id-OLDMANUAL'])
   })
 
   it('drops a CSV row that collides with a synced ticker, keeping the synced one', () => {
     const existing = [holding({ ticker: 'DUP', source: 'snaptrade', shares: 100 })]
-    const plan = planCsvImport(existing, [holding({ ticker: 'dup', source: 'csv', shares: 1 })])
+    const plan = planCsvImport(
+      existing,
+      [holding({ ticker: 'dup', source: 'csv', shares: 1 })],
+      'replace',
+    )
 
     expect(plan.next).toHaveLength(1)
     expect(plan.next[0].source).toBe('snaptrade')
     expect(plan.next[0].shares).toBe(100)
     expect(plan.skipped).toBe(1)
+    expect(plan.toDeleteIds).toEqual([])
   })
 
   it('leaves synced rows intact when the CSV parses to nothing', () => {
     const existing = [holding({ ticker: 'SYNC1', source: 'snaptrade' })]
-    const plan = planCsvImport(existing, [])
+    const plan = planCsvImport(existing, [], 'replace')
 
     expect(plan.next.map((h) => h.ticker)).toEqual(['SYNC1'])
     expect(plan.imported).toBe(0)
+    expect(plan.toDeleteIds).toEqual([])
+  })
+})
+
+describe('planCsvImport — merge mode', () => {
+  it('never deletes anything, even for rows the CSV does not mention', () => {
+    const existing = [
+      holding({ ticker: 'SYNC1', source: 'snaptrade' }),
+      holding({ ticker: 'OLDMANUAL', source: 'manual' }),
+    ]
+    const plan = planCsvImport(existing, [holding({ ticker: 'NEW', source: 'csv' })], 'merge')
+
+    expect(plan.toDeleteIds).toEqual([])
+    expect(plan.replaced).toBe(0)
+    expect(plan.next.map((h) => h.ticker).sort()).toEqual(['NEW', 'OLDMANUAL', 'SYNC1'])
+  })
+
+  it('updates an existing manual/csv row in place by ticker instead of duplicating it', () => {
+    const existing = [holding({ ticker: 'AAA', source: 'manual', shares: 10 })]
+    const plan = planCsvImport(existing, [holding({ ticker: 'aaa', source: 'csv', shares: 50 })], 'merge')
+
+    expect(plan.next).toHaveLength(1)
+    expect(plan.next[0].id).toBe('id-AAA')
+    expect(plan.next[0].shares).toBe(50)
+    expect(plan.toUpsert).toHaveLength(1)
+    expect(plan.toUpsert[0].id).toBe('id-AAA')
+  })
+
+  it('drops a CSV row that collides with a synced ticker, keeping the synced one', () => {
+    const existing = [holding({ ticker: 'DUP', source: 'snaptrade', shares: 100 })]
+    const plan = planCsvImport(
+      existing,
+      [holding({ ticker: 'dup', source: 'csv', shares: 1 })],
+      'merge',
+    )
+
+    expect(plan.next).toHaveLength(1)
+    expect(plan.next[0].source).toBe('snaptrade')
+    expect(plan.skipped).toBe(1)
   })
 })

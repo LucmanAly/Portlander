@@ -1,7 +1,7 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-01
-**Last agent:** claude (session 13)
+**Last agent:** claude (session 14)
 **Current phase:** Phase 1.5 — SnapTrade brokerage sync (Personal-auth refactor **built and deployed** as v17 of both Edge Functions; awaiting the owner's click-test)
 **Phase 1 status:** 🟢 Cloud deploy live and verified end-to-end; PR #4 merged. Only formal Phase 1 exit sign-off left. Phase 1.5 (SnapTrade): the Personal-vs-Commercial root cause is now **confirmed by SnapTrade itself** — a fresh key pair produced `400 code 1012`, "registerUser is not available for personal keys". Both functions were refactored to support `SnaptradeAuth.personalApiKey` (no registration, no `userId`/`userSecret`) behind a `SNAPTRADE_AUTH_MODE` switch defaulting to `personal`, plus an owner-only gate, and deployed as v17. The connect → sync happy-path has still never run end-to-end; that click-test is the remaining unknown.
 
@@ -114,6 +114,16 @@ Single source of truth for current state. If it's here, don't re-explain it else
 ## Session log
 
 Keep entries short — a few bullets, key files, pointer to the PR/commit for full detail. Don't re-narrate git history here.
+
+### 2026-08-01 — claude (session 14)
+- PR 5 of `docs/PLAN-2026-08.md` ("Mutation safety proper"), stacked on top of PR 4 (session 13). Branch `claude/portlander-pr5-mutation-safety-4kq7wz`.
+- Replaced `persistHoldingsRemote`'s select-all → delete-missing → upsert-all with two per-row primitives (`upsertHoldingsRemote`/`deleteHoldingsRemote`) that only ever touch the rows/ids explicitly passed in. The brokerage-synced guard moved from an app-level filter into the delete query itself (`.neq('source', 'snaptrade')`) so it holds regardless of what any given caller remembers to pre-filter.
+- `mappers.ts`'s `holdingToUpdate` → `holdingToWrite`: client no longer sends `last_price`/`day_change_*`/`created_at` on any write — fixes the PR 3 "KNOWN DEFECT, pinned" test for real instead of just documenting it.
+- Built the actual CSV Merge/Replace picker: import no longer applies instantly — it shows a preview card with live counts (imported/removed/synced-protected/skipped), a Merge/Replace toggle, and an explicit confirm click; Replace additionally confirms via dialog before a removal actually fires. Per-row delete in the Portfolio table now confirms via dialog too.
+- Verified in a real browser, not just unit tests: started the Vite dev server, drove it with Playwright (global install at `/opt/node22/lib/node_modules/playwright`, `chromium-cli` still not available in this environment — see session 7's note, still true) — exported the demo book, re-imported it through both Merge and Replace, confirmed the preview counts update live and the post-import summary matches, and confirmed dismissing the per-row delete dialog leaves the row in place. Screenshots in the scratchpad, not committed.
+- `npm run build`/`lint`/`test` all green — 63 tests (3 net new: the DB-level snaptrade-delete-guard test, plus merge-mode CSV coverage).
+- Key files: `src/lib/{mappers,portfolioRepository,csv}.ts`, `src/context/PortfolioContext.tsx`, `src/pages/PortfolioPage.tsx`, `src/components/portfolio/PortfolioTable.tsx`, `src/lib/{portfolioRepository,csv}.test.ts`.
+- **Not done, deliberately out of scope:** watchlist mutations (`persistWatchlistRemote`) still use the old whole-list diff shape — the plan scopes PR 5 to holdings only. PR 6 (score recalibration) is next per the plan's dependency order.
 
 ### 2026-08-01 — claude (session 13)
 - PR 4 of `docs/PLAN-2026-08.md` ("Data truthfulness"), built on top of PRs 1–3 (safety patch, dead-weight deletion, test harness — already on this branch, PR #14 draft). Branch `claude/portlander-pr4-data-truthfulness-0y1dsy`.
