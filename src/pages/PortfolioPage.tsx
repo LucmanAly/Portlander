@@ -1,5 +1,5 @@
 import { usePortfolio } from '@/context/PortfolioContext'
-import { formatMoney } from '@/lib/format'
+import { formatMoney, formatPct } from '@/lib/format'
 import {
   holdingMarketValue,
   portfolioDayChange,
@@ -198,7 +198,9 @@ export function PortfolioPage() {
             valueClassName={dayChangeClass}
           />
         </div>
-      </header>      <PortfolioTable
+      </header>
+
+      <PortfolioTable
         holdings={sorted}
         weightBasis={weightBasis}
         onRemove={removeHolding}
