@@ -2,10 +2,12 @@
  * Portlander — snaptrade-sync Edge Function
  *
  * User-scoped (like refresh-quotes). Pulls the calling user's live brokerage
- * positions from SnapTrade and merges them into holdings — additive/merge,
- * never destructive: only tickers present in the sync get touched, manual/
- * CSV tickers the brokerage doesn't cover are left alone. Never writes
- * last_price/day_change_* — that stays refresh-quotes's (Finnhub) job.
+ * positions from SnapTrade and merges them into holdings — additive/merge for
+ * manual/CSV rows (any ticker the brokerage doesn't cover is left alone), but
+ * reconciling for source='snaptrade' rows: a ticker no longer present in this
+ * run's positions gets deleted, so a position sold at the brokerage doesn't
+ * linger as a ghost holding. Never writes last_price/day_change_* — that
+ * stays refresh-quotes's (Finnhub) job.
  *
  * Mirrors snaptrade-connect's two customer models, selected by
  * SNAPTRADE_AUTH_MODE:
@@ -16,13 +18,6 @@
  *
  *   commercial — a Commercial API Key. Reads the caller's userSecret from
  *     snaptrade_users, written by snaptrade-connect at registration time.
- *
- * Known v1 gap: if a position is fully sold or a connection is removed on
- * SnapTrade's side, the corresponding holdings row is not deleted or zeroed
- * here — it just stops being refreshed by future syncs. Revisit if this
- * shows up in practice (would need a per-sync "seen tickers" diff+delete,
- * scoped to source='snaptrade' only, mirroring persistHoldingsRemote's
- * delete-then-upsert shape but source-scoped).
  *
  * Secrets (supabase secrets set):
  *   SNAPTRADE_CLIENT_ID
@@ -163,6 +158,7 @@ Deno.serve(async (req) => {
       { ticker: string; name?: string; totalUnits: number; totalCost: number }
     >()
 
+    const accountErrorsBefore = errors.length
     for (const account of accounts) {
       try {
         const positions = await api.getAllAccountPositions(account.id)
@@ -185,6 +181,7 @@ Deno.serve(async (req) => {
         errors.push(`account ${account.id}: ${msg}`)
       }
     }
+    const hadAccountError = errors.length > accountErrorsBefore
 
     const rows = [...aggregated.values()]
       .filter((a) => a.totalUnits > 0)
@@ -206,6 +203,31 @@ Deno.serve(async (req) => {
         .from('holdings')
         .upsert(rows, { onConflict: 'user_id,ticker' })
       if (upsertErr) errors.push(`holdings upsert: ${upsertErr.message}`)
+    }
+
+    // Reconcile sold-off positions: delete any source='snaptrade' row for this
+    // user whose ticker wasn't in this run's positions. Only when the run is
+    // trustworthy — zero positions or a per-account error could mean SnapTrade
+    // gave us an incomplete picture, and a mistaken delete here is a real user's
+    // holding disappearing, not just a stale cache entry.
+    if (rows.length > 0 && !hadAccountError) {
+      const seenTickers = new Set(rows.map((r) => r.ticker))
+      const { data: existingSnaptrade, error: listErr } = await sb
+        .from('holdings')
+        .select('id, ticker')
+        .eq('user_id', userId)
+        .eq('source', 'snaptrade')
+      if (listErr) {
+        errors.push(`holdings reconcile list: ${listErr.message}`)
+      } else {
+        const staleIds = (existingSnaptrade ?? [])
+          .filter((r) => !seenTickers.has(String(r.ticker)))
+          .map((r) => r.id)
+        if (staleIds.length > 0) {
+          const { error: delErr } = await sb.from('holdings').delete().in('id', staleIds)
+          if (delErr) errors.push(`holdings reconcile delete: ${delErr.message}`)
+        }
+      }
     }
 
     const status = errors.length ? (rows.length ? 'partial' : 'error') : 'ok'

@@ -20,14 +20,24 @@ import {
   setQuotesLastSync as localSetQuotesLastSync,
 } from '@/lib/storage'
 
+/** Freshness per Edge Function, keyed by what it writes rather than its provider name. */
+export interface SyncTimestamps {
+  positions: string | null
+  prices: string | null
+  events: string | null
+}
+
 export interface PortfolioBundle {
   holdings: Holding[]
   watchlist: WatchlistItem[]
   events: PortfolioEvent[]
   lastSyncAt: string | null
+  syncTimestamps: SyncTimestamps
   backend: DataBackend
   brokerageConnections: BrokerageConnection[]
 }
+
+const EMPTY_SYNC_TIMESTAMPS: SyncTimestamps = { positions: null, prices: null, events: null }
 
 export interface RepoError {
   message: string
@@ -48,6 +58,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       watchlist: loadWatchlist(),
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
+      syncTimestamps: EMPTY_SYNC_TIMESTAMPS,
       backend: 'local',
       brokerageConnections: [],
     }
@@ -60,27 +71,35 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       watchlist: loadWatchlist(),
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
+      syncTimestamps: EMPTY_SYNC_TIMESTAMPS,
       backend: 'local',
       brokerageConnections: [],
     }
   }
 
-  const [holdingsRes, watchRes, eventsRes, syncRes, connectionsRes] = await Promise.all([
-    sb.from('holdings').select('*').eq('user_id', userId).order('ticker'),
-    sb.from('watchlist').select('*').eq('user_id', userId).order('ticker'),
-    sb
-      .from('events')
-      .select('*')
-      .or(`user_id.eq.${userId},user_id.is.null`)
-      .order('event_date'),
+  const lastRunByProvider = (provider: string) =>
     sb
       .from('sync_runs')
       .select('finished_at, started_at, status')
+      .eq('provider', provider)
       .order('started_at', { ascending: false })
       .limit(1)
-      .maybeSingle(),
-    sb.from('snaptrade_connections').select('*').eq('user_id', userId).order('connected_at'),
-  ])
+      .maybeSingle()
+
+  const [holdingsRes, watchRes, eventsRes, positionsSyncRes, pricesSyncRes, eventsSyncRes, connectionsRes] =
+    await Promise.all([
+      sb.from('holdings').select('*').eq('user_id', userId).order('ticker'),
+      sb.from('watchlist').select('*').eq('user_id', userId).order('ticker'),
+      sb
+        .from('events')
+        .select('*')
+        .or(`user_id.eq.${userId},user_id.is.null`)
+        .order('event_date'),
+      lastRunByProvider('snaptrade-positions'),
+      lastRunByProvider('finnhub-quotes'),
+      lastRunByProvider('finnhub'),
+      sb.from('snaptrade_connections').select('*').eq('user_id', userId).order('connected_at'),
+    ])
 
   if (holdingsRes.error) throw holdingsRes.error
   if (watchRes.error) throw watchRes.error
@@ -96,8 +115,20 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
   saveWatchlist(watchlist)
   if (events.length > 0) saveEvents(events)
 
+  const runTimestamp = (res: { data: { finished_at: string | null; started_at: string } | null }) =>
+    res.data?.finished_at ?? res.data?.started_at ?? null
+
+  const syncTimestamps: SyncTimestamps = {
+    positions: runTimestamp(positionsSyncRes),
+    prices: runTimestamp(pricesSyncRes),
+    events: runTimestamp(eventsSyncRes),
+  }
+
   const lastSyncAt =
-    syncRes.data?.finished_at ?? syncRes.data?.started_at ?? loadLastSync()
+    [syncTimestamps.positions, syncTimestamps.prices, syncTimestamps.events]
+      .filter((v): v is string => Boolean(v))
+      .sort()
+      .at(-1) ?? loadLastSync()
 
   if (lastSyncAt) localSetLastSync(lastSyncAt)
 
@@ -106,6 +137,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
     watchlist,
     events: events.length > 0 ? events : loadEvents(),
     lastSyncAt,
+    syncTimestamps,
     backend: 'supabase',
     brokerageConnections,
   }

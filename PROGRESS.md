@@ -1,7 +1,7 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-01
-**Last agent:** claude
+**Last agent:** claude (session 13)
 **Current phase:** Phase 1.5 — SnapTrade brokerage sync (Personal-auth refactor **built and deployed** as v17 of both Edge Functions; awaiting the owner's click-test)
 **Phase 1 status:** 🟢 Cloud deploy live and verified end-to-end; PR #4 merged. Only formal Phase 1 exit sign-off left. Phase 1.5 (SnapTrade): the Personal-vs-Commercial root cause is now **confirmed by SnapTrade itself** — a fresh key pair produced `400 code 1012`, "registerUser is not available for personal keys". Both functions were refactored to support `SnaptradeAuth.personalApiKey` (no registration, no `userId`/`userSecret`) behind a `SNAPTRADE_AUTH_MODE` switch defaulting to `personal`, plus an owner-only gate, and deployed as v17. The connect → sync happy-path has still never run end-to-end; that click-test is the remaining unknown.
 
@@ -18,7 +18,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main`. `main` now includes everything through PR #5 (SnapTrade + configurable table) via PR #6 — owner spent a build minute deliberately to deploy for real testing. |
-| `sync-events` Edge Function | ✅ Live | Global/unscoped (writes shared `events` rows), `verify_jwt: true`, `FINNHUB_API_KEY` set and confirmed working |
+| `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped (writes shared `events` rows), `verify_jwt: true`, `FINNHUB_API_KEY` set and confirmed working. Macro rows (FOMC/CPI/NFP) now come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic date generation. All 9 old `macro-seed` rows deleted from prod; 18 `macro-calendar` rows confirmed live |
 | Daily cron | ✅ Live | `pg_cron` job `daily-sync-events`, `0 11 * * *` UTC, 60s `pg_net` timeout. Owner can retune the time via `select cron.alter_job(1, schedule => '<expr>');` |
 | Owner sign-in + real sync | ✅ Confirmed | Magic-link auth works (after an Auth Site URL fix), 40 real holdings imported, 34 real Finnhub earnings events confirmed live in `events` |
 | `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped. Powers manual "Refresh prices" UI control. Now also persists `day_change_value`/`day_change_pct` from Finnhub's quote response (was fetched, previously discarded) |
@@ -57,7 +57,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 - [x] Owner generated a fresh Client ID + Consumer Key pair and set both in Supabase Secrets — this cleared the `1076` signature error and produced `1012` instead, which is what finally proved the key is Personal, not Commercial.
 - [x] Both Edge Functions refactored to Personal auth and deployed as **v17** (agent-deployed via the Supabase MCP, not owner-deployed).
 - [ ] **Owner: click "Connect brokerage" once more.** Nothing to configure first — `SNAPTRADE_AUTH_MODE` defaults to `personal` and the owner gate auto-resolves while this project has one auth user. The connect → sync flow has still never succeeded end-to-end.
-- [ ] Decide whether to handle the "position fully sold" gap (see `snaptrade-sync/README.md` "Known v1 gap") if it shows up in practice
+- [x] "Position fully sold" gap fixed (v18, session 13) — `snaptrade-sync` now diff+deletes `source='snaptrade'` rows missing from the current run, skipped on zero positions or any per-account error. Not yet exercised by a real sell (the click-test in the item above still hasn't happened even once), so the reconciliation path itself is unverified against a live SnapTrade response.
 
 ---
 
@@ -68,8 +68,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 3. **Owner (optional):** retune the `11:00 UTC` cron time to your actual timezone.
 4. **Owner (still unaddressed since session 5):** check Netlify → Site configuration → Build & deploy → Deploy contexts — Deploy Previews for PRs may be consuming build minutes separately from `main` pushes.
 5. Mark Phase 1 exit criteria formally once the above are confirmed.
-6. If real syncs surface the "position fully sold" gap (see SnapTrade checklist above), build the source-scoped diff+delete described in `snaptrade-sync/README.md`.
-7. Phase 2 (prep cards, journal, alerts) — separate from SnapTrade work, can proceed in parallel once Phase 1 is signed off.
+6. Phase 2 (prep cards, journal, alerts) — separate from SnapTrade work, can proceed in parallel once Phase 1 is signed off.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for adding PE ratio/market cap later. Verified (not memory): 60 calls/min free-tier limit, no daily cap; the earnings-calendar endpoint has a bulk mode (omit `symbol`, get all companies in one call); PE/market cap are price-derived and should refresh 2-3x/day, not weekly (corrected an earlier wrong suggestion); Netlify/Supabase costs are a non-issue at this scale — Finnhub's per-minute limit is the only real constraint. Proposed shape if built: daily bulk earnings call + a 2-3x/day PE/market-cap sync paced ~1.1s/ticker. **Owner hasn't decided whether to build this yet.**
 
@@ -107,12 +106,25 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | 2026-08-01 | Support **both** SnapTrade customer models behind `SNAPTRADE_AUTH_MODE`, defaulting to `personal` — rather than replacing the commercial path | The fresh key pair returned `1012` ("registerUser is not available for personal keys"), which settled the question SnapTrade's dashboard labels never did. The SDK enforces the split per endpoint, verified in `snaptrade-typescript-sdk@11.0.4`'s compiled source: `/snapTrade/registerUser` declares `authModes: ["commercialApiKey"]` while `/snapTrade/login` declares both, and in personal mode `userId`/`userSecret` are typed `never` on every request. Keeping commercial mode costs one `if` per function and preserves the only path to real multi-user brokerage support, which deleting it would have foreclosed. Personal is the default so the owner's install needs no new secret to work. |
 | 2026-08-01 | Personal mode is gated to one user; the owner is auto-resolved when the project has exactly one auth user, and refuses to guess otherwise | A Personal key is bound to the key owner's own brokerage account — every call with it returns the owner's holdings regardless of who invoked the function, so an ungated personal mode would serve any future signup the owner's live positions. `SNAPTRADE_OWNER_USER_ID` is the explicit answer; falling back to "the single auth user" keeps today's one-user install working with zero configuration, and erroring on ≥2 users turns the ambiguity into an actionable message instead of a data leak. Fail-safe without adding another round of "set this secret, try again", which is what the previous four sessions each cost. |
 | 2026-08-01 | `connectionType: 'read'` passed explicitly on the Connection Portal request | Portlander's brokerage scope is read-only (an `AGENTS.md` non-goal). `read` is SnapTrade's default, but stating it means a future SDK default change can't silently request trading permission on the owner's account. |
+| 2026-08-01 | Macro calendar (FOMC/CPI/NFP) replaced with a static, hand-verified table instead of the plan's original ask for hardcoded dates "through 2027" | `buildMacroEvents()`'s weekday-math heuristic was fabricating dates with no connection to real Fed/BLS schedules. Researched real dates via web search (this sandbox's `WebFetch` tool 403s on every external host, including federalreserve.gov/bls.gov directly — used `WebSearch`'s synthesized snippets, corroborated across multiple independent sources per date). Table only covers what's actually officially published as of 2026-08-01: 2026 FOMC dates (confirmed schedule) + the 2027 FOMC dates the Fed itself already labels "tentative" (status `estimated` here) + CPI through Sept 2026 data + NFP through Dec 2026 data — BLS's own full-year schedule pages didn't yield further exact dates via search snippets, so the table stops there rather than guessing. Extend `supabase/functions/_shared/macro-calendar.ts` from the primary sources directly when it goes stale, not by pattern-matching existing rows. |
+| 2026-08-01 | `snaptrade-sync`'s reconcile-delete only runs when `rows.length > 0 && !hadAccountError` | A zero-position response or a failure on any one brokerage account means the position list can't be trusted as complete — deleting under either condition risks wiping real holdings because SnapTrade had a bad moment, not because the user actually sold. `hadAccountError` is tracked via an errors-array length diff around just the per-account loop (not the connection-metadata loop before it), so a connection-metadata hiccup doesn't block reconciliation but a positions-fetch failure does. |
 
 ---
 
 ## Session log
 
 Keep entries short — a few bullets, key files, pointer to the PR/commit for full detail. Don't re-narrate git history here.
+
+### 2026-08-01 — claude (session 13)
+- PR 4 of `docs/PLAN-2026-08.md` ("Data truthfulness"), built on top of PRs 1–3 (safety patch, dead-weight deletion, test harness — already on this branch, PR #14 draft). Branch `claude/portlander-pr4-data-truthfulness-0y1dsy`.
+- New `supabase/functions/_shared/macro-calendar.ts`: static table of real FOMC/CPI/NFP dates (see Decisions row for sourcing/limits). `sync-events` now reads it; deleted `buildMacroEvents()`/`nextWeekday()`/`firstFriday()`/`addDays()`. New rows use `source='macro-calendar'`, `status` reflects whether the date itself is Fed-confirmed or Fed-tentative.
+- One-off `delete from events where source='macro-seed'` run against prod — 9 fabricated rows removed, confirmed via `select source, count(*) from events` before/after.
+- `snaptrade-sync`: added the `seenTickers` diff+delete this file's SnapTrade section used to list as a known gap (see Decisions). Removed the "Known v1 gap" comment block and updated the function's own README.
+- `portfolioRepository.ts`: `loadPortfolioBundle` now queries `sync_runs` once per provider (`snaptrade-positions`/`finnhub-quotes`/`finnhub`) instead of one global newest-row query; new `syncTimestamps: {positions, prices, events}` on `PortfolioBundle`, threaded through `PortfolioContext` and shown as three labelled rows in Settings (previously one "Last sync"). `lastSyncAt` (used by the compact AppShell/Today badges) is now derived as the max of the three rather than its own separate query.
+- Verified in prod, not just deployed: diffed both functions' deployed source against git before touching anything (byte-identical, no drift — PR 2's rule held), then after deploying (`sync-events` v14, `snaptrade-sync` v18) triggered `sync-events` for real via the same `net.http_post` the daily cron uses (works around this sandbox's inability to reach the project host directly — see session 12's note) and confirmed 18/18 macro rows landed with the correct `event_date`/`status` split. `get_advisors` shows no new findings, only the same pre-existing infra items other sessions already logged.
+- `npm run build`/`lint`/`test` all green (60 tests, unchanged — this PR didn't touch anything under test).
+- Key files: `supabase/functions/_shared/macro-calendar.ts` (new), `supabase/functions/{sync-events,snaptrade-sync}/{index.ts,README.md}`, `src/data/macro.ts`, `src/lib/portfolioRepository.ts`, `src/context/PortfolioContext.tsx`, `src/pages/SettingsPage.tsx`.
+- **Not done, deliberately out of scope for this PR:** PR 5 (per-row writes / CSV Merge-Replace picker) and PR 6 (score recalibration) per the plan's dependency order — PR 6 needs this PR's clean weights first, but isn't this PR.
 
 ### 2026-08-01 — claude (session 12)
 - Owner set a **fresh** SnapTrade key pair and retried; the error changed from `401`/`1076` to `400`/`1012`: *"Personal SnapTrade keys are provisioned with their user automatically at signup … registerUser is not available for personal keys."* That is SnapTrade confirming the Personal-key hypothesis outright, so no further diagnosis was needed.
