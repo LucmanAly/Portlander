@@ -1,8 +1,8 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-01
-**Last agent:** codex (session 17)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics/release metadata and the Portfolio table-first UI refinements, are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
+**Last agent:** codex (session 18)
+**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics/release metadata and the Portfolio table-first UI refinements, are now promoted to `main` as the Phase 1 `v1.0` release; Netlify follows its normal git-linked production deploy.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -15,7 +15,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Area | Status | Notes |
 |------|--------|-------|
 | Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
-| Settings diagnostics + release metadata | ✅ Done on `develop` | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
+| Settings diagnostics + release metadata | ✅ Done on `main` (`v1.0`) | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
 | `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
@@ -36,7 +36,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 - [ ] Phase 1 exit criteria formally signed off:
   - [x] Real portfolio loadable; earnings from Finnhub, not demo offsets
   - [ ] Weight ranking + exposure % sanity (math unchanged, not yet owner-verified)
-  - [ ] Snappy UI (fixes live on `develop`, awaiting confirmation)
+  - [ ] Snappy UI (fixes live on `main`, awaiting confirmation)
   - [ ] Used on a real morning once
 
 ### SnapTrade (new scope, not in original AGENTS.md plan)
@@ -52,7 +52,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
 2. **Owner:** click-test "Refresh prices" too, if not already done.
 3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
-4. **Owner:** merge `develop` → `main` when ready to deploy the final Phase 1 UI (costs a Netlify build minute, so deliberate, not automatic).
+4. **Owner:** verify the promoted Phase 1 build on Netlify and complete the remaining real-book acceptance checks.
 5. On the deployed build, verify real-book weight/exposure sanity, sign-out clearing, mobile layout, and one real morning of use; then mark Phase 1 exit criteria formally.
 6. Phase 2 (prep cards, journal, alerts) can begin after that sign-off.
 
@@ -72,7 +72,9 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |\n| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
+| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
+| 2026-08-01 | Phase 1 v1.0 promoted to `main` | PR #25 merged `develop` into `main` after CI run #24 passed build, lint, and test; the production-only SnapTrade error-detail commits already on `main` were preserved |
+| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
 | 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
 | 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
 | 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The dashboard "Schedules" tab this file used to reference doesn't exist. A real sync takes ~16s server-side; `pg_net`'s 5s default was logging a misleading timeout even though the function completed fine |
@@ -96,11 +98,17 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
 
+### 2026-08-01 — codex (session 18)
+- PR #25 promoted `develop` into `main` as the Phase 1 `v1.0` release; the main-targeted CI run (#24) passed build, lint, and test.
+- Preserved the two production-only SnapTrade error-detail commits already on `main`.
+- Settings release metadata records the promotion timestamp `2026-08-01T22:51:27Z` (formatted for Eastern Time).
+- Remaining Phase 1 work is owner acceptance: brokerage connect/sync, Refresh prices, real-book weight/exposure sanity, sign-out clearing, mobile check, and one real morning.
+
 ### 2026-08-01 — codex (session 17)
 - Portfolio now opens on the holdings table with total value plus whole-book daily dollar and percentage change; incomplete price refreshes show an honest unavailable state.
 - Moved CSV import/export, add/update, search, source filters, and sorting below the table.
 - Replaced arrow-based desktop column ordering with native drag-and-drop rows; visibility toggles remain beside each column.
-- This remains part of the Phase 1 v1.0 candidate on `develop`; production `main`/Netlify is unchanged.
+- This became the Phase 1 v1.0 candidate promoted in session 18.
 
 ### 2026-08-01 — codex (session 16)
 - Settings refactor: added a single Diagnostics card with live Backend/Auth/Positions/Prices/Events status rows, surfaced error details, and reload/price-check actions.
