@@ -1,6 +1,6 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
-import { portfolioTotalValue, positionWeightPct } from '@/lib/scoring'
+import { portfolioTotalValue, portfolioWeightBasis, positionWeightPct } from '@/lib/scoring'
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
@@ -18,13 +18,17 @@ export function PortfolioPage() {
     removeWatchlist,
   } = usePortfolio()
 
+  // Two different totals: `total` is the raw dollar sum for the header display;
+  // `weightBasis` is what weight percentages should actually divide by, so a
+  // book mixing weight overrides and computed weights still sums to 100%.
   const total = portfolioTotalValue(holdings)
+  const weightBasis = portfolioWeightBasis(holdings)
   const sorted = useMemo(
     () =>
       [...holdings].sort(
-        (a, b) => positionWeightPct(b, total) - positionWeightPct(a, total),
+        (a, b) => positionWeightPct(b, weightBasis) - positionWeightPct(a, weightBasis),
       ),
-    [holdings, total],
+    [holdings, weightBasis],
   )
 
   const [ticker, setTicker] = useState('')
@@ -288,7 +292,7 @@ export function PortfolioPage() {
         </div>
       </form>
 
-      <PortfolioTable holdings={sorted} total={total} onRemove={removeHolding} />
+      <PortfolioTable holdings={sorted} weightBasis={weightBasis} onRemove={removeHolding} />
 
       {/* Watchlist */}
       <section className="space-y-3">

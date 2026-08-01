@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   computeExposure,
   holdingMarketValue,
+  isEstimatedValue,
   portfolioTotalValue,
+  portfolioWeightBasis,
   positionWeightPct,
   scoreAndFilterEvents,
   scoreEvent,
+  scoreTier,
+  weightAnchor,
 } from '@/lib/scoring'
 import type { Holding, PortfolioEvent } from '@/types'
 
@@ -42,11 +46,14 @@ describe('market value and weights', () => {
     expect(holdingMarketValue(holding('AAA', 10, 5))).toBe(50)
   })
 
-  // KNOWN DEFECT, pinned. Falling back to cost basis mixes cost and market
-  // values into one "Book value" with no marker. PR 6 (plan 3.1) flags these
-  // rows as estimated instead — update this test then.
-  it('currently falls back to cost basis with no estimated marker', () => {
-    expect(holdingMarketValue(holding('AAA', 10, undefined, { costBasis: 4 }))).toBe(40)
+  // Fixed in PR 6. Falling back to cost basis is still a real market value
+  // (still used in totals/weights), but now flagged as estimated rather than
+  // silently indistinguishable from an observed price.
+  it('falls back to cost basis and flags the result as estimated', () => {
+    const h = holding('AAA', 10, undefined, { costBasis: 4 })
+    expect(holdingMarketValue(h)).toBe(40)
+    expect(isEstimatedValue(h)).toBe(true)
+    expect(isEstimatedValue(holding('AAA', 10, 5))).toBe(false)
   })
 
   it('treats a holding with neither price nor cost as worthless', () => {
@@ -74,15 +81,46 @@ describe('market value and weights', () => {
     expect(positionWeightPct(under, 1000)).toBe(0)
   })
 
-  // KNOWN DEFECT, pinned. An override bypasses portfolioTotalValue(), so a book
-  // mixing overridden and computed weights does not sum to 100%. PR 6 (plan 3.1)
-  // routes overrides through the total — update this test then.
-  it('currently lets a mixed book sum to more than 100%', () => {
+  // Fixed in PR 6. positionWeightPct's computed branch now divides by
+  // portfolioWeightBasis(), which scales down to leave exactly the room the
+  // overrides don't already claim — so a mixed book sums to 100%.
+  it('lets a mixed book sum to exactly 100%', () => {
     const book = [holding('AAA', 10, 10, { weightOverridePct: 90 }), holding('BBB', 10, 10)]
-    const total = portfolioTotalValue(book)
-    const sum = book.reduce((acc, h) => acc + positionWeightPct(h, total), 0)
+    const basis = portfolioWeightBasis(book)
+    const sum = book.reduce((acc, h) => acc + positionWeightPct(h, basis), 0)
 
-    expect(sum).toBeCloseTo(140, 5)
+    expect(sum).toBeCloseTo(100, 5)
+  })
+
+  it('portfolioWeightBasis matches portfolioTotalValue when nothing is overridden', () => {
+    const book = [holding('AAA', 10, 10), holding('BBB', 10, 30)]
+    expect(portfolioWeightBasis(book)).toBe(portfolioTotalValue(book))
+  })
+})
+
+describe('weightAnchor', () => {
+  it('floors at 5% on a book with one dominant position and a long thin tail', () => {
+    const book = [
+      holding('BIG', 91, 1),
+      ...Array.from({ length: 9 }, (_, i) => holding(`T${i}`, 1, 1)),
+    ]
+    const basis = portfolioWeightBasis(book)
+    expect(weightAnchor(book, basis)).toBe(5)
+  })
+
+  it('scales up with a more spread-out book instead of staying fixed', () => {
+    const flat = Array.from({ length: 10 }, (_, i) => holding(`T${i}`, 10, 1))
+    const basis = portfolioWeightBasis(flat)
+    expect(weightAnchor(flat, basis)).toBeGreaterThan(5)
+  })
+})
+
+describe('scoreTier', () => {
+  it('buckets into high/medium/low at the 70/45 boundaries', () => {
+    expect(scoreTier(70)).toBe('high')
+    expect(scoreTier(69)).toBe('medium')
+    expect(scoreTier(45)).toBe('medium')
+    expect(scoreTier(44)).toBe('low')
   })
 })
 
@@ -128,18 +166,17 @@ describe('scoreEvent', () => {
     expect(scored.positionWeightPct).toBe(0)
   })
 
-  // KNOWN DEFECT, pinned. weightNorm clamps at 20%, so every position at or
-  // above that weight scores identically and the ordering the product exists to
-  // provide stops working exactly where it matters most. PR 6 (plan 3.2)
-  // replaces the anchor with a portfolio-relative one — update this test then.
-  it('currently cannot separate a 25% position from a 50% one', () => {
+  // Fixed in PR 6. weightNorm now normalizes against a portfolio-relative
+  // anchor (weightAnchor) instead of a fixed 20% clamp, so a 50% position
+  // scores meaningfully higher than a 25% one instead of both maxing out.
+  it('separates a 25% position from a 50% one', () => {
     const book = [holding('QUARTER', 25, 1), holding('HALF', 50, 1), holding('REST', 25, 1)]
     const total = portfolioTotalValue(book)
 
     const quarter = scoreEvent(earnings('QUARTER', '2026-08-04'), book, [], total, TODAY)
     const half = scoreEvent(earnings('HALF', '2026-08-04'), book, [], total, TODAY)
 
-    expect(half.impactScore).toBe(quarter.impactScore)
+    expect(half.impactScore).toBeGreaterThan(quarter.impactScore)
   })
 
   it('breaks the score into components that sum to it', () => {
@@ -158,9 +195,10 @@ describe('scoreEvent', () => {
  * 41 positions, max weight 13.5%, p90 4.49%, median 1.64% — using synthetic
  * tickers and values. It deliberately does not carry real holdings.
  *
- * Under the current /20 anchor almost the whole book lands in one narrow band
- * and only the largest position can reach the red tier. PR 6 (plan 3.2) replaces
- * the anchor and these expectations change — that is the point of the test.
+ * Fixed in PR 6: the old fixed /20 anchor compressed almost the whole book into
+ * one narrow band and let only the largest position reach the red tier. The
+ * portfolio-relative anchor (weightAnchor) spreads the same book across all
+ * three tiers instead.
  */
 describe('score distribution on a realistically flat book', () => {
   // Scaled to sum to exactly 100 with the measured max and median held fixed.
@@ -181,15 +219,15 @@ describe('score distribution on a realistically flat book', () => {
     expect(positionWeightPct(book[25], total)).toBeCloseTo(1.64, 1)
   })
 
-  it('lets exactly one position reach the red >=70 tier', () => {
+  it('lets more than just the single largest position reach the red >=70 tier', () => {
     const scores = book.map(
       (h) => scoreEvent(earnings(h.ticker, inThreeDays), book, [], total, TODAY).impactScore,
     )
 
-    expect(scores.filter((s) => s >= 70)).toHaveLength(1)
+    expect(scores.filter((s) => s >= 70).length).toBeGreaterThan(1)
   })
 
-  it('compresses the middle of the book into a narrow band', () => {
+  it('spreads the middle of the book out instead of compressing it', () => {
     const scores = book
       .map((h) => scoreEvent(earnings(h.ticker, inThreeDays), book, [], total, TODAY).impactScore)
       .sort((a, b) => a - b)
@@ -197,7 +235,7 @@ describe('score distribution on a realistically flat book', () => {
     const median = scores[Math.floor(scores.length / 2)]
     const p90 = scores[Math.floor(scores.length * 0.9)]
 
-    expect(p90 - median).toBeLessThan(15)
+    expect(p90 - median).toBeGreaterThan(15)
   })
 })
 
@@ -300,7 +338,6 @@ describe('computeExposure', () => {
   })
 
   it('picks the highest-impact held earnings event as next critical', () => {
-    // Weights kept under the /20 anchor so neither clamps to the same score.
     const flat = [holding('SMALL', 5, 1), holding('MID', 15, 1), holding('FILLER', 80, 1)]
     const events = [earnings('SMALL', '2026-08-05'), earnings('MID', '2026-08-06')]
     const exposure = computeExposure(events, flat, [], TODAY)

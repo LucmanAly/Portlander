@@ -300,9 +300,11 @@ export function SettingsPage() {
         <h2 className="mb-2 text-sm font-semibold text-ink-200">Impact score v0</h2>
         <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
 {`impact =
-  65% × position_weight (norm to 20%)
+  65% × position_weight (norm to anchor)
 + 25% × event_type_weight
-+ 10% × recency_boost`}
++ 10% × recency_boost
+
+anchor = max(5%, p90 position weight × 1.5)`}
         </pre>
       </section>
     </div>
