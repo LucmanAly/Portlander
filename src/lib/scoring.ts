@@ -123,10 +123,10 @@ export function holdingDayChange(h: Holding): number | undefined {
 /** True when every position has an observed price and day-change value from the same refresh. */
 function hasObservedDayChange(h: Holding): boolean {
   return (
-    Number.isFinite(h.lastPrice) &&
     h.lastPrice != null &&
-    Number.isFinite(h.dayChangeValue) &&
-    h.dayChangeValue != null
+    Number.isFinite(h.lastPrice) &&
+    h.dayChangeValue != null &&
+    Number.isFinite(h.dayChangeValue)
   )
 }
 
