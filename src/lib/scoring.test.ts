@@ -3,6 +3,8 @@ import {
   computeExposure,
   holdingMarketValue,
   isEstimatedValue,
+  portfolioDayChange,
+  portfolioDayChangePct,
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
@@ -95,6 +97,33 @@ describe('market value and weights', () => {
   it('portfolioWeightBasis matches portfolioTotalValue when nothing is overridden', () => {
     const book = [holding('AAA', 10, 10), holding('BBB', 10, 30)]
     expect(portfolioWeightBasis(book)).toBe(portfolioTotalValue(book))
+  })
+})
+
+describe('portfolio day change', () => {
+  it('calculates the whole-book dollar and percentage move from the prior close', () => {
+    const book = [
+      holding('AAA', 10, 110, { dayChangeValue: 10 }),
+      holding('BBB', 5, 50, { dayChangeValue: -2 }),
+    ]
+
+    expect(portfolioDayChange(book)).toBe(90)
+    expect(portfolioDayChangePct(book)).toBeCloseTo((90 / 1260) * 100, 8)
+  })
+
+  it('does not report a partial refresh as a portfolio total', () => {
+    const book = [
+      holding('AAA', 10, 110, { dayChangeValue: 10 }),
+      holding('BBB', 5, 50),
+    ]
+
+    expect(portfolioDayChange(book)).toBeUndefined()
+    expect(portfolioDayChangePct(book)).toBeUndefined()
+  })
+
+  it('does not report a move for an empty book', () => {
+    expect(portfolioDayChange([])).toBeUndefined()
+    expect(portfolioDayChangePct([])).toBeUndefined()
   })
 })
 
