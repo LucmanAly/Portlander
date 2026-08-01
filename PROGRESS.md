@@ -1,8 +1,8 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-01
-**Last agent:** claude (session 14)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence is merged to `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
+**Last agent:** codex (session 15)
+**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21) are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -14,11 +14,11 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings |
+| Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
 | `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
-| Daily cron | ✅ Live | `pg_cron` job `daily-sync-events`, `0 11 * * *` UTC. Retune via `select cron.alter_job(1, schedule => '<expr>');` |
+| Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
 | `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
 | `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner click-test still pending — see Blockers |
 | Portfolio table + CSV | ✅ Rebuilt | Configurable columns, per-row writes (PR 5), CSV Merge/Replace picker with preview counts, `~` estimated-value marker (PR 6), search/sort/source filter + mobile compact cards (PR 7) |
@@ -50,10 +50,10 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
 2. **Owner:** click-test "Refresh prices" too, if not already done.
-3. **Owner (optional):** retune the `11:00 UTC` cron time to your timezone.
-4. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
-5. Mark Phase 1 exit criteria formally once the above are confirmed.
-6. **Owner:** `develop` now has the full PR 1–7 sequence; merge `develop` → `main` when ready to actually deploy it (costs a Netlify build minute, so deliberate, not automatic). Phase 2 (prep cards, journal, alerts) can proceed in parallel once Phase 1 is signed off.
+3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
+4. **Owner:** merge `develop` → `main` when ready to deploy the final Phase 1 UI (costs a Netlify build minute, so deliberate, not automatic).
+5. On the deployed build, verify real-book weight/exposure sanity, sign-out clearing, mobile layout, and one real morning of use; then mark Phase 1 exit criteria formally.
+6. Phase 2 (prep cards, journal, alerts) can begin after that sign-off.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
@@ -71,6 +71,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
 | 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
 | 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The dashboard "Schedules" tab this file used to reference doesn't exist. A real sync takes ~16s server-side; `pg_net`'s 5s default was logging a misleading timeout even though the function completed fine |
 | 2026-07-31 | Added `refresh-quotes`, the project's first **user-scoped** Edge Function | Click-only "Refresh prices" for live `holdings.last_price`, decoupled from the daily earnings cron. Resolves caller's `user_id` from JWT, writes via partial update, never a full-row upsert. `verify_jwt: true` mandatory |
@@ -92,6 +93,12 @@ Single source of truth for current state. If it's here, don't re-explain it else
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-01 — codex (session 15)
+- PR #20 adds a layout-matched boot skeleton and hides local/demo book values until auth + remote loading resolve; CI build/lint/test green, merged to `develop`.
+- PR #21 adds an always-visible Local/Demo banner, mobile `Local` badge, and highlighted desktop mode label so sample/device-only data cannot be mistaken for the cloud book.
+- Live Supabase cron job `daily-sync-events` moved from 11:00 UTC to a DST-safe 9:31 a.m. America/New_York schedule; verified against summer and winter UTC offsets.
+- Phase 1 remains awaiting owner production acceptance only: brokerage connect/sync, Refresh prices, real-book weight/exposure sanity, sign-out clearing, mobile check, and one morning of use.
 
 ### 2026-08-01 — claude (session 14)
 - PR 5 ("Mutation safety proper"): per-row holdings upsert/delete, trimmed client write authority, CSV Merge/Replace picker with live preview counts, per-row delete confirmation. Verified in a real browser via Playwright (dev server, not just unit tests), not only `npm test`. 63 tests green.
