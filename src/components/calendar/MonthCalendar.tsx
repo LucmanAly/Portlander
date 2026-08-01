@@ -12,11 +12,11 @@ import {
 } from 'date-fns'
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import type { PortfolioEvent } from '@/types'
+import type { ScoredEvent } from '@/types'
 import { isDividendType, isMacroType } from '@/lib/scoring'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-function dayTone(events: PortfolioEvent[]): string {
+function dayTone(events: ScoredEvent[]): string {
   if (events.some((e) => e.eventType === 'earnings')) return 'bg-earnings-soft ring-1 ring-earnings/30'
   if (events.some((e) => isDividendType(e.eventType)))
     return 'bg-dividend-soft ring-1 ring-dividend/25'
@@ -24,22 +24,34 @@ function dayTone(events: PortfolioEvent[]): string {
   return ''
 }
 
-function dotColor(e: PortfolioEvent): string {
+function dotColor(e: ScoredEvent): string {
   if (e.eventType === 'earnings') return 'bg-earnings'
   if (isDividendType(e.eventType)) return 'bg-dividend'
   if (isMacroType(e.eventType)) return 'bg-macro'
   return 'bg-ink-500'
 }
 
+/**
+ * Dot size scales with the position it's attached to, so the "position-weighted
+ * calendar" the app's own docs describe actually encodes weight — previously
+ * every dot was the same fixed size regardless of how much of the book an
+ * event affected. Not held / macro events (0% weight) get the smallest dot.
+ */
+function dotSize(e: ScoredEvent): string {
+  if (e.positionWeightPct >= 8) return 'h-2.5 w-2.5'
+  if (e.positionWeightPct >= 3) return 'h-2 w-2'
+  return 'h-1.5 w-1.5'
+}
+
 /** Earnings only: bright = reports before the open, dim = reports after the close. */
-function timingTextTone(e: PortfolioEvent): string {
+function timingTextTone(e: ScoredEvent): string {
   if (e.eventType !== 'earnings') return 'text-ink-200'
   if (e.timing === 'bmo') return 'text-ink-100'
   if (e.timing === 'amc') return 'text-ink-400'
   return 'text-ink-200'
 }
 
-export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
+export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
 
   const days = useMemo(() => {
@@ -49,7 +61,7 @@ export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
   }, [cursor])
 
   const byDate = useMemo(() => {
-    const map = new Map<string, PortfolioEvent[]>()
+    const map = new Map<string, ScoredEvent[]>()
     for (const e of events) {
       const list = map.get(e.eventDate) ?? []
       list.push(e)
@@ -136,7 +148,7 @@ export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
                     className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
                     title={e.title}
                   >
-                    <span className={clsx('h-1.5 w-1.5 shrink-0 rounded-full', dotColor(e))} />
+                    <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} />
                     <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
@@ -157,7 +169,8 @@ export function MonthCalendar({ events }: { events: PortfolioEvent[] }) {
         <Legend color="bg-macro" label="Macro" />
       </div>
       <p className="mt-2 text-[11px] text-ink-600">
-        Earnings ticker: <span className="text-ink-100">bright</span> reports before the open ·{' '}
+        Dot size tracks position weight · Earnings ticker:{' '}
+        <span className="text-ink-100">bright</span> reports before the open ·{' '}
         <span className="text-ink-400">dim</span> reports after the close
       </p>
     </div>

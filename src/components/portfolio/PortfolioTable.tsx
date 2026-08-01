@@ -24,11 +24,13 @@ export function PortfolioTable({
   holdings,
   weightBasis,
   onRemove,
+  emptyMessage = 'No holdings yet.',
 }: {
   holdings: Holding[]
   /** `portfolioWeightBasis(holdings)` — not the raw dollar total, so weights sum to 100% with overrides in play. */
   weightBasis: number
   onRemove: (id: string) => void
+  emptyMessage?: string
 }) {
   const [prefs, setPrefs] = useState(() => loadPortfolioColumnPrefs())
   const [customizeOpen, setCustomizeOpen] = useState(false)
@@ -61,7 +63,9 @@ export function PortfolioTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      {/* Column customization is a table-only affordance — the mobile card layout
+          below always shows the same fixed, compact field set. */}
+      <div className="hidden justify-end sm:flex">
         <button
           type="button"
           onClick={() => setCustomizeOpen((v) => !v)}
@@ -73,7 +77,7 @@ export function PortfolioTable({
       </div>
 
       {customizeOpen ? (
-        <div className="surface-elevated space-y-2 rounded-2xl p-4">
+        <div className="surface-elevated hidden space-y-2 rounded-2xl p-4 sm:block">
           {prefs.order.map((key) => {
             const visible = prefs.visible.includes(key)
             const i = prefs.order.indexOf(key)
@@ -117,7 +121,8 @@ export function PortfolioTable({
         </div>
       ) : null}
 
-      <div className="surface overflow-hidden rounded-2xl">
+      {/* Desktop: full configurable table. */}
+      <div className="surface hidden overflow-hidden rounded-2xl sm:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
@@ -135,7 +140,7 @@ export function PortfolioTable({
               {holdings.length === 0 ? (
                 <tr>
                   <td colSpan={orderedVisible.length + 2} className="px-4 py-10 text-center text-ink-500">
-                    No holdings yet.
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : (
@@ -152,6 +157,26 @@ export function PortfolioTable({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile: compact cards instead of a horizontally-scrolling table. Always
+          shows the same fixed field set — column customization is a desktop-only
+          affordance, not worth reproducing in a one-column layout. */}
+      <div className="space-y-2 sm:hidden">
+        {holdings.length === 0 ? (
+          <p className="surface rounded-2xl px-4 py-10 text-center text-sm text-ink-500">
+            {emptyMessage}
+          </p>
+        ) : (
+          holdings.map((h) => (
+            <HoldingCard
+              key={h.id}
+              holding={h}
+              weightBasis={weightBasis}
+              onRemove={() => onRemove(h.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   )
@@ -245,9 +270,12 @@ function Cell({
       return (
         <div className="flex items-center gap-2">
           <div className="h-1.5 w-16 overflow-hidden rounded-full bg-ink-800">
+            {/* Drive-by fix: this bar used an undocumented ×3 saturation
+                (100% width at ~33% weight), silently inflating small
+                positions on screen. Plain min(100, weight) now. */}
             <div
               className="h-full rounded-full bg-accent-500"
-              style={{ width: `${Math.min(100, weight * 3)}%` }}
+              style={{ width: `${Math.min(100, weight)}%` }}
             />
           </div>
           <span className="tabular text-ink-200">{formatPct(weight)}</span>
@@ -275,6 +303,87 @@ function Cell({
     default:
       return null
   }
+}
+
+function HoldingCard({
+  holding: h,
+  weightBasis,
+  onRemove,
+}: {
+  holding: Holding
+  weightBasis: number
+  onRemove: () => void
+}) {
+  const weight = positionWeightPct(h, weightBasis)
+  const value = holdingMarketValue(h)
+  const estimated = isEstimatedValue(h)
+  const dayChange = holdingDayChange(h)
+  const totalGain = holdingTotalGainLoss(h)
+
+  return (
+    <div className="surface-elevated rounded-xl p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-accent-400">{h.ticker}</span>
+            <span className="rounded-md bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-300 ring-1 ring-border">
+              {SOURCE_LABEL[h.source]}
+            </span>
+          </div>
+          {h.name ? <div className="truncate text-xs text-ink-500">{h.name}</div> : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm(`Remove ${h.ticker} from your holdings?`)) onRemove()
+          }}
+          className="focus-ring shrink-0 rounded-lg p-2 text-ink-500 hover:bg-ink-800 hover:text-critical"
+          aria-label={`Remove ${h.ticker}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-ink-500">Shares</div>
+          <div className="tabular text-ink-200">{h.shares}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-ink-500">Value</div>
+          <div
+            className="tabular font-medium text-ink-100"
+            title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
+          >
+            {estimated ? '~' : ''}
+            {formatMoney(value)}
+          </div>
+        </div>
+        {dayChange != null ? (
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-ink-500">Day change</div>
+            <GainLoss value={dayChange} pct={h.dayChangePct} />
+          </div>
+        ) : null}
+        {totalGain != null ? (
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-ink-500">Total gain/loss</div>
+            <GainLoss value={totalGain} pct={holdingTotalGainLossPct(h)} />
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-800">
+          <div
+            className="h-full rounded-full bg-accent-500"
+            style={{ width: `${Math.min(100, weight)}%` }}
+          />
+        </div>
+        <span className="tabular text-xs text-ink-300">{formatPct(weight)} of portfolio</span>
+      </div>
+    </div>
+  )
 }
 
 function GainLoss({ value, pct }: { value: number; pct?: number }) {
