@@ -35,11 +35,15 @@ Deno.serve(async (req) => {
     return json({ error: 'Method not allowed' }, 405)
   }
 
-  const clientId = Deno.env.get('SNAPTRADE_CLIENT_ID')
-  const consumerKey = Deno.env.get('SNAPTRADE_CONSUMER_KEY')
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  // .trim() guards against a stray leading/trailing newline or space from
+  // copy-pasting into the Supabase Secrets dashboard — SnapTrade's HMAC
+  // signature check fails outright (error 1076) on contaminated key material,
+  // even though the value "looks right" visually.
+  const clientId = Deno.env.get('SNAPTRADE_CLIENT_ID')?.trim()
+  const consumerKey = Deno.env.get('SNAPTRADE_CONSUMER_KEY')?.trim()
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.trim()
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')?.trim()
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()
 
   if (!clientId || !consumerKey || !supabaseUrl || !anonKey || !serviceKey) {
     const missing = [
