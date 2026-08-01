@@ -8,6 +8,7 @@ import {
   holdingMarketValue,
   holdingTotalGainLoss,
   holdingTotalGainLossPct,
+  isEstimatedValue,
   positionWeightPct,
 } from '@/lib/scoring'
 import { PORTFOLIO_COLUMN_LABEL, type PortfolioColumnKey } from '@/lib/portfolioColumns'
@@ -21,11 +22,12 @@ const SOURCE_LABEL: Record<Holding['source'], string> = {
 
 export function PortfolioTable({
   holdings,
-  total,
+  weightBasis,
   onRemove,
 }: {
   holdings: Holding[]
-  total: number
+  /** `portfolioWeightBasis(holdings)` — not the raw dollar total, so weights sum to 100% with overrides in play. */
+  weightBasis: number
   onRemove: (id: string) => void
 }) {
   const [prefs, setPrefs] = useState(() => loadPortfolioColumnPrefs())
@@ -141,7 +143,7 @@ export function PortfolioTable({
                   <HoldingRow
                     key={h.id}
                     holding={h}
-                    total={total}
+                    weightBasis={weightBasis}
                     columns={orderedVisible}
                     onRemove={() => onRemove(h.id)}
                   />
@@ -157,17 +159,18 @@ export function PortfolioTable({
 
 function HoldingRow({
   holding: h,
-  total,
+  weightBasis,
   columns,
   onRemove,
 }: {
   holding: Holding
-  total: number
+  weightBasis: number
   columns: PortfolioColumnKey[]
   onRemove: () => void
 }) {
-  const weight = positionWeightPct(h, total)
+  const weight = positionWeightPct(h, weightBasis)
   const value = holdingMarketValue(h)
+  const estimated = isEstimatedValue(h)
 
   return (
     <tr className="hover:bg-ink-800/30">
@@ -177,7 +180,7 @@ function HoldingRow({
       </td>
       {columns.map((key) => (
         <td key={key} className="px-4 py-3">
-          <Cell columnKey={key} holding={h} weight={weight} value={value} />
+          <Cell columnKey={key} holding={h} weight={weight} value={value} estimated={estimated} />
         </td>
       ))}
       <td className="px-4 py-3 text-right">
@@ -201,11 +204,13 @@ function Cell({
   holding: h,
   weight,
   value,
+  estimated,
 }: {
   columnKey: PortfolioColumnKey
   holding: Holding
   weight: number
   value: number
+  estimated: boolean
 }) {
   switch (columnKey) {
     case 'shares':
@@ -222,7 +227,15 @@ function Cell({
       return <GainLoss value={change} pct={h.dayChangePct} />
     }
     case 'value':
-      return <span className="tabular font-medium text-ink-100">{formatMoney(value)}</span>
+      return (
+        <span
+          className="tabular font-medium text-ink-100"
+          title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
+        >
+          {estimated ? '~' : ''}
+          {formatMoney(value)}
+        </span>
+      )
     case 'totalGainLoss': {
       const gain = holdingTotalGainLoss(h)
       if (gain == null) return <span className="text-ink-500">—</span>
