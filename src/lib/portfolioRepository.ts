@@ -129,12 +129,17 @@ export async function persistHoldingsRemote(
   // Remove remote rows no longer in the client list
   const { data: existingHoldings, error: listErr } = await sb
     .from('holdings')
-    .select('id, ticker')
+    .select('id, ticker, source')
     .eq('user_id', userId)
   if (listErr) return { message: listErr.message, cause: listErr }
 
+  // Brokerage-owned rows are never deleted by a browser write, whatever the
+  // client list happens to contain. Only snaptrade-sync may remove them — it
+  // alone can tell "sold at Fidelity" from "this client just isn't holding a
+  // complete list right now". Without this guard a single CSV import, which
+  // parses to manual rows only, deletes every synced position.
   const deleteIds = (existingHoldings ?? [])
-    .filter((r) => !tickers.has(r.ticker.toUpperCase()))
+    .filter((r) => r.source !== 'snaptrade' && !tickers.has(r.ticker.toUpperCase()))
     .map((r) => r.id)
 
   if (deleteIds.length > 0) {

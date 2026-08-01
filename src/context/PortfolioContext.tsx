@@ -21,7 +21,7 @@ import {
 } from '@/lib/portfolioRepository'
 import { connectBrokerage as connectBrokerageRemote, syncBrokerage as syncBrokerageRemote } from '@/lib/snaptradeRepository'
 import { applyLocalEventsSync } from '@/lib/eventSync'
-import { loadQuotesLastSync } from '@/lib/storage'
+import { clearAllData, loadQuotesLastSync, setStorageNamespace } from '@/lib/storage'
 import {
   getSupabase,
   isSupabaseConfigured,
@@ -104,6 +104,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
   const config = useMemo(() => supabaseConfigSummary(), [])
 
+  /**
+   * Point the cache at one identity and re-read the state derived from it.
+   * Every auth transition goes through here, so a value cached under the
+   * previous identity can't survive into the next one.
+   */
+  const adoptNamespace = useCallback((userId: string | null) => {
+    setStorageNamespace(userId)
+    setQuotesLastSyncedAt(loadQuotesLastSync())
+  }, [])
+
   const applyBundle = useCallback(
     (bundle: Awaited<ReturnType<typeof loadPortfolioBundle>>) => {
       setHoldings(bundle.holdings)
@@ -133,6 +143,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         setSession(null)
         setUser(null)
       }
+      adoptNamespace(uid)
       const bundle = await loadPortfolioBundle(uid)
       applyBundle(bundle)
     } catch (e) {
@@ -142,7 +153,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       const bundle = await loadPortfolioBundle(null)
       applyBundle(bundle)
     }
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace])
 
   // Manual, on-demand live price refresh — never runs automatically, never
   // touches events/watchlist. Deliberately doesn't call refreshFromBackend()
@@ -260,6 +271,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         setUser(data.session?.user ?? null)
 
         if (data.session?.user) {
+          adoptNamespace(data.session.user.id)
           const remote = await loadPortfolioBundle(data.session.user.id)
           if (!cancelled) applyBundle(remote)
         } else {
@@ -272,6 +284,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
           setSession(nextSession)
           setUser(nextSession?.user ?? null)
           try {
+            adoptNamespace(nextSession?.user?.id ?? null)
             const bundle = await loadPortfolioBundle(nextSession?.user?.id ?? null)
             applyBundle(bundle)
             setRemoteError(null)
@@ -300,7 +313,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       cancelled = true
       unsub?.()
     }
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace])
 
   const persistHoldings = useCallback(
     (next: Holding[]) => {
@@ -423,10 +436,19 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   )
 
   const resetDemo = useCallback(() => {
+    // Demo rows must never become the source of a remote write. While signed in,
+    // loading them into state leaves `user` set, so the next holdings edit would
+    // persist demo data over the real book — breaking the promise the Settings
+    // confirmation makes ("remote Supabase rows are not deleted").
+    if (user) {
+      setRemoteError('Sign out before resetting to demo data — it would overwrite your synced portfolio.')
+      return
+    }
     resetLocalDemo()
+    adoptNamespace(null)
     void loadPortfolioBundle(null).then(applyBundle)
     setBackend('local')
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace, user])
 
   const markSynced = useCallback(() => {
     const iso = markLocalSynced()
@@ -448,9 +470,14 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const sb = getSupabase()
     if (sb) await sb.auth.signOut()
+    // Wipe the signed-in user's cache while its namespace is still addressed,
+    // then drop back to the demo namespace. Signing out has to leave no real
+    // holdings on the device.
+    clearAllData()
+    adoptNamespace(null)
     const local = await loadPortfolioBundle(null)
     applyBundle(local)
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace])
 
   const value: PortfolioContextValue = {
     holdings,

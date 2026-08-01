@@ -63,8 +63,25 @@ export function PortfolioPage() {
         setCsvError(errors[0] ?? 'No holdings parsed')
         return
       }
-      replaceHoldings(parsed)
-      setCsvInfo(`Imported ${parsed.length} holdings${errors.length ? ` (${errors.length} warnings)` : ''}`)
+      // A CSV describes manual holdings; it says nothing about what the
+      // brokerage reports. Keep synced rows and replace only the rest, so an
+      // import can never drop a live position it simply doesn't mention.
+      const synced = holdings.filter((h) => h.source === 'snaptrade')
+      const syncedTickers = new Set(synced.map((h) => h.ticker.toUpperCase()))
+      const incoming = parsed.filter((h) => !syncedTickers.has(h.ticker.toUpperCase()))
+      const skipped = parsed.length - incoming.length
+
+      replaceHoldings([...synced, ...incoming])
+      setCsvInfo(
+        [
+          `Imported ${incoming.length} holdings`,
+          synced.length ? `${synced.length} brokerage-synced rows protected` : null,
+          skipped ? `${skipped} row(s) skipped — already synced from your brokerage` : null,
+          errors.length ? `${errors.length} warnings` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      )
       if (errors.length) setCsvError(errors.slice(0, 3).join('; '))
     }
     reader.readAsText(file)

@@ -2,14 +2,37 @@ import type { Holding, PortfolioEvent, WatchlistItem } from '@/types'
 import { DEMO_EVENTS, DEMO_HOLDINGS, DEMO_WATCHLIST } from '@/data/demo'
 import { MACRO_EVENTS } from '@/data/macro'
 
-const KEYS = {
-  holdings: 'portlander.holdings.v1',
-  watchlist: 'portlander.watchlist.v1',
-  events: 'portlander.events.v1',
-  lastSync: 'portlander.lastSync.v1',
-  quotesLastSync: 'portlander.quotesLastSync.v1',
-  seeded: 'portlander.seeded.v1',
+const KEY_SUFFIXES = {
+  holdings: 'holdings.v1',
+  watchlist: 'watchlist.v1',
+  events: 'events.v1',
+  lastSync: 'lastSync.v1',
+  quotesLastSync: 'quotesLastSync.v1',
+  seeded: 'seeded.v1',
 } as const
+
+type KeyName = keyof typeof KEY_SUFFIXES
+
+/**
+ * Which user's cache the keys below address. `null` is the signed-out/demo
+ * namespace and keeps the original unprefixed key names, so an existing demo
+ * cache survives this change untouched.
+ *
+ * Without this, every user shares one set of keys: signing out left the real
+ * portfolio on disk under the same key the next session reads.
+ */
+let namespace: string | null = null
+
+/** Call on every auth transition, before any load/save for the new identity. */
+export function setStorageNamespace(userId: string | null): void {
+  namespace = userId
+}
+
+function key(name: KeyName): string {
+  return namespace
+    ? `portlander.u.${namespace}.${KEY_SUFFIXES[name]}`
+    : `portlander.${KEY_SUFFIXES[name]}`
+}
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -26,12 +49,16 @@ function writeJson(key: string, value: unknown): void {
 }
 
 export function ensureSeeded(): void {
-  if (localStorage.getItem(KEYS.seeded) === '1') return
-  writeJson(KEYS.holdings, DEMO_HOLDINGS)
-  writeJson(KEYS.watchlist, DEMO_WATCHLIST)
-  writeJson(KEYS.events, mergeEvents(DEMO_EVENTS, MACRO_EVENTS))
-  localStorage.setItem(KEYS.lastSync, new Date().toISOString())
-  localStorage.setItem(KEYS.seeded, '1')
+  // Demo rows belong to the signed-out namespace only. A signed-in user's cache
+  // is populated from Supabase — seeding demo holdings into it would put
+  // fabricated positions in front of someone looking at their real book.
+  if (namespace) return
+  if (localStorage.getItem(key('seeded')) === '1') return
+  writeJson(key('holdings'), DEMO_HOLDINGS)
+  writeJson(key('watchlist'), DEMO_WATCHLIST)
+  writeJson(key('events'), mergeEvents(DEMO_EVENTS, MACRO_EVENTS))
+  localStorage.setItem(key('lastSync'), new Date().toISOString())
+  localStorage.setItem(key('seeded'), '1')
 }
 
 function mergeEvents(a: PortfolioEvent[], b: PortfolioEvent[]): PortfolioEvent[] {
@@ -44,54 +71,56 @@ function mergeEvents(a: PortfolioEvent[], b: PortfolioEvent[]): PortfolioEvent[]
 
 export function loadHoldings(): Holding[] {
   ensureSeeded()
-  return readJson<Holding[]>(KEYS.holdings, [])
+  return readJson<Holding[]>(key('holdings'), [])
 }
 
 export function saveHoldings(holdings: Holding[]): void {
-  writeJson(KEYS.holdings, holdings)
+  writeJson(key('holdings'), holdings)
 }
 
 export function loadWatchlist(): WatchlistItem[] {
   ensureSeeded()
-  return readJson<WatchlistItem[]>(KEYS.watchlist, [])
+  return readJson<WatchlistItem[]>(key('watchlist'), [])
 }
 
 export function saveWatchlist(items: WatchlistItem[]): void {
-  writeJson(KEYS.watchlist, items)
+  writeJson(key('watchlist'), items)
 }
 
 export function loadEvents(): PortfolioEvent[] {
   ensureSeeded()
-  return readJson<PortfolioEvent[]>(KEYS.events, [])
+  return readJson<PortfolioEvent[]>(key('events'), [])
 }
 
 export function saveEvents(events: PortfolioEvent[]): void {
-  writeJson(KEYS.events, events)
+  writeJson(key('events'), events)
 }
 
 export function loadLastSync(): string | null {
-  return localStorage.getItem(KEYS.lastSync)
+  return localStorage.getItem(key('lastSync'))
 }
 
 export function setLastSync(iso: string): void {
-  localStorage.setItem(KEYS.lastSync, iso)
+  localStorage.setItem(key('lastSync'), iso)
 }
 
 /** Separate from events lastSync — tracks the manual "Refresh prices" action only. */
 export function loadQuotesLastSync(): string | null {
-  return localStorage.getItem(KEYS.quotesLastSync)
+  return localStorage.getItem(key('quotesLastSync'))
 }
 
 export function setQuotesLastSync(iso: string): void {
-  localStorage.setItem(KEYS.quotesLastSync, iso)
+  localStorage.setItem(key('quotesLastSync'), iso)
 }
 
-/** Reset demo data (Settings). */
+/** Reset demo data (Settings). Demo is inherently the signed-out experience. */
 export function resetToDemo(): void {
-  localStorage.removeItem(KEYS.seeded)
+  setStorageNamespace(null)
+  localStorage.removeItem(key('seeded'))
   ensureSeeded()
 }
 
+/** Wipes the currently-addressed namespace. Called on sign-out, before the namespace resets. */
 export function clearAllData(): void {
-  Object.values(KEYS).forEach((k) => localStorage.removeItem(k))
+  ;(Object.keys(KEY_SUFFIXES) as KeyName[]).forEach((k) => localStorage.removeItem(key(k)))
 }

@@ -137,6 +137,12 @@ export function SettingsPage() {
           </button>
           <button
             type="button"
+            disabled={Boolean(user)}
+            title={
+              user
+                ? 'Sign out first — demo data would overwrite your synced portfolio'
+                : undefined
+            }
             onClick={() => {
               if (
                 confirm(
@@ -146,7 +152,7 @@ export function SettingsPage() {
                 resetDemo()
               }
             }}
-            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20"
+            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset demo data
           </button>
