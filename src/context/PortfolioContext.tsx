@@ -10,17 +10,19 @@ import {
 import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
 import type { EventFilter } from '@/types'
 import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
+import type { CsvImportPlan } from '@/lib/csv'
 import {
   applyQuoteResultsLocally,
+  deleteHoldingsRemote,
   loadPortfolioBundle,
-  persistHoldingsRemote,
   persistWatchlistRemote,
   refreshQuotesRemote,
   resetLocalDemo,
+  upsertHoldingsRemote,
   type SyncTimestamps,
 } from '@/lib/portfolioRepository'
 import { connectBrokerage as connectBrokerageRemote, syncBrokerage as syncBrokerageRemote } from '@/lib/snaptradeRepository'
-import { clearAllData, loadQuotesLastSync, setStorageNamespace } from '@/lib/storage'
+import { clearAllData, loadQuotesLastSync, saveHoldings, setStorageNamespace } from '@/lib/storage'
 import {
   getSupabase,
   isSupabaseConfigured,
@@ -45,7 +47,7 @@ interface PortfolioContextValue {
   addHolding: (h: Omit<Holding, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateHolding: (id: string, patch: Partial<Holding>) => void
   removeHolding: (id: string) => void
-  replaceHoldings: (holdings: Holding[]) => void
+  applyCsvImport: (plan: CsvImportPlan) => void
   addWatchlist: (ticker: string, name?: string) => void
   removeWatchlist: (id: string) => void
   resetDemo: () => void
@@ -311,10 +313,24 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     }
   }, [applyBundle, adoptNamespace])
 
-  const persistHoldings = useCallback(
-    (next: Holding[]) => {
+  /** Sets local state + cache, and upserts exactly `rows` remotely — never a whole-list diff. */
+  const upsertHoldings = useCallback(
+    (next: Holding[], rows: Holding[]) => {
       setHoldings(next)
-      void persistHoldingsRemote(next, user?.id ?? null).then((err) => {
+      saveHoldings(next)
+      void upsertHoldingsRemote(rows, user?.id ?? null).then((err) => {
+        if (err) setRemoteError(err.message)
+      })
+    },
+    [user?.id],
+  )
+
+  /** Sets local state + cache, and deletes exactly `ids` remotely (brokerage-synced rows are DB-guarded, not caller-guarded). */
+  const deleteHoldings = useCallback(
+    (next: Holding[], ids: string[]) => {
+      setHoldings(next)
+      saveHoldings(next)
+      void deleteHoldingsRemote(ids, user?.id ?? null).then((err) => {
         if (err) setRemoteError(err.message)
       })
     },
@@ -352,59 +368,66 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       const ticker = input.ticker.toUpperCase()
       const existing = holdings.find((h) => h.ticker.toUpperCase() === ticker)
       if (existing) {
-        persistHoldings(
-          holdings.map((h) =>
-            h.id === existing.id
-              ? {
-                  ...h,
-                  ...input,
-                  ticker,
-                  shares: input.shares,
-                  updatedAt: now,
-                }
-              : h,
-          ),
+        const row: Holding = { ...existing, ...input, ticker, shares: input.shares, updatedAt: now }
+        upsertHoldings(
+          holdings.map((h) => (h.id === existing.id ? row : h)),
+          [row],
         )
         return
       }
-      persistHoldings([
-        ...holdings,
-        { ...input, ticker, id: uid(), createdAt: now, updatedAt: now },
-      ])
+      const row: Holding = { ...input, ticker, id: uid(), createdAt: now, updatedAt: now }
+      upsertHoldings([...holdings, row], [row])
     },
-    [holdings, persistHoldings],
+    [holdings, upsertHoldings],
   )
 
   const updateHolding = useCallback(
     (id: string, patch: Partial<Holding>) => {
-      persistHoldings(
-        holdings.map((h) =>
-          h.id === id
-            ? {
-                ...h,
-                ...patch,
-                ticker: patch.ticker ? patch.ticker.toUpperCase() : h.ticker,
-                updatedAt: new Date().toISOString(),
-              }
-            : h,
-        ),
-      )
+      let row: Holding | undefined
+      const next = holdings.map((h) => {
+        if (h.id !== id) return h
+        row = {
+          ...h,
+          ...patch,
+          ticker: patch.ticker ? patch.ticker.toUpperCase() : h.ticker,
+          updatedAt: new Date().toISOString(),
+        }
+        return row
+      })
+      if (row) upsertHoldings(next, [row])
     },
-    [holdings, persistHoldings],
+    [holdings, upsertHoldings],
   )
 
   const removeHolding = useCallback(
     (id: string) => {
-      persistHoldings(holdings.filter((h) => h.id !== id))
+      deleteHoldings(
+        holdings.filter((h) => h.id !== id),
+        [id],
+      )
     },
-    [holdings, persistHoldings],
+    [holdings, deleteHoldings],
   )
 
-  const replaceHoldings = useCallback(
-    (next: Holding[]) => {
-      persistHoldings(next)
+  const applyCsvImport = useCallback(
+    (plan: CsvImportPlan) => {
+      setHoldings(plan.next)
+      saveHoldings(plan.next)
+      void (async () => {
+        if (plan.toUpsert.length > 0) {
+          const err = await upsertHoldingsRemote(plan.toUpsert, user?.id ?? null)
+          if (err) {
+            setRemoteError(err.message)
+            return
+          }
+        }
+        if (plan.toDeleteIds.length > 0) {
+          const err = await deleteHoldingsRemote(plan.toDeleteIds, user?.id ?? null)
+          if (err) setRemoteError(err.message)
+        }
+      })()
     },
-    [persistHoldings],
+    [user?.id],
   )
 
   const addWatchlist = useCallback(
@@ -483,7 +506,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     addHolding,
     updateHolding,
     removeHolding,
-    replaceHoldings,
+    applyCsvImport,
     addWatchlist,
     removeWatchlist,
     resetDemo,

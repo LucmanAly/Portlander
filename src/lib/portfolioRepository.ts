@@ -4,7 +4,7 @@ import {
   brokerageConnectionFromRow,
   eventFromRow,
   holdingFromRow,
-  holdingToUpdate,
+  holdingToWrite,
   watchlistFromRow,
 } from '@/lib/mappers'
 import {
@@ -144,56 +144,62 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
 }
 
 /**
- * Always writes localStorage. When signed into Supabase, also upserts by (user_id, ticker).
+ * Upserts exactly the given rows — never touches a holding absent from `rows`.
+ * Local caching is the caller's responsibility (see `saveHoldings`); this only
+ * fires the remote write, and only when signed into Supabase.
  */
-export async function persistHoldingsRemote(
-  holdings: Holding[],
+export async function upsertHoldingsRemote(
+  rows: Holding[],
   userId: string | null,
 ): Promise<RepoError | null> {
-  saveHoldings(holdings)
+  if (rows.length === 0) return null
   if (resolveBackend(Boolean(userId)) !== 'supabase' || !userId) return null
 
   const sb = getSupabase()
   if (!sb) return null
 
-  const tickers = new Set(holdings.map((h) => h.ticker.toUpperCase()))
-
-  // Remove remote rows no longer in the client list
-  const { data: existingHoldings, error: listErr } = await sb
-    .from('holdings')
-    .select('id, ticker, source')
-    .eq('user_id', userId)
-  if (listErr) return { message: listErr.message, cause: listErr }
-
-  // Brokerage-owned rows are never deleted by a browser write, whatever the
-  // client list happens to contain. Only snaptrade-sync may remove them — it
-  // alone can tell "sold at Fidelity" from "this client just isn't holding a
-  // complete list right now". Without this guard a single CSV import, which
-  // parses to manual rows only, deletes every synced position.
-  const deleteIds = (existingHoldings ?? [])
-    .filter((r) => r.source !== 'snaptrade' && !tickers.has(r.ticker.toUpperCase()))
-    .map((r) => r.id)
-
-  if (deleteIds.length > 0) {
-    const { error: delErr } = await sb.from('holdings').delete().in('id', deleteIds)
-    if (delErr) return { message: delErr.message, cause: delErr }
-  }
-
-  if (holdings.length === 0) return null
-
-  const rows = holdings.map((h) => ({
+  const payload = rows.map((h) => ({
     user_id: userId,
-    ...holdingToUpdate({
+    ...holdingToWrite({
       ...h,
       ticker: h.ticker.toUpperCase(),
       updatedAt: h.updatedAt || new Date().toISOString(),
     }),
-    created_at: h.createdAt || new Date().toISOString(),
   }))
 
-  const { error } = await sb.from('holdings').upsert(rows, {
+  const { error } = await sb.from('holdings').upsert(payload, {
     onConflict: 'user_id,ticker',
   })
+  if (error) return { message: error.message, cause: error }
+
+  return null
+}
+
+/**
+ * Deletes exactly the given ids. Brokerage-synced rows are excluded at the
+ * query level (`neq('source', 'snaptrade')`), not by trusting the caller to
+ * have filtered them out first — only snaptrade-sync may remove a synced
+ * row, because only it can tell "sold at the brokerage" from "this client
+ * isn't holding a complete list right now". Local caching is the caller's
+ * responsibility (see `saveHoldings`); this only fires the remote delete,
+ * and only when signed into Supabase.
+ */
+export async function deleteHoldingsRemote(
+  ids: string[],
+  userId: string | null,
+): Promise<RepoError | null> {
+  if (ids.length === 0) return null
+  if (resolveBackend(Boolean(userId)) !== 'supabase' || !userId) return null
+
+  const sb = getSupabase()
+  if (!sb) return null
+
+  const { error } = await sb
+    .from('holdings')
+    .delete()
+    .eq('user_id', userId)
+    .in('id', ids)
+    .neq('source', 'snaptrade')
   if (error) return { message: error.message, cause: error }
 
   return null

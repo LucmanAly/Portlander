@@ -183,7 +183,9 @@ function HoldingRow({
       <td className="px-4 py-3 text-right">
         <button
           type="button"
-          onClick={onRemove}
+          onClick={() => {
+            if (confirm(`Remove ${h.ticker} from your holdings?`)) onRemove()
+          }}
           className="focus-ring rounded-lg p-2 text-ink-500 hover:bg-ink-800 hover:text-critical"
           aria-label={`Remove ${h.ticker}`}
         >
