@@ -1,7 +1,7 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import { portfolioTotalValue, positionWeightPct } from '@/lib/scoring'
-import { holdingsToCsv, parseHoldingsCsv } from '@/lib/csv'
+import { holdingsToCsv, parseHoldingsCsv, planCsvImport } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Trash2, Upload } from 'lucide-react'
@@ -63,20 +63,15 @@ export function PortfolioPage() {
         setCsvError(errors[0] ?? 'No holdings parsed')
         return
       }
-      // A CSV describes manual holdings; it says nothing about what the
-      // brokerage reports. Keep synced rows and replace only the rest, so an
-      // import can never drop a live position it simply doesn't mention.
-      const synced = holdings.filter((h) => h.source === 'snaptrade')
-      const syncedTickers = new Set(synced.map((h) => h.ticker.toUpperCase()))
-      const incoming = parsed.filter((h) => !syncedTickers.has(h.ticker.toUpperCase()))
-      const skipped = parsed.length - incoming.length
-
-      replaceHoldings([...synced, ...incoming])
+      const plan = planCsvImport(holdings, parsed)
+      replaceHoldings(plan.next)
       setCsvInfo(
         [
-          `Imported ${incoming.length} holdings`,
-          synced.length ? `${synced.length} brokerage-synced rows protected` : null,
-          skipped ? `${skipped} row(s) skipped — already synced from your brokerage` : null,
+          `Imported ${plan.imported} holdings`,
+          plan.protectedSynced ? `${plan.protectedSynced} brokerage-synced rows protected` : null,
+          plan.skipped
+            ? `${plan.skipped} row(s) skipped — already synced from your brokerage`
+            : null,
           errors.length ? `${errors.length} warnings` : null,
         ]
           .filter(Boolean)
