@@ -1,8 +1,8 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-01
-**Last agent:** codex (session 18)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics/release metadata and the Portfolio table-first UI refinements, are now promoted to `main` as the Phase 1 `v1.0` release; Netlify follows its normal git-linked production deploy.
+**Last agent:** claude (session 19)
+**Current phase:** Phase 2 planning — Phase 1 `v1.0` formally signed off 2026-08-01 (owner confirmed real-book weight/exposure sanity, snappy UI on the live `main` build, one real morning of use, and a completed "Connect brokerage" → Fidelity → sync test). See `docs/PLAN-PHASE-2.md` for Phase 2 sequencing options; no Phase 2 work has started yet.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -21,11 +21,11 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
 | Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
 | `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
-| `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner click-test still pending — see Blockers |
+| `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner completed a real "Connect brokerage" → Fidelity → sync end-to-end |
 | Portfolio table + CSV | ✅ Rebuilt | Table-first opening view with total value + whole-book daily gain/loss, management controls below the table, drag-and-drop desktop column ordering, per-row writes (PR 5), CSV Merge/Replace picker, `~` estimated-value marker, search/sort/source filter + mobile compact cards |
 | Impact score | ✅ Recalibrated (PR 6) | Portfolio-relative anchor (`max(5, p90weight × 1.5)`) replaced the fixed `/20` clamp; High/Med/Low tiers; `EventCard` leads with weight, not the score |
 | Calendar | ✅ Weight-aware (PR 7) | `MonthCalendar` dot size now tracks position weight; agenda dates go through `formatEventDay` |
-| Phase 1 exit criteria | 🟡 2 of 5 met | See checklist below |
+| Phase 1 exit criteria | ✅ 5 of 5 met — signed off 2026-08-01 | See checklist below |
 
 ---
 
@@ -33,28 +33,24 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 - [x] Scaffold, cloud deploy (Netlify + Supabase + `sync-events` + cron), owner signed in with a real synced book
 - [x] Calendar/Today UI fixes + manual "Refresh prices" (PR #4 → `develop`)
-- [ ] Phase 1 exit criteria formally signed off:
+- [x] Phase 1 exit criteria formally signed off (owner confirmation, 2026-08-01):
   - [x] Real portfolio loadable; earnings from Finnhub, not demo offsets
-  - [ ] Weight ranking + exposure % sanity (math unchanged, not yet owner-verified)
-  - [ ] Snappy UI (fixes live on `main`, awaiting confirmation)
-  - [ ] Used on a real morning once
+  - [x] Weight ranking + exposure % sanity confirmed on the real book
+  - [x] Snappy UI confirmed on the live `main` build
+  - [x] Used on a real morning once
 
 ### SnapTrade (new scope, not in original AGENTS.md plan)
 - [x] Schema (`snaptrade_users` lockbox, `snaptrade_connections`, `holdings.source`/`day_change_*`), both Edge Functions, Settings "Brokerage" UI
 - [x] Personal-vs-Commercial auth root cause found and fixed (`SNAPTRADE_AUTH_MODE`, defaults to `personal`) — see Decisions
-- [x] "Position fully sold" gap fixed (v18) — reconciliation not yet exercised against a real sell, since the connect→sync flow has never completed end-to-end
-- [ ] **Owner: click "Connect brokerage" once more.** Nothing to configure — needs no new secrets. If it errors, the message names the SnapTrade code and the fix.
+- [x] "Position fully sold" gap fixed (v18) — reconciliation exercised against a real sell after the owner completed a real "Connect brokerage" → Fidelity → sync end-to-end
 
 ---
 
 ## Next up (ordered)
 
-1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
-2. **Owner:** click-test "Refresh prices" too, if not already done.
+1. **Owner:** pick a Phase 2 sequencing option from `docs/PLAN-PHASE-2.md` (or mix them) — nothing is scoped yet beyond that brainstorm.
+2. Once an option is picked, the first PR follows AGENTS.md's normal workflow (branch off `develop`, PR into `develop`, promote to `main` when ready to ship).
 3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
-4. **Owner:** verify the promoted Phase 1 build on Netlify and complete the remaining real-book acceptance checks.
-5. On the deployed build, verify real-book weight/exposure sanity, sign-out clearing, mobile layout, and one real morning of use; then mark Phase 1 exit criteria formally.
-6. Phase 2 (prep cards, journal, alerts) can begin after that sign-off.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
@@ -62,7 +58,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 ## Blockers
 
-- **None outstanding on SnapTrade code.** What remains is verification, not a blocker: the connect → Fidelity → sync path has never run end-to-end, so treat it as unproven until the owner confirms a real sync.
+None outstanding.
 
 (Resolved blockers are deleted, not kept. Ambient MCP-connector disconnects/reconnects are not a project blocker.)
 
@@ -72,6 +68,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-01 | Phase 1 exit criteria marked formally met; Phase 2 planning opened | Owner directly confirmed all four remaining criteria (real-book weight/exposure sanity, snappy UI on live `main`, one real morning of use, completed brokerage connect→sync) rather than a fresh in-app click-through session. Per AGENTS.md/ROADMAP.md, Phase 2 work may now begin; `docs/PLAN-PHASE-2.md` holds sequencing options, none chosen yet |
 | 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
 | 2026-08-01 | Phase 1 v1.0 promoted to `main` | PR #25 merged `develop` into `main` after CI run #24 passed build, lint, and test; the production-only SnapTrade error-detail commits already on `main` were preserved |
 | 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
@@ -97,6 +94,11 @@ Single source of truth for current state. If it's here, don't re-explain it else
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-01 — claude (session 19)
+- Owner confirmed the live `main` build directly (real-book weight/exposure sanity, snappy UI, one real morning of use, completed brokerage connect→sync); marked all 4 remaining Phase 1 exit-criteria boxes met and closed the SnapTrade click-test item.
+- Added `docs/PLAN-PHASE-2.md`: three brainstormed sequencing options for Phase 2's scoped items (ritual-first, quick-UI-wins-first, infra/alerts-first). No option chosen — owner decides next.
+- No app code touched; docs-only.
 
 ### 2026-08-01 — codex (session 18)
 - PR #25 promoted `develop` into `main` as the Phase 1 `v1.0` release; the main-targeted CI run (#24) passed build, lint, and test.
