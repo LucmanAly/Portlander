@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-01
 **Last agent:** claude (session 14)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left.
+**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence is merged to `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -48,12 +48,12 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 ## Next up (ordered)
 
-1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Then merge/close PR #13 (draft → develop, https://github.com/LucmanAly/Portlander/pull/13) — it's just sitting open.
+1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
 2. **Owner:** click-test "Refresh prices" too, if not already done.
 3. **Owner (optional):** retune the `11:00 UTC` cron time to your timezone.
 4. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
 5. Mark Phase 1 exit criteria formally once the above are confirmed.
-6. PR 6 (score recalibration) is next per `docs/PLAN-2026-08.md`'s dependency order. Phase 2 (prep cards, journal, alerts) can proceed in parallel once Phase 1 is signed off.
+6. **Owner:** `develop` now has the full PR 1–7 sequence; merge `develop` → `main` when ready to actually deploy it (costs a Netlify build minute, so deliberate, not automatic). Phase 2 (prep cards, journal, alerts) can proceed in parallel once Phase 1 is signed off.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
@@ -101,7 +101,7 @@ Keep entries short — a few bullets, key files, PR/commit pointer for detail. D
 - PR: https://github.com/LucmanAly/Portlander/pull/18 (draft → develop). Verified in a real browser (Playwright), not just `npm test` — Today page's weight-as-hero + tier badges, Portfolio's estimated marker, Settings' updated formula text all confirmed live. 67 tests green (7 net new). Key files: `src/lib/scoring.ts`, `src/components/ui/Badge.tsx`, `src/components/today/EventCard.tsx`, `src/components/portfolio/PortfolioTable.tsx`, `src/pages/{Portfolio,Settings}Page.tsx`.
 - PR 7 ("Morning read, sliced"), stacked on PR 6 — the last PR in `docs/PLAN-2026-08.md`'s sequence. `MonthCalendar` dots now vary in size with `positionWeightPct` (was fixed regardless of weight); Portfolio gained search/source-filter/sort (real gap at 41 holdings); `PortfolioTable` gets mobile compact cards below `sm` instead of the horizontally-scrolling table; agenda dates go through `formatEventDay`. Drive-by fix: the weight bar's undocumented `× 3` saturation (flagged in the plan's own verification table, never assigned to a PR) — removed while already in that file for the mobile cards.
 - PR: https://github.com/LucmanAly/Portlander/pull/19 (draft → develop). Verified in a real browser at both desktop and mobile viewports (Playwright) — calendar dots visibly scale with weight, search/filter/sort narrow the table with the right empty-state copy, table hidden / cards shown below `sm`, agenda shows human-readable dates. 67 tests green (unchanged — this PR is UI-only, no new pure-logic surface to test at the unit level). Key files: `src/components/calendar/MonthCalendar.tsx`, `src/pages/{Calendar,Portfolio}Page.tsx`, `src/components/portfolio/PortfolioTable.tsx`.
-- **PRs #14 (1–3), #16 (4), #17 (5), #18 (6), #19 (7) are all open drafts stacked against `develop`, none merged.** That's every PR in the plan doc — next up is owner review, not more autonomous implementation.
+- Owner asked to review and merge all of them: undrafted and merged **#14, #16, #17, #18, #19** into `develop` in that order (each was a superset of the last — stacked branches, not independent diffs). CI was green and no review comments existed on any of them. Skipped **PR #15** ("DeepSeek API integration" plan) at the owner's call: a different session's PR, unrelated to this sequence, and it touched `PROGRESS.md` in a way that would've conflicted. Re-checked out `develop` locally post-merge and reran `build`/`lint`/`test` against the actual merged tree, not just each PR in isolation — still 67/67 green. `main`/Netlify untouched; that's a separate, deliberate step per the `develop`-workflow Decisions row.
 
 ### 2026-08-01 — claude (session 13)
 - PR 4 ("Data truthfulness"): real published macro dates (see Decisions), reconciled sold SnapTrade positions, per-provider sync freshness in Settings. Deployed + verified live in prod (`sync-events` v14, `snaptrade-sync` v18); `get_advisors` clean.
