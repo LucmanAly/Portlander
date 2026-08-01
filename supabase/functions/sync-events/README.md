@@ -14,9 +14,10 @@ Finnhub → `public.events` + `public.sync_runs` (Supabase Edge Function).
 1. Load distinct tickers from `holdings` ∪ `watchlist` (service role, all users).
 2. For each ticker, call Finnhub `GET /calendar/earnings?from&to&symbol`.
 3. Upsert global event rows (`user_id = null`, deterministic UUID by `earnings|TICKER|date`).
-4. Upsert macro seeds (FOMC / CPI / NFP) — **currently generated from heuristics, not
-   published dates**. Being replaced by a static published calendar; see
-   `docs/PLAN-2026-08.md` PR 4.
+4. Upsert macro rows (FOMC / CPI / NFP) from the static, hand-verified table in
+   `../_shared/macro-calendar.ts` — real published dates only, `source = 'macro-calendar'`. No
+   generator: extending the calendar means adding rows to that file from the primary source, not
+   computing new ones.
 5. Write `sync_runs` with status `ok` | `partial` | `error`.
 
 Window: **−7 days → +90 days**.

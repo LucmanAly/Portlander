@@ -17,6 +17,7 @@ import {
   persistWatchlistRemote,
   refreshQuotesRemote,
   resetLocalDemo,
+  type SyncTimestamps,
 } from '@/lib/portfolioRepository'
 import { connectBrokerage as connectBrokerageRemote, syncBrokerage as syncBrokerageRemote } from '@/lib/snaptradeRepository'
 import { clearAllData, loadQuotesLastSync, setStorageNamespace } from '@/lib/storage'
@@ -35,6 +36,8 @@ interface PortfolioContextValue {
   watchlist: WatchlistItem[]
   events: PortfolioEvent[]
   lastSyncAt: string | null
+  /** Per-provider freshness: Positions (SnapTrade) / Prices (Finnhub quotes) / Events (Finnhub + macro). */
+  syncTimestamps: SyncTimestamps
   filter: EventFilter
   setFilter: (f: EventFilter) => void
   upcoming14: ReturnType<typeof scoreAndFilterEvents>
@@ -83,6 +86,11 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([])
   const [events, setEvents] = useState<PortfolioEvent[]>([])
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
+  const [syncTimestamps, setSyncTimestamps] = useState<SyncTimestamps>({
+    positions: null,
+    prices: null,
+    events: null,
+  })
   const [filter, setFilter] = useState<EventFilter>('all')
   const [booting, setBooting] = useState(true)
   const [user, setUser] = useState<User | null>(null)
@@ -117,6 +125,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setWatchlist(bundle.watchlist)
       setEvents(bundle.events)
       setLastSyncAt(bundle.lastSyncAt)
+      setSyncTimestamps(bundle.syncTimestamps)
       setBackend(bundle.backend)
       setBrokerageConnections(bundle.brokerageConnections)
     },
@@ -466,6 +475,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     watchlist,
     events,
     lastSyncAt,
+    syncTimestamps,
     filter,
     setFilter,
     upcoming14,

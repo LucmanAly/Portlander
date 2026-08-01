@@ -6,7 +6,7 @@ import clsx from 'clsx'
 export function SettingsPage() {
   const {
     resetDemo,
-    lastSyncAt,
+    syncTimestamps,
     holdings,
     events,
     backend,
@@ -108,13 +108,30 @@ export function SettingsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Last sync</dt>
-            <dd className="font-medium text-ink-100">{formatRelativeSync(lastSyncAt)}</dd>
-          </div>
-          <div>
             <dt className="text-ink-500">Holdings / events</dt>
             <dd className="tabular font-medium text-ink-100">
               {holdings.length} · {events.length}
+            </dd>
+          </div>
+        </dl>
+
+        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-ink-500">Positions</dt>
+            <dd className="font-medium text-ink-100">
+              {formatRelativeSync(syncTimestamps.positions)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Prices</dt>
+            <dd className="font-medium text-ink-100">
+              {formatRelativeSync(syncTimestamps.prices)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Events</dt>
+            <dd className="font-medium text-ink-100">
+              {formatRelativeSync(syncTimestamps.events)}
             </dd>
           </div>
         </dl>
