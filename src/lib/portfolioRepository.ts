@@ -1,5 +1,5 @@
 import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
-import { getSupabase, isSupabaseConfigured, resolveBackend, type DataBackend } from '@/lib/supabase'
+import { getSupabase, resolveBackend, type DataBackend } from '@/lib/supabase'
 import {
   brokerageConnectionFromRow,
   eventFromRow,
@@ -288,11 +288,3 @@ export function resetLocalDemo(): void {
   localResetToDemo()
 }
 
-export function markLocalSynced(iso = new Date().toISOString()): string {
-  localSetLastSync(iso)
-  return iso
-}
-
-export function getConfiguredFlag(): boolean {
-  return isSupabaseConfigured()
-}

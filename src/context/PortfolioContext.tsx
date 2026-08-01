@@ -13,14 +13,12 @@ import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
 import {
   applyQuoteResultsLocally,
   loadPortfolioBundle,
-  markLocalSynced,
   persistHoldingsRemote,
   persistWatchlistRemote,
   refreshQuotesRemote,
   resetLocalDemo,
 } from '@/lib/portfolioRepository'
 import { connectBrokerage as connectBrokerageRemote, syncBrokerage as syncBrokerageRemote } from '@/lib/snaptradeRepository'
-import { applyLocalEventsSync } from '@/lib/eventSync'
 import { clearAllData, loadQuotesLastSync, setStorageNamespace } from '@/lib/storage'
 import {
   getSupabase,
@@ -48,7 +46,6 @@ interface PortfolioContextValue {
   addWatchlist: (ticker: string, name?: string) => void
   removeWatchlist: (id: string) => void
   resetDemo: () => void
-  markSynced: () => void
   /** Hydration / remote load */
   booting: boolean
   /** local | supabase (effective write target) */
@@ -129,9 +126,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const refreshFromBackend = useCallback(async () => {
     try {
       setRemoteError(null)
-      // Always try local Finnhub file first (npm run sync:events) — no cloud required
-      await applyLocalEventsSync()
-
       const sb = getSupabase()
       let uid: string | null = null
       if (sb) {
@@ -157,9 +151,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
   // Manual, on-demand live price refresh — never runs automatically, never
   // touches events/watchlist. Deliberately doesn't call refreshFromBackend()
-  // afterward: that also re-merges the local Finnhub file and reloads
-  // events/watchlist, which would blur the "price-only" boundary this is
-  // scoped to. The Edge Function's response already carries the new prices.
+  // afterward: that reloads events and watchlist too, which would blur the
+  // "price-only" boundary this is scoped to. The Edge Function's response
+  // already carries the new prices.
   const refreshQuotes = useCallback(async () => {
     if (quotesSyncing) return
     if (backend !== 'supabase') {
@@ -251,13 +245,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         // Always paint local first for speed
         const local = await loadPortfolioBundle(null)
         if (!cancelled) applyBundle(local)
-
-        // Merge Finnhub file from `npm run sync:events` (cloud mode not required)
-        await applyLocalEventsSync()
-        if (!cancelled) {
-          const afterSync = await loadPortfolioBundle(null)
-          applyBundle(afterSync)
-        }
 
         const sb = getSupabase()
         if (!sb) {
@@ -450,11 +437,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     setBackend('local')
   }, [applyBundle, adoptNamespace, user])
 
-  const markSynced = useCallback(() => {
-    const iso = markLocalSynced()
-    setLastSyncAt(iso)
-  }, [])
-
   const signInWithMagicLink = useCallback(async (email: string) => {
     const sb = getSupabase()
     if (!sb) return { error: 'Supabase is not configured' }
@@ -495,7 +477,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     addWatchlist,
     removeWatchlist,
     resetDemo,
-    markSynced,
     booting,
     backend,
     supabaseConfigured: isSupabaseConfigured(),

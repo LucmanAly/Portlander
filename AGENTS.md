@@ -40,6 +40,14 @@ Portfolio **event intelligence** built around time — not a generic calendar.
 - Match existing patterns: types in `src/types`, lib in `src/lib`, components in `src/components`, pages in `src/pages`.
 - Keep `user_id` on multi-tenant tables even if single-user for now.
 - **Never** call market-data APIs from the browser for calendar data; use Supabase + Edge cron (or local mock until wired).
+- **Never `supabase functions deploy` without diffing production first.** Deployed Edge
+  Function source is authoritative only once it is in git. Fetch the live source
+  (`get_edge_function`) for the slug you are about to deploy, diff it against
+  `supabase/functions/<slug>/index.ts`, and reconcile any difference into the repo
+  *before* deploying. A blind deploy silently rolls production back to whatever the
+  repo happens to hold — which has previously meant re-breaking a working brokerage
+  sync. Function version numbers count redeploys, not drift, so they cannot tell you
+  whether the repo is current; only a diff can.
 - Preserve premium UI tokens in `src/index.css` / Tailwind theme; do not introduce random purple SaaS defaults.
 - Do not commit secrets. Use `.env.example` only for env var names.
 
@@ -121,7 +129,7 @@ src/
   data/                   ← mock/demo data until live sync
   components/             ← UI primitives + feature components
   pages/                  ← Today, Calendar, Portfolio, Settings
-  hooks/                  ← data hooks
+  context/                ← PortfolioContext (state, auth, sync orchestration)
 netlify.toml              ← deploy config
 .env.example
 ```

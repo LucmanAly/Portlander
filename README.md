@@ -51,30 +51,21 @@ Demo holdings (CRWD, PANW, FTNT, MSFT, NVDA, META) and relative earnings/macro e
 
 | Mode | When | Behavior |
 |------|------|----------|
-| **Local** (default now) | No Supabase env / not signed in | `localStorage` + demo seed |
-| **Local + Finnhub file** | After `npm run sync:events` | Merges `public/data/events-sync.json` on boot |
-| **Supabase cloud** | Deferred | Env + magic link — holdings remote; events from DB after Edge cron |
+| **Local / demo** | No Supabase env / not signed in | `localStorage` + demo seed |
+| **Supabase cloud** (live) | Env set + signed in | Holdings remote; events from Postgres, filled by the daily Edge cron |
 
-### Live earnings without cloud (recommended now)
-
-```bash
-# PowerShell
-$env:FINNHUB_API_KEY="your_finnhub_key"
-npm.cmd run sync:events
-# optional tickers: npm.cmd run sync:events -- CRWD PANW MSFT
-npm.cmd run dev
-```
-
-Edit default symbols in `scripts/tickers.txt`. Refresh the app or **Settings → Reload data**.
-
-### Cloud mode (later)
+### Cloud mode
 
 ```bash
 cp .env.example .env.local
 # VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
 # apply supabase/schema.sql
-# deploy supabase/functions/sync-events + set FINNHUB_API_KEY secret + daily cron
 ```
+
+Edge Functions (`sync-events`, `refresh-quotes`, `snaptrade-connect`, `snaptrade-sync`)
+and the daily cron are already deployed. See each function's README for its secrets.
+
+> **Never `supabase functions deploy` without diffing production first** — see `AGENTS.md`.
 
 ## Project docs
 
