@@ -65,12 +65,21 @@ export function AppShell() {
             <div className="text-[11px] font-medium uppercase tracking-wider text-ink-500">
               Book value
             </div>
-            <div className="tabular mt-1 text-lg font-semibold text-ink-100">
-              {formatMoney(exposure.totalPortfolioValue)}
-            </div>
-            <div className="mt-1 text-xs text-ink-500">
-              {holdings.length} holdings · {formatRelativeSync(lastSyncAt)}
-            </div>
+            {booting ? (
+              <div className="mt-2 space-y-2" aria-label="Loading portfolio summary">
+                <div className="h-5 w-28 animate-pulse rounded bg-ink-700" />
+                <div className="h-3 w-36 animate-pulse rounded bg-ink-800" />
+              </div>
+            ) : (
+              <>
+                <div className="tabular mt-1 text-lg font-semibold text-ink-100">
+                  {formatMoney(exposure.totalPortfolioValue)}
+                </div>
+                <div className="mt-1 text-xs text-ink-500">
+                  {holdings.length} holdings · {formatRelativeSync(lastSyncAt)}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </aside>
@@ -85,16 +94,23 @@ export function AppShell() {
             <span className="text-sm font-semibold">Portlander</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="tabular text-xs text-ink-400">
-              {formatMoney(exposure.totalPortfolioValue)}
-            </span>
+            {booting ? (
+              <span
+                className="h-3 w-16 animate-pulse rounded bg-ink-700"
+                aria-label="Loading portfolio value"
+              />
+            ) : (
+              <span className="tabular text-xs text-ink-400">
+                {formatMoney(exposure.totalPortfolioValue)}
+              </span>
+            )}
             <RefreshQuotesButton variant="compact" />
           </div>
         </header>
 
         <main className="scrollbar-thin flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="mx-auto max-w-6xl">
-            <Outlet />
+            {booting ? <AppSkeleton /> : <Outlet />}
           </div>
         </main>
 
@@ -117,6 +133,53 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
+      </div>
+    </div>
+  )
+}
+
+
+function AppSkeleton() {
+  return (
+    <div className="space-y-6" role="status" aria-label="Loading portfolio">
+      <span className="sr-only">Loading portfolio…</span>
+      <div className="animate-pulse space-y-6" aria-hidden="true">
+        <div className="space-y-3">
+          <div className="h-3 w-28 rounded bg-accent-500/15" />
+          <div className="h-9 w-64 max-w-full rounded-lg bg-ink-700" />
+          <div className="h-4 w-full max-w-xl rounded bg-ink-800" />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="surface rounded-2xl p-4">
+              <div className="h-3 w-20 rounded bg-ink-800" />
+              <div className="mt-3 h-7 w-24 rounded bg-ink-700" />
+              <div className="mt-3 h-3 w-32 rounded bg-ink-800" />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="h-8 w-20 rounded-full bg-ink-800" />
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="surface rounded-2xl p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="h-4 w-24 rounded bg-ink-700" />
+                  <div className="h-5 w-full max-w-md rounded bg-ink-800" />
+                  <div className="h-3 w-40 rounded bg-ink-800" />
+                </div>
+                <div className="h-10 w-16 shrink-0 rounded-lg bg-ink-700" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
