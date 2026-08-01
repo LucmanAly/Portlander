@@ -67,8 +67,65 @@ export function PortfolioTable({
 
   return (
     <div className="space-y-3">
-      {/* Column customization is a table-only affordance — the mobile card layout
-          below always shows the same fixed, compact field set. */}
+      {/* Desktop: full configurable table. */}
+      <div className="surface hidden overflow-hidden rounded-2xl sm:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-ink-500">
+                <th className="px-4 py-3 font-medium">Ticker</th>
+                {orderedVisible.map((key) => (
+                  <th key={key} className="px-4 py-3 font-medium">
+                    {PORTFOLIO_COLUMN_LABEL[key]}
+                  </th>
+                ))}
+                <th className="px-4 py-3 font-medium" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {holdings.length === 0 ? (
+                <tr>
+                  <td colSpan={orderedVisible.length + 2} className="px-4 py-10 text-center text-ink-500">
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : (
+                holdings.map((h) => (
+                  <HoldingRow
+                    key={h.id}
+                    holding={h}
+                    weightBasis={weightBasis}
+                    columns={orderedVisible}
+                    onRemove={() => onRemove(h.id)}
+                  />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Mobile: compact cards instead of a horizontally-scrolling table. Always
+          shows the same fixed field set — column customization is a desktop-only
+          affordance, not worth reproducing in a one-column layout. */}
+      <div className="space-y-2 sm:hidden">
+        {holdings.length === 0 ? (
+          <p className="surface rounded-2xl px-4 py-10 text-center text-sm text-ink-500">
+            {emptyMessage}
+          </p>
+        ) : (
+          holdings.map((h) => (
+            <HoldingCard
+              key={h.id}
+              holding={h}
+              weightBasis={weightBasis}
+              onRemove={() => onRemove(h.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Column customization stays below the table so the opening view is table-first. */}
       <div className="hidden justify-end sm:flex">
         <button
           type="button"
@@ -147,63 +204,6 @@ export function PortfolioTable({
         </div>
       ) : null}
 
-      {/* Desktop: full configurable table. */}
-      <div className="surface hidden overflow-hidden rounded-2xl sm:block">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-ink-500">
-                <th className="px-4 py-3 font-medium">Ticker</th>
-                {orderedVisible.map((key) => (
-                  <th key={key} className="px-4 py-3 font-medium">
-                    {PORTFOLIO_COLUMN_LABEL[key]}
-                  </th>
-                ))}
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {holdings.length === 0 ? (
-                <tr>
-                  <td colSpan={orderedVisible.length + 2} className="px-4 py-10 text-center text-ink-500">
-                    {emptyMessage}
-                  </td>
-                </tr>
-              ) : (
-                holdings.map((h) => (
-                  <HoldingRow
-                    key={h.id}
-                    holding={h}
-                    weightBasis={weightBasis}
-                    columns={orderedVisible}
-                    onRemove={() => onRemove(h.id)}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Mobile: compact cards instead of a horizontally-scrolling table. Always
-          shows the same fixed field set — column customization is a desktop-only
-          affordance, not worth reproducing in a one-column layout. */}
-      <div className="space-y-2 sm:hidden">
-        {holdings.length === 0 ? (
-          <p className="surface rounded-2xl px-4 py-10 text-center text-sm text-ink-500">
-            {emptyMessage}
-          </p>
-        ) : (
-          holdings.map((h) => (
-            <HoldingCard
-              key={h.id}
-              holding={h}
-              weightBasis={weightBasis}
-              onRemove={() => onRemove(h.id)}
-            />
-          ))
-        )}
-      </div>
     </div>
   )
 }
