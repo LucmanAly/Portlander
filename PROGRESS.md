@@ -63,7 +63,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 ## Next up (ordered)
 
-1. **Owner:** click "Connect brokerage" in Settings → link Fidelity → then "Sync now". v17 is already deployed and needs no new secrets. If it errors, the message now names the SnapTrade code and the exact fix (the catch block maps `1012`/`1076` to a mode-mismatch hint), so paste it verbatim.
+1. **Owner:** click "Connect brokerage" in Settings → link Fidelity → then "Sync now". v17 is already deployed and needs no new secrets. If it errors, the message now names the SnapTrade code and the exact fix (the catch block maps `1012`/`1076` to a mode-mismatch hint), so paste it verbatim. Separately: merge or close **PR #13** (https://github.com/LucmanAly/Portlander/pull/13, draft, → `develop`) once the click-test confirms v17 actually works — it's currently just sitting open.
 2. **Owner:** click-test "Refresh prices" too, if not already done — now also confirms Day change populates.
 3. **Owner (optional):** retune the `11:00 UTC` cron time to your actual timezone.
 4. **Owner (still unaddressed since session 5):** check Netlify → Site configuration → Build & deploy → Deploy contexts — Deploy Previews for PRs may be consuming build minutes separately from `main` pushes.
@@ -119,7 +119,9 @@ Keep entries short — a few bullets, key files, pointer to the PR/commit for fu
 - Verified the mechanism in the real SDK source (downloaded the `snaptrade-typescript-sdk@11.0.4` tarball again, per the note below): `/snapTrade/registerUser` is `authModes: ["commercialApiKey"]` only, `/snapTrade/login` accepts both, and personal mode signs with `PersonalSignature`/`PersonalTimestamp` while typing `userId`/`userSecret` as `never`.
 - Refactored **both** Edge Functions to support personal and commercial modes behind `SNAPTRADE_AUTH_MODE` (default `personal`), added the owner gate, added `connectionType: 'read'`, and made the catch blocks translate codes `1012`/`1076` into the exact config fix. `snaptrade-sync`'s three reads now go through a small `SnaptradeReader` interface so the credential difference lives in one place.
 - **Deployed both as v17 via the Supabase MCP** (`deploy_edge_function`) and read the deployed source back to confirm it round-tripped — previous sessions left deploys to the owner, which is part of why each fix took a full session to test.
+- Committed + pushed to `claude/portlander-snaptrade-oauth-77b9jl`, opened **PR #13** (draft, → `develop`): https://github.com/LucmanAly/Portlander/pull/13 — not yet merged. The code in the PR matches what's already live (v17); merging it doesn't change app behavior, it just brings the branch history in sync with the deploy.
 - Could not click-test: the connect flow needs a signed-in user's JWT, and this sandbox's network policy blocks direct HTTPS to the project host (403 on CONNECT). Owner's single click is the remaining verification.
+- **Session ended here at the owner's request**, before the click-test happened — owner was mid-way through setting up a GitHub Codespace on mobile Safari to run the app (hit a clipboard-paste issue in the Monaco editor, worked around via terminal heredoc) and chose to pick that back up later rather than test now. So: v17 is live, PR #13 is open, and the SnapTrade connect→sync path is **still unverified end-to-end** — next session should check PR #13's state first (owner may have merged it manually) and ask whether the click-test happened before doing anything else.
 - Key evidence: request ID `d515631b78aa4cfc69169373a3e88438`; SDK v11.0.4 `dist/index.mjs` auth-mode branches; deployed `snaptrade-connect`/`snaptrade-sync` v17.
 
 ### 2026-08-01 — codex (session 11)
