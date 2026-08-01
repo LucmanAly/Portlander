@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-01
 **Last agent:** codex (session 15)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21) are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
+**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics and release metadata, are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -15,6 +15,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Area | Status | Notes |
 |------|--------|-------|
 | Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
+| Settings diagnostics + release metadata | ✅ Done on `develop` | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
 | `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
@@ -71,6 +72,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
 | 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
 | 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
 | 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The dashboard "Schedules" tab this file used to reference doesn't exist. A real sync takes ~16s server-side; `pg_net`'s 5s default was logging a misleading timeout even though the function completed fine |
@@ -93,6 +95,12 @@ Single source of truth for current state. If it's here, don't re-explain it else
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-01 — codex (session 16)
+- Settings refactor: added a single Diagnostics card with live Backend/Auth/Positions/Prices/Events status rows, surfaced error details, and reload/price-check actions.
+- Added `src/lib/appMeta.ts` with Phase 1 release metadata (`v1.0`) and an Eastern-time formatted last-updated timestamp.
+- Added the release/versioning protocol to `AGENTS.md`: phase finals use major versions, feature releases use minor versions, and hotfixes use patch versions.
+- This work is on `develop`; production `main` remains unchanged until the owner promotes the final Phase 1 release.
 
 ### 2026-08-01 — codex (session 15)
 - PR #20 adds a layout-matched boot skeleton and hides local/demo book values until auth + remote loading resolve; CI build/lint/test green, merged to `develop`.
