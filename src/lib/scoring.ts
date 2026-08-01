@@ -120,6 +120,41 @@ export function holdingDayChange(h: Holding): number | undefined {
   return h.shares * h.dayChangeValue
 }
 
+/** True when every position has an observed price and day-change value from the same refresh. */
+function hasObservedDayChange(h: Holding): boolean {
+  return (
+    Number.isFinite(h.lastPrice) &&
+    h.lastPrice != null &&
+    Number.isFinite(h.dayChangeValue) &&
+    h.dayChangeValue != null
+  )
+}
+
+/**
+ * Today's dollar move for the whole book. A partial refresh is deliberately
+ * reported as unavailable rather than presenting a misleading partial total.
+ */
+export function portfolioDayChange(holdings: Holding[]): number | undefined {
+  if (holdings.length === 0 || !holdings.every(hasObservedDayChange)) return undefined
+  return holdings.reduce((sum, h) => sum + (holdingDayChange(h) ?? 0), 0)
+}
+
+/**
+ * Today's portfolio move as a percentage of the previous close. Both values
+ * require a complete price refresh so the denominator is the prior portfolio
+ * value, not today's value.
+ */
+export function portfolioDayChangePct(holdings: Holding[]): number | undefined {
+  const change = portfolioDayChange(holdings)
+  if (change == null) return undefined
+
+  const currentValue = holdings.reduce((sum, h) => sum + h.shares * (h.lastPrice as number), 0)
+  const previousValue = currentValue - change
+  if (!Number.isFinite(previousValue) || previousValue <= 0) return undefined
+
+  return (change / previousValue) * 100
+}
+
 /** Total unrealized gain/loss ($) since cost basis. Undefined if either input is missing. */
 export function holdingTotalGainLoss(h: Holding): number | undefined {
   if (h.lastPrice == null || h.costBasis == null) return undefined
