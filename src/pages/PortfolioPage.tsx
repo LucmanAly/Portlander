@@ -1,11 +1,33 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
-import { portfolioTotalValue, portfolioWeightBasis, positionWeightPct } from '@/lib/scoring'
+import {
+  holdingMarketValue,
+  portfolioTotalValue,
+  portfolioWeightBasis,
+  positionWeightPct,
+} from '@/lib/scoring'
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Download, Trash2, Upload } from 'lucide-react'
-import type { Holding } from '@/types'
+import { Download, Search, Trash2, Upload } from 'lucide-react'
+import clsx from 'clsx'
+import type { Holding, HoldingSource } from '@/types'
+
+type SortKey = 'weight' | 'ticker' | 'value' | 'dayChange'
+
+const SOURCE_FILTERS: { id: HoldingSource | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'manual', label: 'Manual' },
+  { id: 'csv', label: 'CSV' },
+  { id: 'snaptrade', label: 'Synced' },
+]
+
+const SORT_LABEL: Record<SortKey, string> = {
+  weight: '% of portfolio',
+  ticker: 'Ticker',
+  value: 'Value',
+  dayChange: 'Day change',
+}
 
 export function PortfolioPage() {
   const {
@@ -23,13 +45,36 @@ export function PortfolioPage() {
   // book mixing weight overrides and computed weights still sums to 100%.
   const total = portfolioTotalValue(holdings)
   const weightBasis = portfolioWeightBasis(holdings)
-  const sorted = useMemo(
-    () =>
-      [...holdings].sort(
-        (a, b) => positionWeightPct(b, weightBasis) - positionWeightPct(a, weightBasis),
-      ),
-    [holdings, weightBasis],
-  )
+
+  const [search, setSearch] = useState('')
+  const [sourceFilter, setSourceFilter] = useState<HoldingSource | 'all'>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('weight')
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return holdings.filter((h) => {
+      if (sourceFilter !== 'all' && h.source !== sourceFilter) return false
+      if (!q) return true
+      return h.ticker.toLowerCase().includes(q) || (h.name ?? '').toLowerCase().includes(q)
+    })
+  }, [holdings, search, sourceFilter])
+
+  const sorted = useMemo(() => {
+    const list = [...filtered]
+    switch (sortKey) {
+      case 'ticker':
+        return list.sort((a, b) => a.ticker.localeCompare(b.ticker))
+      case 'value':
+        return list.sort((a, b) => holdingMarketValue(b) - holdingMarketValue(a))
+      case 'dayChange':
+        return list.sort((a, b) => (b.dayChangePct ?? -Infinity) - (a.dayChangePct ?? -Infinity))
+      case 'weight':
+      default:
+        return list.sort(
+          (a, b) => positionWeightPct(b, weightBasis) - positionWeightPct(a, weightBasis),
+        )
+    }
+  }, [filtered, sortKey, weightBasis])
 
   const [ticker, setTicker] = useState('')
   const [shares, setShares] = useState('')
@@ -292,7 +337,60 @@ export function PortfolioPage() {
         </div>
       </form>
 
-      <PortfolioTable holdings={sorted} weightBasis={weightBasis} onRemove={removeHolding} />
+      {/* Search / sort / source filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
+          <Search className="h-4 w-4 shrink-0 text-ink-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ticker or name"
+            className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {SOURCE_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setSourceFilter(f.id)}
+              className={clsx(
+                'focus-ring rounded-lg px-3 py-1.5 text-sm font-medium transition duration-150',
+                sourceFilter === f.id
+                  ? 'bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/40'
+                  : 'bg-ink-850 text-ink-400 ring-1 ring-border hover:text-ink-200',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-400">
+          Sort
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="input w-auto"
+          >
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((key) => (
+              <option key={key} value={key}>
+                {SORT_LABEL[key]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <PortfolioTable
+        holdings={sorted}
+        weightBasis={weightBasis}
+        onRemove={removeHolding}
+        emptyMessage={
+          holdings.length === 0
+            ? 'No holdings yet.'
+            : 'No holdings match your search/filter.'
+        }
+      />
 
       {/* Watchlist */}
       <section className="space-y-3">
