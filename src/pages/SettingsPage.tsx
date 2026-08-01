@@ -1,13 +1,14 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatRelativeSync } from '@/lib/format'
+import { APP_LAST_UPDATED, APP_PHASE, APP_VERSION, formatAppUpdatedAt } from '@/lib/appMeta'
 import { useState, type FormEvent } from 'react'
+import { AlertCircle, CheckCircle2, CircleHelp, RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
 
 export function SettingsPage() {
   const {
     resetDemo,
-    markSynced,
-    lastSyncAt,
+    syncTimestamps,
     holdings,
     events,
     backend,
@@ -25,6 +26,10 @@ export function SettingsPage() {
     brokerageError,
     connectBrokerage,
     syncBrokerage,
+    quotesLastSyncedAt,
+    quotesError,
+    quotesSyncing,
+    refreshQuotes,
   } = usePortfolio()
 
   const [email, setEmail] = useState('')
@@ -47,6 +52,35 @@ export function SettingsPage() {
       ? 'Supabase (signed in)'
       : 'Supabase configured · using local until sign-in'
 
+  const backendState: DiagnosticState = remoteError
+    ? 'error'
+    : booting
+      ? 'checking'
+      : backend === 'supabase'
+        ? 'healthy'
+        : 'local'
+  const authState: DiagnosticState = !supabaseConfigured
+    ? 'local'
+    : user
+      ? 'healthy'
+      : 'attention'
+  const positionsState: DiagnosticState = brokerageError
+    ? 'error'
+    : brokerageConnections.length > 0
+      ? 'healthy'
+      : 'not-run'
+  const pricesState: DiagnosticState = quotesError
+    ? 'error'
+    : quotesLastSyncedAt || syncTimestamps.prices
+      ? 'healthy'
+      : 'not-run'
+  const eventsState: DiagnosticState = remoteError
+    ? 'error'
+    : syncTimestamps.events
+      ? 'healthy'
+      : 'not-run'
+  const hasIssues = Boolean(remoteError || brokerageError || quotesError)
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header>
@@ -63,11 +97,37 @@ export function SettingsPage() {
         </p>
       </header>
 
-      {remoteError ? (
-        <div className="rounded-xl border border-critical/30 bg-critical-soft px-4 py-3 text-sm text-critical">
-          {remoteError}
+      <section className="surface-elevated space-y-4 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
+              About this build
+            </h2>
+            <p className="mt-1 text-sm text-ink-400">
+              Release metadata for the version currently running.
+            </p>
+          </div>
+          <span className="tabular rounded-lg bg-accent-glow px-2.5 py-1 text-sm font-semibold text-accent-300 ring-1 ring-accent-500/30">
+            v{APP_VERSION}
+          </span>
         </div>
-      ) : null}
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-ink-500">Phase</dt>
+            <dd className="font-medium text-ink-100">{APP_PHASE}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Last updated</dt>
+            <dd className="font-medium text-ink-100">
+              {formatAppUpdatedAt(APP_LAST_UPDATED)}
+            </dd>
+          </div>
+        </dl>
+        <p className="text-xs leading-relaxed text-ink-500">
+          The timestamp is updated with the release metadata when a version is promoted to
+          <code className="mx-1 text-ink-300">main</code>.
+        </p>
+      </section>
 
       <section className="surface-elevated space-y-4 rounded-2xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">Data</h2>
@@ -109,10 +169,6 @@ export function SettingsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Last sync</dt>
-            <dd className="font-medium text-ink-100">{formatRelativeSync(lastSyncAt)}</dd>
-          </div>
-          <div>
             <dt className="text-ink-500">Holdings / events</dt>
             <dd className="tabular font-medium text-ink-100">
               {holdings.length} · {events.length}
@@ -120,23 +176,36 @@ export function SettingsPage() {
           </div>
         </dl>
 
+        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-ink-500">Positions</dt>
+            <dd className="font-medium text-ink-100">
+              {formatRelativeSync(syncTimestamps.positions)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Prices</dt>
+            <dd className="font-medium text-ink-100">
+              {formatRelativeSync(syncTimestamps.prices)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Events</dt>
+            <dd className="font-medium text-ink-100">
+              {formatRelativeSync(syncTimestamps.events)}
+            </dd>
+          </div>
+        </dl>
+
         <div className="flex flex-wrap gap-2 pt-2">
           <button
             type="button"
-            onClick={() => void refreshFromBackend()}
-            className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
-          >
-            Reload data
-          </button>
-          <button
-            type="button"
-            onClick={() => markSynced()}
-            className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
-          >
-            Mark synced now
-          </button>
-          <button
-            type="button"
+            disabled={Boolean(user)}
+            title={
+              user
+                ? 'Sign out first — demo data would overwrite your synced portfolio'
+                : undefined
+            }
             onClick={() => {
               if (
                 confirm(
@@ -146,7 +215,7 @@ export function SettingsPage() {
                 resetDemo()
               }
             }}
-            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20"
+            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset demo data
           </button>
@@ -260,9 +329,117 @@ export function SettingsPage() {
               {brokerageSyncing ? 'Syncing…' : 'Sync now'}
             </button>
           </div>
-          {brokerageError ? <p className="text-sm text-critical">{brokerageError}</p> : null}
         </section>
       ) : null}
+
+      <section className="surface-elevated space-y-4 rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
+              Diagnostics
+            </h2>
+            <p className="mt-1 text-sm text-ink-400">
+              Live checks for authentication, backend data, prices, events and brokerage sync.
+            </p>
+          </div>
+          <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-400 ring-1 ring-border">
+            Live
+          </span>
+        </div>
+
+        <div className="divide-y divide-border rounded-xl bg-ink-950/30 px-3">
+          <DiagnosticRow
+            label="Backend"
+            state={backendState}
+            detail={
+              backend === 'supabase'
+                ? 'Supabase data path is active.'
+                : 'Local / demo data path is active.'
+            }
+          />
+          <DiagnosticRow
+            label="Authentication"
+            state={authState}
+            detail={
+              user?.email
+                ? 'Signed in as ' + user.email
+                : supabaseConfigured
+                  ? 'Supabase is configured, but no session is active.'
+                  : 'Supabase is not configured.'
+            }
+          />
+          <DiagnosticRow
+            label="Positions"
+            state={positionsState}
+            detail={
+              brokerageConnections.length > 0
+                ? brokerageConnections.length +
+                  ' brokerage connection(s) · ' +
+                  formatRelativeSync(syncTimestamps.positions)
+                : 'No brokerage connection has been tested in this session.'
+            }
+          />
+          <DiagnosticRow
+            label="Prices"
+            state={pricesState}
+            detail={
+              quotesLastSyncedAt || syncTimestamps.prices
+                ? 'Last refreshed ' +
+                  formatRelativeSync(quotesLastSyncedAt || syncTimestamps.prices)
+                : 'No live price refresh has been run.'
+            }
+          />
+          <DiagnosticRow
+            label="Events"
+            state={eventsState}
+            detail={
+              syncTimestamps.events
+                ? 'Last synced ' + formatRelativeSync(syncTimestamps.events)
+                : 'No remote event sync is recorded.'
+            }
+          />
+        </div>
+
+        {hasIssues ? (
+          <div
+            className="rounded-xl border border-critical/30 bg-critical-soft px-3 py-2.5 text-sm text-critical"
+            role="alert"
+          >
+            <p className="font-semibold">Issues reported</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+              {remoteError ? <li>Data/backend: {remoteError}</li> : null}
+              {quotesError ? <li>Prices: {quotesError}</li> : null}
+              {brokerageError ? <li>Brokerage: {brokerageError}</li> : null}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-xs text-ink-500">
+            No current errors have been reported. The actions below re-run the relevant checks.
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => void refreshFromBackend()}
+            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Reload data
+          </button>
+          {supabaseConfigured && user ? (
+            <button
+              type="button"
+              onClick={() => void refreshQuotes()}
+              disabled={quotesSyncing}
+              className="focus-ring inline-flex items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750 disabled:opacity-50"
+            >
+              <RefreshCw className={clsx('h-3.5 w-3.5', quotesSyncing && 'animate-spin')} />
+              {quotesSyncing ? 'Checking prices…' : 'Check prices'}
+            </button>
+          ) : null}
+        </div>
+      </section>
 
       <section className="surface-elevated space-y-3 rounded-2xl p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
@@ -281,51 +458,87 @@ export function SettingsPage() {
         </ol>
       </section>
 
-      <section className="surface-elevated space-y-3 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-          Earnings sync (local — no cloud)
-        </h2>
-        <p className="text-sm text-ink-400">
-          Pull real Finnhub earnings into the app without Supabase. Run this on your machine, then
-          click <span className="text-ink-200">Reload data</span>.
-        </p>
-        <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
-{`$env:FINNHUB_API_KEY="your_key"
-npm run sync:events
-# optional: npm run sync:events -- CRWD MSFT`}
-        </pre>
-        <p className="text-xs text-ink-500">
-          Writes <code className="text-ink-400">public/data/events-sync.json</code>. Edit tickers in{' '}
-          <code className="text-ink-400">scripts/tickers.txt</code>. Cloud Edge Function exists for
-          later deploy — see <code className="text-ink-400">supabase/functions/sync-events</code>.
-        </p>
-      </section>
-
-      <section className="surface-elevated space-y-3 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-          Deferred / later
-        </h2>
-        <ul className="space-y-2 text-sm text-ink-400">
-          <li>
-            <span className="text-ink-200">Cloud mode</span> — Supabase Auth + client remote backend
-            (wired, not required now)
-          </li>
-          <li>
-            <span className="text-ink-200">Edge deploy + cron</span> — when you want hands-off nightly
-            sync into Postgres
-          </li>
-        </ul>
-      </section>
-
       <section className="surface rounded-2xl p-5 text-sm text-ink-400">
         <h2 className="mb-2 text-sm font-semibold text-ink-200">Impact score v0</h2>
         <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
 {`impact =
-  65% × position_weight (norm to 20%)
+  65% × position_weight (norm to anchor)
 + 25% × event_type_weight
-+ 10% × recency_boost`}
++ 10% × recency_boost
+
+anchor = max(5%, p90 position weight × 1.5)`}
         </pre>
       </section>
+    </div>
+  )
+}
+
+
+type DiagnosticState = 'healthy' | 'attention' | 'error' | 'checking' | 'local' | 'not-run'
+
+const diagnosticStateStyles: Record<
+  DiagnosticState,
+  { label: string; className: string; icon: typeof CheckCircle2 }
+> = {
+  healthy: {
+    label: 'Healthy',
+    className: 'text-accent-400 ring-accent-500/30 bg-accent-glow',
+    icon: CheckCircle2,
+  },
+  attention: {
+    label: 'Action needed',
+    className: 'text-amber-300 ring-amber-400/30 bg-amber-400/10',
+    icon: CircleHelp,
+  },
+  error: {
+    label: 'Error',
+    className: 'text-critical ring-critical/30 bg-critical-soft',
+    icon: AlertCircle,
+  },
+  checking: {
+    label: 'Checking',
+    className: 'text-ink-300 ring-border bg-ink-800',
+    icon: RefreshCw,
+  },
+  local: {
+    label: 'Local',
+    className: 'text-amber-300 ring-amber-400/30 bg-amber-400/10',
+    icon: CircleHelp,
+  },
+  'not-run': {
+    label: 'Not tested',
+    className: 'text-ink-400 ring-border bg-ink-800',
+    icon: CircleHelp,
+  },
+}
+
+function DiagnosticRow({
+  label,
+  state,
+  detail,
+}: {
+  label: string
+  state: DiagnosticState
+  detail: string
+}) {
+  const status = diagnosticStateStyles[state]
+  const Icon = status.icon
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink-200">{label}</p>
+        <p className="mt-0.5 truncate text-xs text-ink-500">{detail}</p>
+      </div>
+      <span
+        className={clsx(
+          'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ring-1',
+          status.className,
+        )}
+      >
+        <Icon className={clsx('h-3 w-3', state === 'checking' && 'animate-spin')} />
+        {status.label}
+      </span>
     </div>
   )
 }

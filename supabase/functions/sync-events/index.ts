@@ -3,6 +3,8 @@
  *
  * Fetches Finnhub earnings calendar for all holdings ∪ watchlist tickers,
  * upserts into public.events (global rows, user_id null), logs public.sync_runs.
+ * Also refreshes the macro rows (FOMC/CPI/NFP) from the static, hand-verified
+ * table in ../_shared/macro-calendar.ts — see that file for sourcing.
  *
  * Secrets (supabase secrets set):
  *   FINNHUB_API_KEY
@@ -20,6 +22,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
+import { MACRO_CALENDAR } from '../_shared/macro-calendar.ts'
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
 const LOOKAHEAD_DAYS = 90
@@ -128,11 +131,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Seed/refresh shared macro rows (deterministic ids)
-    const macro = buildMacroEvents()
-    for (const m of macro) {
-      const { error } = await sb.from('events').upsert(m, { onConflict: 'id' })
-      if (error) errors.push(`macro ${m.title}: ${error.message}`)
+    // Seed/refresh shared macro rows (deterministic ids) from the published calendar.
+    for (const entry of MACRO_CALENDAR) {
+      const row = macroRow(entry)
+      const { error } = await sb.from('events').upsert(row, { onConflict: 'id' })
+      if (error) errors.push(`macro ${row.title} ${row.event_date}: ${error.message}`)
       else upserted++
     }
 
@@ -257,74 +260,22 @@ function toEventRow(row: FinnhubEarning) {
   }
 }
 
-function buildMacroEvents() {
-  const out: ReturnType<typeof macroRow>[] = []
-  const start = new Date()
-
-  // FOMC-style: next 3 Wednesdays spaced ~6 weeks (approximate seed)
-  let fomc = nextWeekday(start, 3) // Wed
-  for (let i = 0; i < 3; i++) {
-    const d = addDays(fomc, i * 42)
-    out.push(
-      macroRow('fomc', ymd(d), 'FOMC decision', 'Federal Reserve rate decision / statement'),
-    )
-  }
-
-  for (let m = 0; m < 3; m++) {
-    const month = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + m, 13))
-    if (month >= start) {
-      out.push(macroRow('cpi', ymd(month), 'CPI release', 'Consumer Price Index'))
-    }
-    const first = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + m, 1))
-    const nfp = firstFriday(first)
-    if (nfp >= start) {
-      out.push(macroRow('nfp', ymd(nfp), 'Nonfarm payrolls', 'US employment report'))
-    }
-  }
-
-  return out
-}
-
-function macroRow(
-  event_type: string,
-  event_date: string,
-  title: string,
-  description: string,
-) {
+function macroRow(entry: (typeof MACRO_CALENDAR)[number]) {
   return {
-    id: deterministicUuid(`macro|${event_type}|${event_date}`),
+    id: deterministicUuid(`macro|${entry.eventType}|${entry.eventDate}`),
     user_id: null,
     ticker: null,
-    title,
-    event_type,
-    event_date,
+    title: entry.title,
+    event_type: entry.eventType,
+    event_date: entry.eventDate,
     event_time: null,
-    timing: event_type === 'fomc' ? 'unknown' : 'bmo',
-    status: 'estimated',
-    source: 'macro-seed',
-    description,
+    timing: entry.timing,
+    status: entry.status,
+    source: 'macro-calendar',
+    description: entry.description,
     raw: null,
     updated_at: new Date().toISOString(),
   }
-}
-
-function nextWeekday(from: Date, day: number): Date {
-  const d = new Date(from)
-  const delta = (day - d.getUTCDay() + 7) % 7
-  d.setUTCDate(d.getUTCDate() + (delta === 0 ? 0 : delta))
-  return d
-}
-
-function firstFriday(monthStart: Date): Date {
-  const d = new Date(monthStart)
-  while (d.getUTCDay() !== 5) d.setUTCDate(d.getUTCDate() + 1)
-  return d
-}
-
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d)
-  x.setUTCDate(x.getUTCDate() + n)
-  return x
 }
 
 async function finishRun(

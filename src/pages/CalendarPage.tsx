@@ -3,7 +3,7 @@ import { usePortfolio } from '@/context/PortfolioContext'
 import { scoreAndFilterEvents, sortEventsByDate } from '@/lib/scoring'
 import { addDays, startOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import { useMemo } from 'react'
-import { formatPct } from '@/lib/format'
+import { formatEventDay, formatPct } from '@/lib/format'
 import { TypeBadge } from '@/components/ui/Badge'
 
 export function CalendarPage() {
@@ -13,8 +13,11 @@ export function CalendarPage() {
   const monthEvents = useMemo(() => {
     const from = startOfMonth(today)
     const to = endOfMonth(addMonths(today, 1))
-    return events.filter((e) => e.eventDate >= formatYmd(from) && e.eventDate <= formatYmd(to))
-  }, [events, today])
+    // Scored, not raw, so the calendar's dots can encode position weight —
+    // scoreAndFilterEvents already does the date-window filtering this used
+    // to do by hand.
+    return scoreAndFilterEvents(events, holdings, watchlist, { fromDate: from, toDate: to, today })
+  }, [events, holdings, watchlist, today])
 
   const agenda = useMemo(() => {
     const scored = scoreAndFilterEvents(events, holdings, watchlist, {
@@ -66,7 +69,7 @@ export function CalendarPage() {
                       {e.ticker ? `${e.ticker} · ${e.title}` : e.title}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-ink-500">{e.eventDate}</p>
+                  <p className="mt-0.5 text-xs text-ink-500">{formatEventDay(e.eventDate)}</p>
                 </div>
                 <div className="tabular shrink-0 text-right text-sm">
                   <div className="font-semibold text-ink-200">{e.impactScore}</div>
@@ -83,11 +86,4 @@ export function CalendarPage() {
       </section>
     </div>
   )
-}
-
-function formatYmd(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
 }

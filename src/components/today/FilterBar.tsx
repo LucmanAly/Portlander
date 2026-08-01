@@ -1,10 +1,12 @@
 import clsx from 'clsx'
 import type { EventFilter } from '@/types'
 
+// No 'Dividends' chip: no sync path fetches ex-dividend dates, so against real
+// data the filter is always empty. The 'dividends' EventFilter and its scoring
+// branch stay — put the chip back the day ex-div fetching exists.
 const FILTERS: { id: EventFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'earnings', label: 'Earnings' },
-  { id: 'dividends', label: 'Dividends' },
   { id: 'macro', label: 'Macro' },
   { id: 'holdings', label: 'Holdings only' },
 ]

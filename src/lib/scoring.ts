@@ -37,23 +37,122 @@ export function holdingMarketValue(h: Holding): number {
   return h.shares * price
 }
 
+/** True when market value fell back to cost basis — an estimate, not an observed price. */
+export function isEstimatedValue(h: Holding): boolean {
+  return h.lastPrice == null && h.costBasis != null
+}
+
 export function portfolioTotalValue(holdings: Holding[]): number {
   return holdings.reduce((sum, h) => sum + holdingMarketValue(h), 0)
 }
 
-/** Position weight 0–100. Override wins; else market value / total. */
-export function positionWeightPct(holding: Holding, totalValue: number): number {
-  if (holding.weightOverridePct != null && !Number.isNaN(holding.weightOverridePct)) {
-    return Math.max(0, Math.min(100, holding.weightOverridePct))
+function clampOverride(pct: number): number {
+  return Math.max(0, Math.min(100, pct))
+}
+
+function hasOverride(h: Holding): boolean {
+  return h.weightOverridePct != null && !Number.isNaN(h.weightOverridePct)
+}
+
+/**
+ * Denominator for `positionWeightPct`'s computed branch. A plain
+ * `portfolioTotalValue()` still includes overridden holdings' market value in
+ * the total, so an override adds its fixed percentage *on top of* what the
+ * computed holdings already summed to — a book mixing overrides and computed
+ * weights doesn't sum to 100%. This scales the computed holdings' shared
+ * denominator down so their weights fill exactly the remainder the overrides
+ * leave behind. With no overrides in the book, this is `portfolioTotalValue()`.
+ */
+export function portfolioWeightBasis(holdings: Holding[]): number {
+  const overrideSum = holdings.reduce(
+    (sum, h) => sum + (hasOverride(h) ? clampOverride(h.weightOverridePct as number) : 0),
+    0,
+  )
+  const computedValue = holdings.reduce(
+    (sum, h) => sum + (hasOverride(h) ? 0 : holdingMarketValue(h)),
+    0,
+  )
+  const remainingPct = Math.max(0, 100 - overrideSum)
+  if (remainingPct <= 0 || computedValue <= 0) return 0
+  return (computedValue * 100) / remainingPct
+}
+
+/** Position weight 0–100. Override wins; else market value / basis. Pass `portfolioWeightBasis(holdings)`, not the raw dollar total, so a mixed book sums to 100%. */
+export function positionWeightPct(holding: Holding, weightBasis: number): number {
+  if (hasOverride(holding)) {
+    return clampOverride(holding.weightOverridePct as number)
   }
-  if (totalValue <= 0) return 0
-  return (holdingMarketValue(holding) / totalValue) * 100
+  if (weightBasis <= 0) return 0
+  return (holdingMarketValue(holding) / weightBasis) * 100
+}
+
+function percentile(sortedAscending: number[], p: number): number {
+  if (sortedAscending.length === 0) return 0
+  const rank = Math.ceil((p / 100) * sortedAscending.length) - 1
+  return sortedAscending[Math.min(sortedAscending.length - 1, Math.max(0, rank))]
+}
+
+/**
+ * Portfolio-relative anchor for `weightNorm`, replacing the old fixed `/20`
+ * clamp. That clamp meant every position at or above 20% weight scored
+ * identically — on a realistically flat book (max weight ~13.5%), almost the
+ * whole book landed in one narrow band and only the single largest position
+ * could ever reach the red tier. `max(5, p90 * 1.5)` keeps a sane floor on a
+ * very concentrated book while staying relative to how spread out *this*
+ * book actually is.
+ */
+export function weightAnchor(holdings: Holding[], weightBasis: number): number {
+  const weights = holdings.map((h) => positionWeightPct(h, weightBasis)).sort((a, b) => a - b)
+  return Math.max(5, percentile(weights, 90) * 1.5)
+}
+
+export type ScoreTier = 'high' | 'medium' | 'low'
+
+export function scoreTier(impactScore: number): ScoreTier {
+  if (impactScore >= 70) return 'high'
+  if (impactScore >= 45) return 'medium'
+  return 'low'
 }
 
 /** Today's dollar gain/loss for the position, from the last "Refresh prices" run. */
 export function holdingDayChange(h: Holding): number | undefined {
   if (h.dayChangeValue == null) return undefined
   return h.shares * h.dayChangeValue
+}
+
+/** True when every position has an observed price and day-change value from the same refresh. */
+function hasObservedDayChange(h: Holding): boolean {
+  return (
+    h.lastPrice != null &&
+    Number.isFinite(h.lastPrice) &&
+    h.dayChangeValue != null &&
+    Number.isFinite(h.dayChangeValue)
+  )
+}
+
+/**
+ * Today's dollar move for the whole book. A partial refresh is deliberately
+ * reported as unavailable rather than presenting a misleading partial total.
+ */
+export function portfolioDayChange(holdings: Holding[]): number | undefined {
+  if (holdings.length === 0 || !holdings.every(hasObservedDayChange)) return undefined
+  return holdings.reduce((sum, h) => sum + (holdingDayChange(h) ?? 0), 0)
+}
+
+/**
+ * Today's portfolio move as a percentage of the previous close. Both values
+ * require a complete price refresh so the denominator is the prior portfolio
+ * value, not today's value.
+ */
+export function portfolioDayChangePct(holdings: Holding[]): number | undefined {
+  const change = portfolioDayChange(holdings)
+  if (change == null) return undefined
+
+  const currentValue = holdings.reduce((sum, h) => sum + h.shares * (h.lastPrice as number), 0)
+  const previousValue = currentValue - change
+  if (!Number.isFinite(previousValue) || previousValue <= 0) return undefined
+
+  return (change / previousValue) * 100
 }
 
 /** Total unrealized gain/loss ($) since cost basis. Undefined if either input is missing. */
@@ -87,7 +186,7 @@ export function scoreEvent(
   event: PortfolioEvent,
   holdings: Holding[],
   watchlist: WatchlistItem[],
-  totalValue: number,
+  weightBasis: number,
   today = startOfDay(new Date()),
 ): ScoredEvent {
   const ticker = event.ticker?.toUpperCase() ?? null
@@ -98,9 +197,9 @@ export function scoreEvent(
     ? watchlist.some((w) => w.ticker.toUpperCase() === ticker)
     : false
 
-  const weightPct = holding ? positionWeightPct(holding, totalValue) : 0
-  // Normalize weight: 20% position → 1.0 on this component scale
-  const weightNorm = Math.min(1, weightPct / 20)
+  const weightPct = holding ? positionWeightPct(holding, weightBasis) : 0
+  const anchor = weightAnchor(holdings, weightBasis)
+  const weightNorm = anchor > 0 ? Math.min(1, weightPct / anchor) : 0
   const typeW = TYPE_WEIGHT[event.eventType] ?? 0.4
   const recency = recencyBoost(event.eventDate, today)
 
@@ -138,7 +237,7 @@ export function scoreAndFilterEvents(
   const today = startOfDay(opts.today ?? new Date())
   const from = opts.fromDate ?? today
   const to = opts.toDate ?? addDays(today, 14)
-  const total = portfolioTotalValue(holdings)
+  const weightBasis = portfolioWeightBasis(holdings)
   const holdingTickers = new Set(holdings.map((h) => h.ticker.toUpperCase()))
 
   let scored = events
@@ -146,7 +245,7 @@ export function scoreAndFilterEvents(
       const d = parseISO(e.eventDate)
       return d >= from && d <= to
     })
-    .map((e) => scoreEvent(e, holdings, watchlist, total, today))
+    .map((e) => scoreEvent(e, holdings, watchlist, weightBasis, today))
 
   const filter = opts.filter ?? 'all'
   if (filter === 'earnings') {
@@ -190,6 +289,7 @@ export function computeExposure(
   today = startOfDay(new Date()),
 ): ExposureSummary {
   const total = portfolioTotalValue(holdings)
+  const weightBasis = portfolioWeightBasis(holdings)
   const end7 = addDays(today, 7)
   const end30 = addDays(today, 30)
 
@@ -203,7 +303,7 @@ export function computeExposure(
     let pct = 0
     for (const h of holdings) {
       if (tickers.has(h.ticker.toUpperCase())) {
-        pct += positionWeightPct(h, total)
+        pct += positionWeightPct(h, weightBasis)
       }
     }
     return Math.min(100, Math.round(pct * 10) / 10)

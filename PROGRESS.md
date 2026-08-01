@@ -1,11 +1,10 @@
 # PROGRESS.md — Portlander live status
 
-**Last updated:** 2026-07-31
-**Last agent:** claude-code
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync (live on `main`, one real bug found + fixed via click-test, re-test pending)
-**Phase 1 status:** 🟢 Cloud deploy live and verified end-to-end; PR #4 merged. Only formal Phase 1 exit sign-off left. Phase 1.5 (SnapTrade): PR #5 merged to `develop`, then `develop` → `main` (PR #6) — **the live app at portlander.netlify.app now runs the full SnapTrade + configurable-table build.** Owner's first real click-test hit a real bug (SDK client construction) — found, fixed, and redeployed (v2 of both functions) — see Decisions.
+**Last updated:** 2026-08-01
+**Last agent:** codex (session 17)
+**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics/release metadata and the Portfolio table-first UI refinements, are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
 
-> **Protocol:** Every agent must read `AGENTS.md` + this file before work, and update this file after work without being asked. See `AGENTS.md`'s "Keep PROGRESS.md lean" section — this file was rewritten 2026-07-31 to cut session-log bloat; keep it that way.
+> **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
 ---
 
@@ -15,69 +14,57 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings |
+| Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
+| Settings diagnostics + release metadata | ✅ Done on `develop` | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
-| Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main`. `main` now includes everything through PR #5 (SnapTrade + configurable table) via PR #6 — owner spent a build minute deliberately to deploy for real testing. |
-| `sync-events` Edge Function | ✅ Live | Global/unscoped (writes shared `events` rows), `verify_jwt: true`, `FINNHUB_API_KEY` set and confirmed working |
-| Daily cron | ✅ Live | `pg_cron` job `daily-sync-events`, `0 11 * * *` UTC, 60s `pg_net` timeout. Owner can retune the time via `select cron.alter_job(1, schedule => '<expr>');` |
-| Owner sign-in + real sync | ✅ Confirmed | Magic-link auth works (after an Auth Site URL fix), 40 real holdings imported, 34 real Finnhub earnings events confirmed live in `events` |
-| `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped. Powers manual "Refresh prices" UI control. Now also persists `day_change_value`/`day_change_pct` from Finnhub's quote response (was fetched, previously discarded) |
-| Calendar/Today UI fixes | ✅ Merged | PR #4 — sort toggle, full date labels, ticker-truncation bug, BMO/AMC coloring, 30-day agenda bug, all fixed and live on `develop` |
-| SnapTrade integration | 🟡 Live on `main`, one bug found + fixed via real click-test, re-test pending | `snaptrade-connect` + `snaptrade-sync` Edge Functions deployed (v2); `holdings.source`/`day_change_*` columns, `snaptrade_users` (lockbox RLS), `snaptrade_connections` tables live; Settings "Brokerage" section + Portfolio table wired up. Owner's first real "Connect brokerage" click hit a 500 — root cause found by downloading and reading the real SDK source (client wasn't constructed correctly), fixed, redeployed. Three more latent bugs caught in the same pass (see Decisions) before they could surface. **Owner needs to click-test again** — this exact flow has still never succeeded end-to-end. |
-| Portfolio table | ✅ Rebuilt | Configurable columns (show/hide + left/right reorder, persisted to `localStorage`), new Day change / Total gain/loss / % of portfolio / Source columns. CSV import still works as fallback |
+| Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
+| `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
+| Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
+| `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
+| `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner click-test still pending — see Blockers |
+| Portfolio table + CSV | ✅ Rebuilt | Table-first opening view with total value + whole-book daily gain/loss, management controls below the table, drag-and-drop desktop column ordering, per-row writes (PR 5), CSV Merge/Replace picker, `~` estimated-value marker, search/sort/source filter + mobile compact cards |
+| Impact score | ✅ Recalibrated (PR 6) | Portfolio-relative anchor (`max(5, p90weight × 1.5)`) replaced the fixed `/20` clamp; High/Med/Low tiers; `EventCard` leads with weight, not the score |
+| Calendar | ✅ Weight-aware (PR 7) | `MonthCalendar` dot size now tracks position weight; agenda dates go through `formatEventDay` |
 | Phase 1 exit criteria | 🟡 2 of 5 met | See checklist below |
 
 ---
 
 ## Phase 1 checklist
 
-- [x] Scaffold, UI, scoring, local data, agent docs, build passes
-- [x] Cloud deploy: Netlify + Supabase schema + `sync-events` + secret + daily cron, all live
-- [x] Owner signed in, real CSV imported, real Finnhub sync confirmed (34 events)
-- [x] Calendar/Today UI fixes merged (PR #4 → `develop`)
-- [x] Manual "Refresh prices" feature merged (PR #4 → `develop`)
-- [ ] Phase 1 exit criteria formally signed off (see below)
+- [x] Scaffold, cloud deploy (Netlify + Supabase + `sync-events` + cron), owner signed in with a real synced book
+- [x] Calendar/Today UI fixes + manual "Refresh prices" (PR #4 → `develop`)
+- [ ] Phase 1 exit criteria formally signed off:
+  - [x] Real portfolio loadable; earnings from Finnhub, not demo offsets
+  - [ ] Weight ranking + exposure % sanity (math unchanged, not yet owner-verified)
+  - [ ] Snappy UI (fixes live on `develop`, awaiting confirmation)
+  - [ ] Used on a real morning once
 
-### Phase 1 exit criteria
-- [x] Real portfolio loadable
-- [x] Earnings from Finnhub, not only demo offsets
-- [ ] Weight ranking + exposure % sanity (math unchanged, not yet formally owner-verified)
-- [ ] Snappy UI (fixes are live on `develop`, awaiting owner confirmation)
-- [ ] Used on a real morning once
-
-### SnapTrade (new scope, not in original `AGENTS.md` plan)
-- [x] Owner obtained app-level `clientId` + `consumerKey`, stored as Supabase Edge secrets `SNAPTRADE_CLIENT_ID` / `SNAPTRADE_CONSUMER_KEY`
-- [x] `snaptrade_users` table (RLS enabled, zero client policies — lockbox for the per-user `userSecret`) + `snaptrade_connections` (client-readable metadata only)
-- [x] `holdings` gained `source` (`manual`/`csv`/`snaptrade`), `day_change_value`, `day_change_pct`
-- [x] `snaptrade-connect` Edge Function: registers user, returns Connection Portal URL
-- [x] `snaptrade-sync` Edge Function: pulls positions, upserts `holdings` (additive — never deletes manual/CSV tickers)
-- [x] Settings "Brokerage" section: connect + list connections + "Sync now"
-- [x] Portfolio table: configurable columns (show/hide + left/right reorder), Day change / Total gain/loss / Source columns
-- [x] Owner click-tested "Connect brokerage" — hit a real 500. Root cause found (client construction bug) and fixed, v2 redeployed. Three more latent bugs caught in the same source-verification pass, also fixed — see Decisions.
-- [ ] **Owner: click-test again** — the connect → sync flow has still never succeeded end-to-end; this is the one thing that couldn't be verified from the sandbox
-- [ ] Decide whether to handle the "position fully sold" gap (see `snaptrade-sync/README.md` "Known v1 gap") if it shows up in practice
+### SnapTrade (new scope, not in original AGENTS.md plan)
+- [x] Schema (`snaptrade_users` lockbox, `snaptrade_connections`, `holdings.source`/`day_change_*`), both Edge Functions, Settings "Brokerage" UI
+- [x] Personal-vs-Commercial auth root cause found and fixed (`SNAPTRADE_AUTH_MODE`, defaults to `personal`) — see Decisions
+- [x] "Position fully sold" gap fixed (v18) — reconciliation not yet exercised against a real sell, since the connect→sync flow has never completed end-to-end
+- [ ] **Owner: click "Connect brokerage" once more.** Nothing to configure — needs no new secrets. If it errors, the message names the SnapTrade code and the fix.
 
 ---
 
 ## Next up (ordered)
 
-1. **Owner:** open Settings (on the live site, `main` now has it), click "Connect brokerage" again, complete the SnapTrade portal flow for Fidelity, then "Sync now" — confirm real positions land in Portfolio with `source = Synced`. The first attempt hit a real bug (now fixed, v2 deployed) — this is a fresh attempt, not a retry of a known-bad state. If it still errors, check `snaptrade-connect/README.md` / `snaptrade-sync/README.md` — both now document exactly what was wrong last time and how it was confirmed against the real SDK source, which is the first place to look for anything new.
-2. **Owner:** click-test "Refresh prices" too, if not already done — now also confirms Day change populates.
-3. **Owner (optional):** retune the `11:00 UTC` cron time to your actual timezone.
-4. **Owner (still unaddressed since session 5):** check Netlify → Site configuration → Build & deploy → Deploy contexts — Deploy Previews for PRs may be consuming build minutes separately from `main` pushes.
-5. Mark Phase 1 exit criteria formally once the above are confirmed.
-6. If real syncs surface the "position fully sold" gap (see SnapTrade checklist above), build the source-scoped diff+delete described in `snaptrade-sync/README.md`.
-7. Phase 2 (prep cards, journal, alerts) — separate from SnapTrade work, can proceed in parallel once Phase 1 is signed off.
+1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
+2. **Owner:** click-test "Refresh prices" too, if not already done.
+3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
+4. **Owner:** merge `develop` → `main` when ready to deploy the final Phase 1 UI (costs a Netlify build minute, so deliberate, not automatic).
+5. On the deployed build, verify real-book weight/exposure sanity, sign-out clearing, mobile layout, and one real morning of use; then mark Phase 1 exit criteria formally.
+6. Phase 2 (prep cards, journal, alerts) can begin after that sign-off.
 
-**Open discussion, not a task yet:** Finnhub rate-limit strategy for adding PE ratio/market cap later. Verified (not memory): 60 calls/min free-tier limit, no daily cap; the earnings-calendar endpoint has a bulk mode (omit `symbol`, get all companies in one call); PE/market cap are price-derived and should refresh 2-3x/day, not weekly (corrected an earlier wrong suggestion); Netlify/Supabase costs are a non-issue at this scale — Finnhub's per-minute limit is the only real constraint. Proposed shape if built: daily bulk earnings call + a 2-3x/day PE/market-cap sync paced ~1.1s/ticker. **Owner hasn't decided whether to build this yet.**
-
-**Advisory, not a task:** owner asked for an opinion on page architecture as the app scales into Phase 2/3. Recommendation: dedicated pages for major new concerns (journal, daily briefing, risk radar), but keep single-item detail (a prep card, notes on one holding) as inline/modal content rather than a new page per item.
+**Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
 ---
 
 ## Blockers
 
-None currently active. (Resolved blockers are deleted, not kept — see `AGENTS.md`'s lean-file protocol. Ambient MCP-connector disconnects/reconnects are not a project blocker, just expect them.)
+- **None outstanding on SnapTrade code.** What remains is verification, not a blocker: the connect → Fidelity → sync path has never run end-to-end, so treat it as unproven until the owner confirms a real sync.
+
+(Resolved blockers are deleted, not kept. Ambient MCP-connector disconnects/reconnects are not a project blocker.)
 
 ---
 
@@ -85,73 +72,74 @@ None currently active. (Resolved blockers are deleted, not kept — see `AGENTS.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-03-25 | Dual sync paths (local script + Edge Function); deterministic event UUIDs; browser never calls Finnhub; `events-sync.json` gitignored | Local dogfood now, cloud later without rewrite; stable upserts; API keys stay server-side; generated artifact shouldn't be committed |
-| 2026-07-31 | `mergeEvents` dedups stale demo/local earnings by ticker, not ticker+date | Demo seed dates are arbitrary offsets that never matched real Finnhub dates, so stale placeholders kept coexisting with real data. Ticker-level purge (Finnhub-sourced rows never purged by this path) fixed it. Known gap: doesn't handle a real earnings date getting *rescheduled* between two Finnhub syncs — would need date-aware purging of future/estimated rows if that shows up in practice. |
-| 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Owner requested real deployment. Netlify's production branch is `main`; pushing to `develop` costs no build minutes (owner is on a limited plan), so PRs target `develop` and only merge to `main` when ready to actually ship. |
-| 2026-07-31 | SnapTrade added as new scope (read-only Fidelity sync) | Owner's explicit request, read-only only (no trading — consistent with `AGENTS.md`'s brokerage non-goal). Not yet added to `AGENTS.md`'s locked stack — do that once actually built. |
-| 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The "Schedules" tab this file used to reference doesn't exist in the current dashboard. Configured directly via `execute_sql`/`apply_migration`. Timeout bumped from `pg_net`'s 5s default because a real 40-ticker sync takes ~16s server-side and was logging a misleading client-side timeout even though the function completed fine. `pg_net`'s public-schema security lint is a known cosmetic issue for that extension (doesn't support `ALTER EXTENSION ... SET SCHEMA`) — left as-is. |
-| 2026-07-31 | Added `refresh-quotes`, the project's first **user-scoped** Edge Function | Owner wanted a persistent, click-only "Refresh prices" control (never auto-fires on page load) for live `holdings.last_price`, fully decoupled from the daily earnings cron. Unlike `sync-events` (deliberately global — writes shared rows, safe for any authenticated caller), this does privileged per-user writes: resolves the caller's `user_id` from their JWT (anon-key client's `.auth.getUser()`), then a service-role client scoped to just that user — never iterates all users. Writes via partial `.update({last_price, updated_at})`, never a full-row upsert, so other holding fields are untouched. `verify_jwt: true` is mandatory here (tolerable either way on `sync-events`). Reuses `sync_runs` columns (`provider='finnhub-quotes'`) rather than a migration. |
-| 2026-07-31 | Gated (signed-out/local-mode) UI states stay clickable-but-muted, not hard `disabled` | A true `disabled` button has no tap affordance for a `title` tooltip on mobile — muted-but-clickable keeps the explanation reachable everywhere. `disabled` is reserved for genuine in-flight state, to block double-click spam. |
-| 2026-07-31 | SnapTrade owns *what you own* (shares/cost basis via `snaptrade-sync`); Finnhub owns *what it's worth* (price/day-change via `refresh-quotes`) | Owner's explicit call after discussing the split. `snaptrade-sync`'s `holdings` upsert deliberately omits `last_price`/`day_change_*` so Postgres `ON CONFLICT DO UPDATE` never touches those columns — `refresh-quotes` already refreshes every ticker in a user's `holdings` regardless of `source`, so no new price path was needed. |
-| 2026-07-31 | SnapTrade sync is additive/merge, never destructive; CSV/manual entry stays as a fallback | Owner's explicit call. `snaptrade-sync` upserts by `(user_id, ticker)` and marks matched rows `source='snaptrade'` (authoritative going forward for that ticker), but never deletes — a manual/CSV ticker the brokerage doesn't cover is left untouched indefinitely. Known gap this creates: a fully-sold `snaptrade` position isn't cleaned up either (see `snaptrade-sync/README.md`) — deferred until it shows up in practice, since fixing it correctly needs a `source`-scoped diff+delete, not a blanket one. |
-| 2026-07-31 | `snaptrade_users` (holds the SnapTrade `userSecret`) has RLS enabled with **zero** policies for `authenticated`/`anon` | Standard Postgres "lockbox" pattern — RLS enabled + no permissive policy means only the service-role key (used exclusively inside `snaptrade-connect`/`snaptrade-sync`) can ever touch it. Confirmed via `get_advisors`: shows up as the expected `rls_enabled_no_policy` INFO-level lint, not a real finding. `snaptrade_connections` (display metadata, no secrets) has a normal `select`-own policy instead, since the client needs to read it for the "Connected: Fidelity" UI. |
-| 2026-07-31 | `snaptrade-connect`/`snaptrade-sync` use the official `snaptrade-typescript-sdk` via Deno's `npm:` specifier, not hand-rolled HMAC request signing | Confirmed working: the import resolves on the hosted Edge Runtime and (as of v2) the client construction and every method/field access have been verified directly against the real `snaptrade-typescript-sdk@11.0.4` source (`.d.ts`/`.mjs`, downloaded from the npm registry tarball and read line-by-line — not docs, not guesses). |
-| 2026-07-31 | First real "Connect brokerage" click hit a 500 — root cause: `new Snaptrade({clientId, consumerKey})` is wrong; the SDK requires `new Snaptrade({auth: SnaptradeAuth.commercialApiKey({clientId, consumerKey})})` | Without the `auth` wrapper, `configuration.authMode` stays `undefined`, so the SDK never attaches `clientId` or applies SnapTrade's required request signing — every call went out unsigned and got rejected, surfacing as a generic non-2xx error with no useful detail (the function never `console.error`'d, so Supabase logs only showed the HTTP status). Found by downloading the SDK's real compiled source rather than re-guessing; same fix applied to both Edge Functions since both had the identical bug. Three more real bugs caught in the same verification pass, all in `snaptrade-sync`: `auth.brokerage?.displayName` should be `display_name` (snake_case wire field); `extractPosition()` read a nonexistent `average_purchase_price` field instead of the real `cost_basis`; `getAllAccountPositions` returns `{results: AccountPosition[], data_freshness}`, not a plain array — the code was iterating the wrapper object directly, which would have silently synced zero positions on every run. All four fixed, v2 of both functions redeployed. |
-| 2026-07-31 | Added `--color-positive` design token (green, alongside existing `--color-critical` red) | Gain/loss coloring in the new Portfolio table columns needed a semantic positive color distinct from `--color-dividend` (also green, but means something different — a scheduled payout, not a market gain). Tailwind v4 auto-generates `text-positive`/`bg-positive-soft` utilities from the `--color-*` custom property, same mechanism already powering `text-critical`. |
+| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |\n| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
+| 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
+| 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
+| 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The dashboard "Schedules" tab this file used to reference doesn't exist. A real sync takes ~16s server-side; `pg_net`'s 5s default was logging a misleading timeout even though the function completed fine |
+| 2026-07-31 | Added `refresh-quotes`, the project's first **user-scoped** Edge Function | Click-only "Refresh prices" for live `holdings.last_price`, decoupled from the daily earnings cron. Resolves caller's `user_id` from JWT, writes via partial update, never a full-row upsert. `verify_jwt: true` mandatory |
+| 2026-07-31 | SnapTrade owns *what you own* (`snaptrade-sync`); Finnhub owns *what it's worth* (`refresh-quotes`) | `snaptrade-sync`'s upsert omits `last_price`/`day_change_*` so `ON CONFLICT DO UPDATE` never touches those columns |
+| 2026-07-31 | `snaptrade_users` (holds the SnapTrade `userSecret`) has RLS enabled with **zero** policies | Standard Postgres lockbox pattern — only the service-role key can touch it. Shows up as the expected `rls_enabled_no_policy` INFO lint, not a real finding |
+| 2026-07-31 | `snaptrade-connect`/`snaptrade-sync` use the official `snaptrade-typescript-sdk` via Deno's `npm:` specifier | Every method/field access verified directly against the real SDK source (`.d.ts`/`.mjs` from the npm tarball), not docs or guesses — this is how every real SnapTrade bug below was actually found, not from reasoning about docs |
+| 2026-08-01 | Established "surface real errors in the client, not the logs" as the debugging pattern for Edge Functions | Supabase's `get_logs` MCP tool never surfaces `console.error` output — only the HTTP boundary line. `describeFunctionError()` in `snaptradeRepository.ts` reads the real JSON error body off `error.context` instead (supabase-js's `FunctionsHttpError.message` is always generic) |
+| 2026-08-01 | SnapTrade: support **both** Personal and Commercial API key models behind `SNAPTRADE_AUTH_MODE`, defaulting to `personal`, gated to one owner user | A fresh key pair returned SnapTrade's own `1012` error ("registerUser is not available for personal keys") — settled the question directly. The SDK enforces the split per endpoint (`userId`/`userSecret` typed `never` in personal mode). Personal mode auto-resolves the owner when there's exactly one auth user, else requires `SNAPTRADE_OWNER_USER_ID` — refuses to guess with ≥2 users, since a Personal key always returns the key owner's own brokerage account regardless of caller |
+| 2026-08-01 | Macro calendar (FOMC/CPI/NFP) replaced with a static, hand-verified table instead of the plan's original ask for hardcoded dates "through 2027" | The old `buildMacroEvents()` heuristic fabricated dates with no connection to real Fed/BLS schedules. `supabase/functions/_shared/macro-calendar.ts` tables only what's officially published as of 2026-08-01 (2026 FOMC confirmed, 2027 FOMC marked `estimated` per the Fed's own "tentative" label, CPI/NFP through their published horizon) and stops there rather than extrapolating. Extend it from primary sources directly when stale, not by pattern-matching existing rows |
+| 2026-08-01 | `snaptrade-sync`'s reconcile-delete only runs when the run returned positions and hit no per-account error | A zero-position response or a per-account failure means the list can't be trusted as complete — deleting under either condition risks wiping real holdings because SnapTrade had a bad moment, not because the user actually sold |
+| 2026-08-01 | `portfolioRepository.ts`'s holdings writes are per-row (`upsertHoldingsRemote`/`deleteHoldingsRemote`), not a whole-list select→delete→upsert diff; the client never sends `last_price`/`day_change_*`/`created_at` | The old shape re-diffed the entire book on every single-field edit and let a stale client overwrite Finnhub's price data. The brokerage-synced delete guard moved into the query itself (`.neq('source','snaptrade')`) so it holds regardless of caller |
+| 2026-08-01 | Added `portfolioWeightBasis()` as a function distinct from `portfolioTotalValue()`, rather than changing what the latter returns | `portfolioTotalValue()` has to stay a plain dollar sum — it feeds the "Total value" header and `ExposureSummary.totalPortfolioValue`, which don't care about weight overrides. The basis is only for dividing a *non*-overridden holding's value into a weight percentage, scaled so overridden + computed weights sum to 100% |
+| 2026-08-01 | `weightAnchor` (`max(5, p90weight × 1.5)`) is recomputed per book inside `scoreEvent` rather than memoized per render | Cheap at this portfolio's scale (tens of holdings, tens of events) — recomputing beats threading another precomputed value through every call site for no measurable benefit |
+| 2026-08-01 | Portfolio's mobile card layout ignores the desktop table's column customization (show/hide + reorder) — always the same fixed compact field set | Drag/reorder doesn't map cleanly onto a single column of cards, and the plan only asked for compact cards, not customizable ones. Column prefs stay a `sm:`-and-up affordance |
+| 2026-08-01 | Fixed the weight bar's undocumented `× 3` saturation (`PortfolioTable.tsx`, confirmed in `docs/PLAN-2026-08.md`'s verification table but never assigned to a PR) while already touching that file for PR 7's mobile cards | It silently maxed the bar out around 33% weight instead of 100%, on both the desktop cell and the new mobile card that shares its logic. Plain `min(100, weight)` now — same drive-by-fix-while-in-the-file precedent as PR 1's `resetDemo()` fix |
 
 ---
 
 ## Session log
 
-Keep entries short — a few bullets, key files, pointer to the PR/commit for full detail. Don't re-narrate git history here.
+Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
 
-### 2026-07-31 — claude-code (session 8)
-- Merged PR #5 → `develop`, then opened and merged `develop` → `main` (PR #6) at the owner's request — `main`/the live Netlify app now has the full SnapTrade + configurable-table build.
-- Owner's first real "Connect brokerage" click hit `Edge Function returned a non-2xx status code`. Diagnosed by downloading the actual `snaptrade-typescript-sdk@11.0.4` tarball from the npm registry and reading its real `.d.ts`/`.mjs` source (couldn't invoke the function as the real user, and Supabase logs only carried the HTTP status, no body). Found the real root cause (client construction — see Decisions) plus three more latent bugs in `snaptrade-sync` in the same pass, all confirmed against real SDK types rather than guessed. Fixed all four, redeployed both functions as v2.
-- Also asked a general question about which LLM to use for a future data-analytics feature (ranked 10 models on quality/value/value-per-dollar) — discussion only, no code, not part of the SnapTrade work.
-- **Still unverified:** the connect → sync flow has never actually succeeded end-to-end — this was the first real attempt and it hit the bug now fixed. Owner needs to try again.
-- Key files: `supabase/functions/{snaptrade-connect,snaptrade-sync}/{index.ts,README.md}`.
+### 2026-08-01 — codex (session 17)
+- Portfolio now opens on the holdings table with total value plus whole-book daily dollar and percentage change; incomplete price refreshes show an honest unavailable state.
+- Moved CSV import/export, add/update, search, source filters, and sorting below the table.
+- Replaced arrow-based desktop column ordering with native drag-and-drop rows; visibility toggles remain beside each column.
+- This remains part of the Phase 1 v1.0 candidate on `develop`; production `main`/Netlify is unchanged.
 
-### 2026-07-31 — claude-code (session 7)
-- Confirmed PR #4 had merged (fixed session 6's open item) and rebuilt this session's branch from `origin/develop` instead of stale `main`.
-- Discussed architecture with the owner before writing code (SnapTrade rate limit is 250/min shared, non-issue at this scale; Finnhub vs SnapTrade split; CSV-as-fallback; left/right column reorder) — see Decisions for the calls made.
-- Built the full SnapTrade integration end-to-end: schema (`holdings.source`/`day_change_*`, `snaptrade_users` lockbox, `snaptrade_connections`), two new Edge Functions (`snaptrade-connect`, `snaptrade-sync`), extended `refresh-quotes` to persist day-change, Settings "Brokerage" section, `snaptradeRepository.ts`, `PortfolioContext` wiring.
-- Rebuilt the Portfolio table as a configurable component (`PortfolioTable.tsx`, `portfolioColumns.ts`, `tablePrefs.ts`) — show/hide + left/right reorder, persisted to `localStorage`; added Day change / Total gain/loss / Source columns (`scoring.ts`: `holdingDayChange`/`holdingTotalGainLoss`/`holdingTotalGainLossPct`).
-- Verified: `npm run build`/`lint` clean, all three Edge Functions deployed (`ACTIVE` status), `get_advisors` shows only expected/pre-existing findings, and a full Playwright pass (dev server + global `playwright` package, `chromium-cli` wasn't available) — screenshots confirm the table renders correctly with real demo gain/loss numbers, column customize show/hide + reorder works and persists across reload, and Settings correctly shows zero SnapTrade network calls in signed-out/local mode (the one "snaptrade" URL that fired was Vite serving the local `.ts` module file, not an API call — false positive, double-checked).
-- **Could not verify:** the actual authenticated SnapTrade connect → sync happy-path (no real user session in the sandbox). See Next up #1 and each new function's README "verify at deploy time" note for what to check if it errors.
-- Key files: `supabase/schema.sql`, `supabase/functions/{snaptrade-connect,snaptrade-sync,refresh-quotes}/`, `src/lib/{snaptradeRepository,portfolioColumns,tablePrefs,scoring,mappers,portfolioRepository,csv}.ts`, `src/context/PortfolioContext.tsx`, `src/pages/{Settings,Portfolio}Page.tsx`, `src/components/portfolio/PortfolioTable.tsx`, `src/types/{index,database}.ts`, `src/index.css`, `src/data/demo.ts`.
+### 2026-08-01 — codex (session 16)
+- Settings refactor: added a single Diagnostics card with live Backend/Auth/Positions/Prices/Events status rows, surfaced error details, and reload/price-check actions.
+- Added `src/lib/appMeta.ts` with Phase 1 release metadata (`v1.0`) and an Eastern-time formatted last-updated timestamp.
+- Added the release/versioning protocol to `AGENTS.md`: phase finals use major versions, feature releases use minor versions, and hotfixes use patch versions.
+- This work is on `develop`; production `main` remains unchanged until the owner promotes the final Phase 1 release.
 
-### 2026-07-31 — claude-code (session 6)
-- Resolved the daily cron (`pg_cron`/`pg_net`), confirmed `FINNHUB_API_KEY` works, fixed a Supabase Auth Site URL misconfig blocking magic-link sign-in, and confirmed a real end-to-end sync (34 real Finnhub events). All infra-only, no `src/` changes — see Decisions for specifics.
-- Fixed four owner-reported UI issues (Today sort toggle, full date labels, a real calendar-ticker-truncation CSS bug, BMO/AMC coloring, a real 30-day-agenda bug that was silently capping at ~14 days) and built a new manual "Refresh prices" feature (first user-scoped Edge Function — see Decisions). Verified via `npm run build`/`lint`, Playwright screenshots + computed-style checks, and a live post-deploy auth-boundary test. Key files: `src/pages/{Today,Calendar}Page.tsx`, `src/components/calendar/MonthCalendar.tsx`, `src/lib/{format,scoring}.ts`, `src/context/PortfolioContext.tsx`, `src/lib/portfolioRepository.ts`, `src/components/layout/{AppShell,RefreshQuotesButton}.tsx`, `supabase/functions/refresh-quotes/`.
-- Researched (verified against Finnhub's docs, not memory) rate-limit/bulk-call strategy for future PE/market-cap metrics — discussion only, not built. See Next up.
-- Discovered PR #3 was merged early and only carried one of five commits; opened **PR #4** for the rest. All stale PR #3 references in this file corrected.
-- Owner obtained SnapTrade `clientId`/`consumerKey` and pasted them in chat; talked through where they go and what building the integration needs (verified against SnapTrade's docs), but didn't store or build anything — owner action first.
-- Owner asked for a session handoff to paste into a new session — provided in chat, and this file was rewritten to cut accumulated bloat (see `AGENTS.md`'s lean-file protocol, added this session).
+### 2026-08-01 — codex (session 15)
+- PR #20 adds a layout-matched boot skeleton and hides local/demo book values until auth + remote loading resolve; CI build/lint/test green, merged to `develop`.
+- PR #21 adds an always-visible Local/Demo banner, mobile `Local` badge, and highlighted desktop mode label so sample/device-only data cannot be mistaken for the cloud book.
+- Live Supabase cron job `daily-sync-events` moved from 11:00 UTC to a DST-safe 9:31 a.m. America/New_York schedule; verified against summer and winter UTC offsets.
+- Phase 1 remains awaiting owner production acceptance only: brokerage connect/sync, Refresh prices, real-book weight/exposure sanity, sign-out clearing, mobile check, and one morning of use.
 
-### 2026-07-31 — claude-code (session 5)
-- Netlify connected via Git-linked continuous deployment, confirmed live. Established the `develop`-branch build-minute-conservation workflow (see Decisions).
-- Applied schema + deployed `sync-events` to a previously-empty Supabase project via the Supabase MCP connector. Caught and fixed a real mistake: first deploy had `verify_jwt: false`, which would have let anyone burn Finnhub quota — redeployed correctly.
-- Couldn't set secrets or cron (no MCP tool exposes either) — left for session 6, along with a stale "Schedules" tab reference in the function README that turned out not to exist.
-- Clarified SnapTrade scope: owner wants read-only live Fidelity holdings, needs the app's own SnapTrade dev registration (distinct from a personal chat-scoped connector that happened to be available). Owner got one of two keys this session.
+### 2026-08-01 — claude (session 14)
+- PR 5 ("Mutation safety proper"): per-row holdings upsert/delete, trimmed client write authority, CSV Merge/Replace picker with live preview counts, per-row delete confirmation. Verified in a real browser via Playwright (dev server, not just unit tests), not only `npm test`. 63 tests green.
+- PR: https://github.com/LucmanAly/Portlander/pull/17 (draft → develop). Key files: `src/lib/{mappers,portfolioRepository,csv}.ts`, `src/context/PortfolioContext.tsx`, `src/pages/PortfolioPage.tsx`, `src/components/portfolio/PortfolioTable.tsx`.
+- Owner asked for this file to be trimmed — was 225 lines / 6.1k words and regrowing the bloat it was cut for on 2026-07-31. Collapsed sessions 1–12's debugging narrative into a pointer at Decisions (which already held the resolved "why"), dropped a Decisions row referencing `eventSync.ts` (deleted in PR 2), fixed a stale "known gap" note PR 4 already closed. 225 → 112 lines. Commit `51cbcf4`.
+- PR 6 ("Score recalibration"), stacked on PR 5. New `portfolioWeightBasis()` (mixed override/computed books now sum to 100%), `weightAnchor()` (portfolio-relative anchor replaces the fixed `/20` clamp — took the red tier from 1/41 holdings to 7 on the distribution fixture), `isEstimatedValue()` (cost-basis fallback flagged, shown as `~` in the Portfolio table), `scoreTier()`/`TierBadge` (High/Med/Low). `EventCard` now leads with weight%, not the score; the redundant progress bar is gone.
+- PR: https://github.com/LucmanAly/Portlander/pull/18 (draft → develop). Verified in a real browser (Playwright), not just `npm test` — Today page's weight-as-hero + tier badges, Portfolio's estimated marker, Settings' updated formula text all confirmed live. 67 tests green (7 net new). Key files: `src/lib/scoring.ts`, `src/components/ui/Badge.tsx`, `src/components/today/EventCard.tsx`, `src/components/portfolio/PortfolioTable.tsx`, `src/pages/{Portfolio,Settings}Page.tsx`.
+- PR 7 ("Morning read, sliced"), stacked on PR 6 — the last PR in `docs/PLAN-2026-08.md`'s sequence. `MonthCalendar` dots now vary in size with `positionWeightPct` (was fixed regardless of weight); Portfolio gained search/source-filter/sort (real gap at 41 holdings); `PortfolioTable` gets mobile compact cards below `sm` instead of the horizontally-scrolling table; agenda dates go through `formatEventDay`. Drive-by fix: the weight bar's undocumented `× 3` saturation (flagged in the plan's own verification table, never assigned to a PR) — removed while already in that file for the mobile cards.
+- PR: https://github.com/LucmanAly/Portlander/pull/19 (draft → develop). Verified in a real browser at both desktop and mobile viewports (Playwright) — calendar dots visibly scale with weight, search/filter/sort narrow the table with the right empty-state copy, table hidden / cards shown below `sm`, agenda shows human-readable dates. 67 tests green (unchanged — this PR is UI-only, no new pure-logic surface to test at the unit level). Key files: `src/components/calendar/MonthCalendar.tsx`, `src/pages/{Calendar,Portfolio}Page.tsx`, `src/components/portfolio/PortfolioTable.tsx`.
+- Owner asked to review and merge all of them: undrafted and merged **#14, #16, #17, #18, #19** into `develop` in that order (each was a superset of the last — stacked branches, not independent diffs). CI was green and no review comments existed on any of them. Skipped **PR #15** ("DeepSeek API integration" plan) at the owner's call: a different session's PR, unrelated to this sequence, and it touched `PROGRESS.md` in a way that would've conflicted. Re-checked out `develop` locally post-merge and reran `build`/`lint`/`test` against the actual merged tree, not just each PR in isolation — still 67/67 green. `main`/Netlify untouched; that's a separate, deliberate step per the `develop`-workflow Decisions row.
 
-### 2026-07-31 — claude-code (session 4)
-- Bug: earnings dates shown for some tickers were wrong after a real sync. Root cause + fix: see the `mergeEvents` Decisions row above. Files: `src/lib/eventSync.ts`. Verified via build/lint + a standalone before/after repro.
+### 2026-08-01 — claude (session 13)
+- PR 4 ("Data truthfulness"): real published macro dates (see Decisions), reconciled sold SnapTrade positions, per-provider sync freshness in Settings. Deployed + verified live in prod (`sync-events` v14, `snaptrade-sync` v18); `get_advisors` clean.
+- PR: https://github.com/LucmanAly/Portlander/pull/16 (draft → develop).
 
-### 2026-03-25 — grok-build (sessions 1-3)
-- Session 1: Phase 1 scaffold, UI, local demo data.
-- Session 2: Supabase client + repository + magic-link Settings (cloud made optional/deferred).
-- Session 3: `sync-events` Edge Function, local `scripts/sync-events.mjs`, `eventSync.ts` merge logic, docs.
+### Sessions 1–12 (2026-03-25 – 2026-08-01)
+Scaffolded the app and local demo mode, then cloud deploy (Netlify + Supabase + `sync-events` cron), then the SnapTrade brokerage integration. The SnapTrade Personal-vs-Commercial auth mismatch took several sessions to isolate; the resolved mechanism and every real bug found along the way (SDK client construction, `display_name` field casing, `cost_basis` vs a nonexistent field, `getAllAccountPositions`'s response shape) are in the Decisions table above, not repeated here. PRs #1–#13 cover this work; full narrative is in git history if needed.
 
 ---
 
 ## Notes for the next agent
 
-1. **Cloud mode is fully live and verified end-to-end.** Nothing left to set up infra-wise — remaining Phase 1 work is UI polish + formal sign-off.
-2. **Never trust a PR number in this file without checking.** PR #3 got merged early mid-session and only carried one of five commits. Use `list_pull_requests`/`pull_request_read` before assuming what's merged.
-3. **No tool on the Supabase MCP surface exposes secrets management or Auth URL config** — confirmed repeatedly across sessions. Any new secret always needs the owner to paste it into the dashboard themselves.
-4. **`sync-events` is deliberately global/unscoped** (writes shared rows, safe for any caller). **`refresh-quotes` is user-scoped** (privileged per-user writes). Don't copy the wrong pattern when adding a new Edge Function — check which shape the new function actually needs.
-5. **SnapTrade is fully built and live on `main`**, now on v2 of both Edge Functions after the first real click-test found and fixed a real client-construction bug (see Decisions) — but **the connect→sync flow has still never succeeded end-to-end**, don't assume it works until the owner confirms a real sync. If a *new* error shows up, don't re-guess at SDK usage from docs — download the real tarball from the npm registry (`curl https://registry.npmjs.org/snaptrade-typescript-sdk/latest` for the version, then the tarball URL from that response) and grep the `.d.ts`/`.mjs` directly, the way this bug was actually found. That was dramatically more reliable than reasoning from documentation or MCP tool names.
-6. If a Supabase/Netlify/SnapTrade MCP connector is available, prefer it over asking the owner to click through a dashboard for anything it can do — they reconnect with new internal tool IDs frequently in this project, check via ToolSearch rather than assuming unavailability.
-7. **Keep this file lean** — see `AGENTS.md`'s protocol section. Short session-log entries, delete resolved blockers, edit Decisions rows in place rather than layering corrections on top.
-8. No `chromium-cli` in this environment as of session 7 — for Playwright verification, `playwright` is installed globally at `/opt/node22/lib/node_modules/playwright`, and the Chromium binary is at `/opt/pw-browsers/chromium` (a symlink straight to the `chrome` executable, not a directory — pass it directly as `executablePath`).
+1. **Never trust a PR number without checking** — one got merged early mid-session carrying only part of its commits. Use `list_pull_requests`/`pull_request_read` before assuming what's merged.
+2. **No Supabase MCP tool exposes secrets management or Auth URL config** — any new secret needs the owner to paste it into the dashboard. **But `deploy_edge_function` works and `get_edge_function` reads deployed source back to verify** — don't hand the owner a deploy step you can do yourself.
+3. **`sync-events` is deliberately global/unscoped** (shared rows, safe for any caller). **`refresh-quotes`/`snaptrade-sync` are user-scoped** (privileged per-user writes). Check which shape a new Edge Function actually needs.
+4. **If a SnapTrade SDK error shows up, don't guess from docs** — download the real tarball (`npm registry` → `snaptrade-typescript-sdk`) and grep the `.d.ts`/`.mjs` directly. Every real bug here was found that way, not by reasoning about documentation.
+5. **The Supabase `get_logs` MCP tool cannot read `console.error` output — confirmed dead.** Make Edge Functions return error detail in the JSON body instead, and make sure the client actually reads it (`describeFunctionError()` in `snaptradeRepository.ts` is the working pattern).
+6. If a Supabase/Netlify/SnapTrade MCP connector is available, prefer it over asking the owner to click through a dashboard — check via ToolSearch rather than assuming unavailability.
+7. **Keep this file lean.** Short session-log entries, delete resolved blockers, edit Decisions rows in place rather than layering corrections on top.
+8. No `chromium-cli` in this environment — for Playwright verification, it's installed globally at `/opt/node22/lib/node_modules/playwright`, Chromium binary at `/opt/pw-browsers/chromium` (pass directly as `executablePath`).

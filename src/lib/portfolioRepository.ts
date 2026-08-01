@@ -1,10 +1,10 @@
 import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
-import { getSupabase, isSupabaseConfigured, resolveBackend, type DataBackend } from '@/lib/supabase'
+import { getSupabase, resolveBackend, type DataBackend } from '@/lib/supabase'
 import {
   brokerageConnectionFromRow,
   eventFromRow,
   holdingFromRow,
-  holdingToUpdate,
+  holdingToWrite,
   watchlistFromRow,
 } from '@/lib/mappers'
 import {
@@ -20,14 +20,24 @@ import {
   setQuotesLastSync as localSetQuotesLastSync,
 } from '@/lib/storage'
 
+/** Freshness per Edge Function, keyed by what it writes rather than its provider name. */
+export interface SyncTimestamps {
+  positions: string | null
+  prices: string | null
+  events: string | null
+}
+
 export interface PortfolioBundle {
   holdings: Holding[]
   watchlist: WatchlistItem[]
   events: PortfolioEvent[]
   lastSyncAt: string | null
+  syncTimestamps: SyncTimestamps
   backend: DataBackend
   brokerageConnections: BrokerageConnection[]
 }
+
+const EMPTY_SYNC_TIMESTAMPS: SyncTimestamps = { positions: null, prices: null, events: null }
 
 export interface RepoError {
   message: string
@@ -48,6 +58,7 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       watchlist: loadWatchlist(),
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
+      syncTimestamps: EMPTY_SYNC_TIMESTAMPS,
       backend: 'local',
       brokerageConnections: [],
     }
@@ -60,27 +71,35 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
       watchlist: loadWatchlist(),
       events: loadEvents(),
       lastSyncAt: loadLastSync(),
+      syncTimestamps: EMPTY_SYNC_TIMESTAMPS,
       backend: 'local',
       brokerageConnections: [],
     }
   }
 
-  const [holdingsRes, watchRes, eventsRes, syncRes, connectionsRes] = await Promise.all([
-    sb.from('holdings').select('*').eq('user_id', userId).order('ticker'),
-    sb.from('watchlist').select('*').eq('user_id', userId).order('ticker'),
-    sb
-      .from('events')
-      .select('*')
-      .or(`user_id.eq.${userId},user_id.is.null`)
-      .order('event_date'),
+  const lastRunByProvider = (provider: string) =>
     sb
       .from('sync_runs')
       .select('finished_at, started_at, status')
+      .eq('provider', provider)
       .order('started_at', { ascending: false })
       .limit(1)
-      .maybeSingle(),
-    sb.from('snaptrade_connections').select('*').eq('user_id', userId).order('connected_at'),
-  ])
+      .maybeSingle()
+
+  const [holdingsRes, watchRes, eventsRes, positionsSyncRes, pricesSyncRes, eventsSyncRes, connectionsRes] =
+    await Promise.all([
+      sb.from('holdings').select('*').eq('user_id', userId).order('ticker'),
+      sb.from('watchlist').select('*').eq('user_id', userId).order('ticker'),
+      sb
+        .from('events')
+        .select('*')
+        .or(`user_id.eq.${userId},user_id.is.null`)
+        .order('event_date'),
+      lastRunByProvider('snaptrade-positions'),
+      lastRunByProvider('finnhub-quotes'),
+      lastRunByProvider('finnhub'),
+      sb.from('snaptrade_connections').select('*').eq('user_id', userId).order('connected_at'),
+    ])
 
   if (holdingsRes.error) throw holdingsRes.error
   if (watchRes.error) throw watchRes.error
@@ -96,8 +115,20 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
   saveWatchlist(watchlist)
   if (events.length > 0) saveEvents(events)
 
+  const runTimestamp = (res: { data: { finished_at: string | null; started_at: string } | null }) =>
+    res.data?.finished_at ?? res.data?.started_at ?? null
+
+  const syncTimestamps: SyncTimestamps = {
+    positions: runTimestamp(positionsSyncRes),
+    prices: runTimestamp(pricesSyncRes),
+    events: runTimestamp(eventsSyncRes),
+  }
+
   const lastSyncAt =
-    syncRes.data?.finished_at ?? syncRes.data?.started_at ?? loadLastSync()
+    [syncTimestamps.positions, syncTimestamps.prices, syncTimestamps.events]
+      .filter((v): v is string => Boolean(v))
+      .sort()
+      .at(-1) ?? loadLastSync()
 
   if (lastSyncAt) localSetLastSync(lastSyncAt)
 
@@ -106,57 +137,69 @@ export async function loadPortfolioBundle(userId: string | null): Promise<Portfo
     watchlist,
     events: events.length > 0 ? events : loadEvents(),
     lastSyncAt,
+    syncTimestamps,
     backend: 'supabase',
     brokerageConnections,
   }
 }
 
 /**
- * Always writes localStorage. When signed into Supabase, also upserts by (user_id, ticker).
+ * Upserts exactly the given rows — never touches a holding absent from `rows`.
+ * Local caching is the caller's responsibility (see `saveHoldings`); this only
+ * fires the remote write, and only when signed into Supabase.
  */
-export async function persistHoldingsRemote(
-  holdings: Holding[],
+export async function upsertHoldingsRemote(
+  rows: Holding[],
   userId: string | null,
 ): Promise<RepoError | null> {
-  saveHoldings(holdings)
+  if (rows.length === 0) return null
   if (resolveBackend(Boolean(userId)) !== 'supabase' || !userId) return null
 
   const sb = getSupabase()
   if (!sb) return null
 
-  const tickers = new Set(holdings.map((h) => h.ticker.toUpperCase()))
-
-  // Remove remote rows no longer in the client list
-  const { data: existingHoldings, error: listErr } = await sb
-    .from('holdings')
-    .select('id, ticker')
-    .eq('user_id', userId)
-  if (listErr) return { message: listErr.message, cause: listErr }
-
-  const deleteIds = (existingHoldings ?? [])
-    .filter((r) => !tickers.has(r.ticker.toUpperCase()))
-    .map((r) => r.id)
-
-  if (deleteIds.length > 0) {
-    const { error: delErr } = await sb.from('holdings').delete().in('id', deleteIds)
-    if (delErr) return { message: delErr.message, cause: delErr }
-  }
-
-  if (holdings.length === 0) return null
-
-  const rows = holdings.map((h) => ({
+  const payload = rows.map((h) => ({
     user_id: userId,
-    ...holdingToUpdate({
+    ...holdingToWrite({
       ...h,
       ticker: h.ticker.toUpperCase(),
       updatedAt: h.updatedAt || new Date().toISOString(),
     }),
-    created_at: h.createdAt || new Date().toISOString(),
   }))
 
-  const { error } = await sb.from('holdings').upsert(rows, {
+  const { error } = await sb.from('holdings').upsert(payload, {
     onConflict: 'user_id,ticker',
   })
+  if (error) return { message: error.message, cause: error }
+
+  return null
+}
+
+/**
+ * Deletes exactly the given ids. Brokerage-synced rows are excluded at the
+ * query level (`neq('source', 'snaptrade')`), not by trusting the caller to
+ * have filtered them out first — only snaptrade-sync may remove a synced
+ * row, because only it can tell "sold at the brokerage" from "this client
+ * isn't holding a complete list right now". Local caching is the caller's
+ * responsibility (see `saveHoldings`); this only fires the remote delete,
+ * and only when signed into Supabase.
+ */
+export async function deleteHoldingsRemote(
+  ids: string[],
+  userId: string | null,
+): Promise<RepoError | null> {
+  if (ids.length === 0) return null
+  if (resolveBackend(Boolean(userId)) !== 'supabase' || !userId) return null
+
+  const sb = getSupabase()
+  if (!sb) return null
+
+  const { error } = await sb
+    .from('holdings')
+    .delete()
+    .eq('user_id', userId)
+    .in('id', ids)
+    .neq('source', 'snaptrade')
   if (error) return { message: error.message, cause: error }
 
   return null
@@ -283,11 +326,3 @@ export function resetLocalDemo(): void {
   localResetToDemo()
 }
 
-export function markLocalSynced(iso = new Date().toISOString()): string {
-  localSetLastSync(iso)
-  return iso
-}
-
-export function getConfiguredFlag(): boolean {
-  return isSupabaseConfigured()
-}

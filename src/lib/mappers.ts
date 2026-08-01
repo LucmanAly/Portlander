@@ -62,15 +62,21 @@ export function holdingFromRow(row: HoldingRow): Holding {
   }
 }
 
-export function holdingToUpdate(h: Holding) {
+/**
+ * Columns the browser actually has authority over. Deliberately excludes
+ * `last_price`/`day_change_value`/`day_change_pct` (refresh-quotes's Finnhub
+ * data — a client holding a stale price must never overwrite a fresher one)
+ * and `created_at` (the DB default owns it on insert; re-sending it on every
+ * update risks a stale client clobbering the real creation timestamp).
+ * Postgres `ON CONFLICT DO UPDATE` only touches columns present in the
+ * payload, so omitting these here is what keeps them untouched by this path.
+ */
+export function holdingToWrite(h: Holding) {
   return {
     ticker: h.ticker.toUpperCase(),
     name: h.name ?? null,
     shares: h.shares,
     cost_basis: h.costBasis ?? null,
-    last_price: h.lastPrice ?? null,
-    day_change_value: h.dayChangeValue ?? null,
-    day_change_pct: h.dayChangePct ?? null,
     weight_override_pct: h.weightOverridePct ?? null,
     tags: h.tags ?? [],
     notes: h.notes ?? null,
