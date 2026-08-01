@@ -2,6 +2,8 @@ import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import {
   holdingMarketValue,
+  portfolioDayChange,
+  portfolioDayChangePct,
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
@@ -45,6 +47,10 @@ export function PortfolioPage() {
   // book mixing weight overrides and computed weights still sums to 100%.
   const total = portfolioTotalValue(holdings)
   const weightBasis = portfolioWeightBasis(holdings)
+  const dayChange = portfolioDayChange(holdings)
+  const dayChangePct = portfolioDayChangePct(holdings)
+  const dayChangeClass =
+    dayChange == null ? 'text-ink-300' : dayChange >= 0 ? 'text-positive' : 'text-critical'
 
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<HoldingSource | 'all'>('all')
@@ -169,219 +175,30 @@ export function PortfolioPage() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-accent-500">
             Portfolio
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-100">Holdings</h1>
           <p className="mt-1.5 text-sm text-ink-400">
-            Weights drive event impact. Use last price or cost basis for market value.
+            Your holdings and today’s move at a glance. Management tools live below the table.
           </p>
         </div>
-        <div className="tabular text-right">
-          <div className="text-[11px] uppercase tracking-wider text-ink-500">Total value</div>
-          <div className="text-2xl font-semibold text-ink-100">{formatMoney(total)}</div>
+        <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
+          <SummaryMetric label="Total value" value={formatMoney(total)} />
+          <SummaryMetric
+            label="Today’s change"
+            value={dayChange == null ? '—' : `${dayChange >= 0 ? '+' : ''}${formatMoney(dayChange)}`}
+            detail={
+              dayChangePct == null
+                ? 'Refresh prices to calculate'
+                : `${dayChangePct >= 0 ? '+' : ''}${formatPct(dayChangePct)} today`
+            }
+            valueClassName={dayChangeClass}
+          />
         </div>
-      </header>
-
-      {/* Import / export */}
-      <div className="flex flex-wrap gap-2">
-        <label className="focus-ring inline-flex cursor-pointer items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750">
-          <Upload className="h-4 w-4" />
-          Import CSV
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) onCsv(f)
-              e.target.value = ''
-            }}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={exportCsv}
-          disabled={holdings.length === 0}
-          className="focus-ring inline-flex items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750 disabled:opacity-40"
-        >
-          <Download className="h-4 w-4" />
-          Export CSV
-        </button>
-      </div>
-      {csvInfo ? <p className="text-sm text-accent-400">{csvInfo}</p> : null}
-      {csvError ? <p className="text-sm text-critical">{csvError}</p> : null}
-      <p className="text-xs text-ink-500">
-        CSV headers: <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
-      </p>
-
-      {pendingCsv && csvPlan ? (
-        <div className="surface-elevated space-y-4 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink-100">Import preview</h2>
-            <div className="flex gap-1 rounded-lg bg-ink-900 p-1">
-              {(['merge', 'replace'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setCsvMode(mode)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
-                    csvMode === mode
-                      ? 'bg-accent-500 text-ink-950'
-                      : 'text-ink-400 hover:text-ink-200'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="text-xs text-ink-500">
-            {csvMode === 'merge'
-              ? 'Adds/updates CSV rows by ticker. Existing rows the CSV doesn’t mention are left alone.'
-              : 'CSV rows replace every existing manual/CSV row. Any manual/CSV ticker the CSV doesn’t mention is removed.'}
-          </p>
-          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div>
-              <dt className="text-ink-500">Imported</dt>
-              <dd className="tabular font-medium text-ink-100">{csvPlan.imported}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-500">Removed</dt>
-              <dd className={`tabular font-medium ${csvPlan.replaced ? 'text-critical' : 'text-ink-100'}`}>
-                {csvPlan.replaced}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-ink-500">Synced protected</dt>
-              <dd className="tabular font-medium text-ink-100">{csvPlan.protectedSynced}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-500">Skipped</dt>
-              <dd className="tabular font-medium text-ink-100">{csvPlan.skipped}</dd>
-            </div>
-          </dl>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={confirmCsvImport}
-              className="focus-ring rounded-xl bg-accent-500 px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-accent-400"
-            >
-              Confirm {csvMode}
-            </button>
-            <button
-              type="button"
-              onClick={cancelCsvImport}
-              className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Add form */}
-      <form
-        onSubmit={onAdd}
-        className="surface-elevated grid gap-3 rounded-2xl p-4 sm:grid-cols-2 lg:grid-cols-5"
-      >
-        <Field label="Ticker">
-          <input
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            placeholder="CRWD"
-            className="input"
-            required
-          />
-        </Field>
-        <Field label="Shares">
-          <input
-            value={shares}
-            onChange={(e) => setShares(e.target.value)}
-            type="number"
-            min="0"
-            step="any"
-            placeholder="40"
-            className="input"
-            required
-          />
-        </Field>
-        <Field label="Last price">
-          <input
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            type="number"
-            min="0"
-            step="any"
-            placeholder="312"
-            className="input"
-          />
-        </Field>
-        <Field label="Name">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="CrowdStrike"
-            className="input"
-          />
-        </Field>
-        <div className="flex items-end">
-          <button
-            type="submit"
-            className="focus-ring w-full rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-accent-400"
-          >
-            Add / update
-          </button>
-        </div>
-      </form>
-
-      {/* Search / sort / source filter */}
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
-          <Search className="h-4 w-4 shrink-0 text-ink-500" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ticker or name"
-            className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
-          />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {SOURCE_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setSourceFilter(f.id)}
-              className={clsx(
-                'focus-ring rounded-lg px-3 py-1.5 text-sm font-medium transition duration-150',
-                sourceFilter === f.id
-                  ? 'bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/40'
-                  : 'bg-ink-850 text-ink-400 ring-1 ring-border hover:text-ink-200',
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <label className="flex items-center gap-2 text-sm text-ink-400">
-          Sort
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="input w-auto"
-          >
-            {(Object.keys(SORT_LABEL) as SortKey[]).map((key) => (
-              <option key={key} value={key}>
-                {SORT_LABEL[key]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <PortfolioTable
+      </header>      <PortfolioTable
         holdings={sorted}
         weightBasis={weightBasis}
         onRemove={removeHolding}
@@ -391,6 +208,221 @@ export function PortfolioPage() {
             : 'No holdings match your search/filter.'
         }
       />
+
+      <section
+        aria-labelledby="manage-holdings"
+        className="surface-elevated space-y-5 rounded-2xl p-5"
+      >
+        <div>
+          <h2 id="manage-holdings" className="text-sm font-semibold uppercase tracking-wider text-ink-500">
+            Manage holdings
+          </h2>
+          <p className="mt-1 text-sm text-ink-400">
+            Import, add, search, filter, and sort your book here. These controls stay below the
+            table so the portfolio opens on the information that matters most.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <label className="focus-ring inline-flex cursor-pointer items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750">
+            <Upload className="h-4 w-4" />
+            Import CSV
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) onCsv(f)
+                e.target.value = ''
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={holdings.length === 0}
+            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750 disabled:opacity-40"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+        </div>
+
+        {csvInfo ? <p className="text-sm text-accent-400">{csvInfo}</p> : null}
+        {csvError ? <p className="text-sm text-critical">{csvError}</p> : null}
+        <p className="text-xs text-ink-500">
+          CSV headers: <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
+        </p>
+
+        {pendingCsv && csvPlan ? (
+          <div className="surface space-y-4 rounded-2xl p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-ink-100">Import preview</h3>
+                <p className="mt-1 text-xs text-ink-500">
+                  Review the changes before writing them to your portfolio.
+                </p>
+              </div>
+              <div className="flex gap-1 rounded-lg bg-ink-900 p-1">
+                {(['merge', 'replace'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setCsvMode(mode)}
+                    className={clsx(
+                      'rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition-colors',
+                      csvMode === mode
+                        ? 'bg-accent-500 text-ink-950'
+                        : 'text-ink-400 hover:text-ink-200',
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-ink-500">
+              {csvMode === 'merge'
+                ? 'Adds or updates CSV rows by ticker. Existing rows the CSV does not mention stay unchanged.'
+                : 'CSV rows replace existing manual and CSV rows. Brokerage-synced rows are protected.'}
+            </p>
+            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-ink-500">Imported</dt>
+                <dd className="tabular font-medium text-ink-100">{csvPlan.imported}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-500">Removed</dt>
+                <dd className={clsx('tabular font-medium', csvPlan.replaced ? 'text-critical' : 'text-ink-100')}>
+                  {csvPlan.replaced}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-500">Synced protected</dt>
+                <dd className="tabular font-medium text-ink-100">{csvPlan.protectedSynced}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-500">Skipped</dt>
+                <dd className="tabular font-medium text-ink-100">{csvPlan.skipped}</dd>
+              </div>
+            </dl>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={confirmCsvImport}
+                className="focus-ring rounded-xl bg-accent-500 px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-accent-400"
+              >
+                Confirm {csvMode}
+              </button>
+              <button
+                type="button"
+                onClick={cancelCsvImport}
+                className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <form
+          onSubmit={onAdd}
+          className="grid gap-3 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-5"
+        >
+          <Field label="Ticker">
+            <input
+              value={ticker}
+              onChange={(e) => setTicker(e.target.value)}
+              placeholder="CRWD"
+              className="input"
+              required
+            />
+          </Field>
+          <Field label="Shares">
+            <input
+              value={shares}
+              onChange={(e) => setShares(e.target.value)}
+              type="number"
+              min="0"
+              step="any"
+              placeholder="40"
+              className="input"
+              required
+            />
+          </Field>
+          <Field label="Last price">
+            <input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              type="number"
+              min="0"
+              step="any"
+              placeholder="312"
+              className="input"
+            />
+          </Field>
+          <Field label="Name">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="CrowdStrike"
+              className="input"
+            />
+          </Field>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              className="focus-ring w-full rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-accent-400"
+            >
+              Add / update
+            </button>
+          </div>
+        </form>
+
+        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
+          <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
+            <Search className="h-4 w-4 shrink-0 text-ink-500" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ticker or name"
+              className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {SOURCE_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setSourceFilter(f.id)}
+                className={clsx(
+                  'focus-ring rounded-lg px-3 py-1.5 text-sm font-medium transition duration-150',
+                  sourceFilter === f.id
+                    ? 'bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/40'
+                    : 'bg-ink-850 text-ink-400 ring-1 ring-border hover:text-ink-200',
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-sm text-ink-400">
+            Sort
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="input w-auto"
+            >
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABEL[key]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
 
       {/* Watchlist */}
       <section className="space-y-3">
@@ -442,6 +474,26 @@ export function PortfolioPage() {
           )}
         </div>
       </section>
+    </div>
+  )
+}
+
+function SummaryMetric({
+  label,
+  value,
+  detail,
+  valueClassName = 'text-ink-100',
+}: {
+  label: string
+  value: string
+  detail?: string
+  valueClassName?: string
+}) {
+  return (
+    <div className="surface-elevated min-w-0 rounded-2xl px-4 py-3">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-ink-500">{label}</div>
+      <div className={clsx('mt-1 truncate text-xl font-semibold tabular', valueClassName)}>{value}</div>
+      {detail ? <div className="mt-0.5 truncate text-xs text-ink-500">{detail}</div> : null}
     </div>
   )
 }
