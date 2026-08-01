@@ -86,6 +86,41 @@ export function parseHoldingsCsv(text: string): { holdings: Holding[]; errors: s
   return { holdings, errors }
 }
 
+export interface CsvImportPlan {
+  /** The full holdings list to persist. */
+  next: Holding[]
+  /** Rows from the CSV that will be written. */
+  imported: number
+  /** Brokerage-synced rows carried through untouched. */
+  protectedSynced: number
+  /** CSV rows dropped because a brokerage sync already owns that ticker. */
+  skipped: number
+}
+
+/**
+ * Fold a parsed CSV into the current book.
+ *
+ * A CSV describes manual holdings; it says nothing about what the brokerage
+ * reports. So `source='snaptrade'` rows are carried through untouched and any
+ * CSV row naming a ticker the brokerage already owns is dropped rather than
+ * competing with it. Everything else the CSV replaces wholesale.
+ *
+ * Kept here rather than in the page so the rule that protects live positions is
+ * testable on its own.
+ */
+export function planCsvImport(existing: Holding[], parsed: Holding[]): CsvImportPlan {
+  const synced = existing.filter((h) => h.source === 'snaptrade')
+  const syncedTickers = new Set(synced.map((h) => h.ticker.toUpperCase()))
+  const imported = parsed.filter((h) => !syncedTickers.has(h.ticker.toUpperCase()))
+
+  return {
+    next: [...synced, ...imported],
+    imported: imported.length,
+    protectedSynced: synced.length,
+    skipped: parsed.length - imported.length,
+  }
+}
+
 function splitCsvLine(line: string): string[] {
   const out: string[] = []
   let cur = ''

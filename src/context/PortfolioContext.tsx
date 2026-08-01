@@ -13,15 +13,13 @@ import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
 import {
   applyQuoteResultsLocally,
   loadPortfolioBundle,
-  markLocalSynced,
   persistHoldingsRemote,
   persistWatchlistRemote,
   refreshQuotesRemote,
   resetLocalDemo,
 } from '@/lib/portfolioRepository'
 import { connectBrokerage as connectBrokerageRemote, syncBrokerage as syncBrokerageRemote } from '@/lib/snaptradeRepository'
-import { applyLocalEventsSync } from '@/lib/eventSync'
-import { loadQuotesLastSync } from '@/lib/storage'
+import { clearAllData, loadQuotesLastSync, setStorageNamespace } from '@/lib/storage'
 import {
   getSupabase,
   isSupabaseConfigured,
@@ -48,7 +46,6 @@ interface PortfolioContextValue {
   addWatchlist: (ticker: string, name?: string) => void
   removeWatchlist: (id: string) => void
   resetDemo: () => void
-  markSynced: () => void
   /** Hydration / remote load */
   booting: boolean
   /** local | supabase (effective write target) */
@@ -104,6 +101,16 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
 
   const config = useMemo(() => supabaseConfigSummary(), [])
 
+  /**
+   * Point the cache at one identity and re-read the state derived from it.
+   * Every auth transition goes through here, so a value cached under the
+   * previous identity can't survive into the next one.
+   */
+  const adoptNamespace = useCallback((userId: string | null) => {
+    setStorageNamespace(userId)
+    setQuotesLastSyncedAt(loadQuotesLastSync())
+  }, [])
+
   const applyBundle = useCallback(
     (bundle: Awaited<ReturnType<typeof loadPortfolioBundle>>) => {
       setHoldings(bundle.holdings)
@@ -119,9 +126,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const refreshFromBackend = useCallback(async () => {
     try {
       setRemoteError(null)
-      // Always try local Finnhub file first (npm run sync:events) — no cloud required
-      await applyLocalEventsSync()
-
       const sb = getSupabase()
       let uid: string | null = null
       if (sb) {
@@ -133,6 +137,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         setSession(null)
         setUser(null)
       }
+      adoptNamespace(uid)
       const bundle = await loadPortfolioBundle(uid)
       applyBundle(bundle)
     } catch (e) {
@@ -142,13 +147,13 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       const bundle = await loadPortfolioBundle(null)
       applyBundle(bundle)
     }
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace])
 
   // Manual, on-demand live price refresh — never runs automatically, never
   // touches events/watchlist. Deliberately doesn't call refreshFromBackend()
-  // afterward: that also re-merges the local Finnhub file and reloads
-  // events/watchlist, which would blur the "price-only" boundary this is
-  // scoped to. The Edge Function's response already carries the new prices.
+  // afterward: that reloads events and watchlist too, which would blur the
+  // "price-only" boundary this is scoped to. The Edge Function's response
+  // already carries the new prices.
   const refreshQuotes = useCallback(async () => {
     if (quotesSyncing) return
     if (backend !== 'supabase') {
@@ -241,13 +246,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         const local = await loadPortfolioBundle(null)
         if (!cancelled) applyBundle(local)
 
-        // Merge Finnhub file from `npm run sync:events` (cloud mode not required)
-        await applyLocalEventsSync()
-        if (!cancelled) {
-          const afterSync = await loadPortfolioBundle(null)
-          applyBundle(afterSync)
-        }
-
         const sb = getSupabase()
         if (!sb) {
           if (!cancelled) setBooting(false)
@@ -260,6 +258,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
         setUser(data.session?.user ?? null)
 
         if (data.session?.user) {
+          adoptNamespace(data.session.user.id)
           const remote = await loadPortfolioBundle(data.session.user.id)
           if (!cancelled) applyBundle(remote)
         } else {
@@ -272,6 +271,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
           setSession(nextSession)
           setUser(nextSession?.user ?? null)
           try {
+            adoptNamespace(nextSession?.user?.id ?? null)
             const bundle = await loadPortfolioBundle(nextSession?.user?.id ?? null)
             applyBundle(bundle)
             setRemoteError(null)
@@ -300,7 +300,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       cancelled = true
       unsub?.()
     }
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace])
 
   const persistHoldings = useCallback(
     (next: Holding[]) => {
@@ -423,15 +423,19 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   )
 
   const resetDemo = useCallback(() => {
+    // Demo rows must never become the source of a remote write. While signed in,
+    // loading them into state leaves `user` set, so the next holdings edit would
+    // persist demo data over the real book — breaking the promise the Settings
+    // confirmation makes ("remote Supabase rows are not deleted").
+    if (user) {
+      setRemoteError('Sign out before resetting to demo data — it would overwrite your synced portfolio.')
+      return
+    }
     resetLocalDemo()
+    adoptNamespace(null)
     void loadPortfolioBundle(null).then(applyBundle)
     setBackend('local')
-  }, [applyBundle])
-
-  const markSynced = useCallback(() => {
-    const iso = markLocalSynced()
-    setLastSyncAt(iso)
-  }, [])
+  }, [applyBundle, adoptNamespace, user])
 
   const signInWithMagicLink = useCallback(async (email: string) => {
     const sb = getSupabase()
@@ -448,9 +452,14 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     const sb = getSupabase()
     if (sb) await sb.auth.signOut()
+    // Wipe the signed-in user's cache while its namespace is still addressed,
+    // then drop back to the demo namespace. Signing out has to leave no real
+    // holdings on the device.
+    clearAllData()
+    adoptNamespace(null)
     const local = await loadPortfolioBundle(null)
     applyBundle(local)
-  }, [applyBundle])
+  }, [applyBundle, adoptNamespace])
 
   const value: PortfolioContextValue = {
     holdings,
@@ -468,7 +477,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     addWatchlist,
     removeWatchlist,
     resetDemo,
-    markSynced,
     booting,
     backend,
     supabaseConfigured: isSupabaseConfigured(),

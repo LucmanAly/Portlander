@@ -6,7 +6,6 @@ import clsx from 'clsx'
 export function SettingsPage() {
   const {
     resetDemo,
-    markSynced,
     lastSyncAt,
     holdings,
     events,
@@ -130,13 +129,12 @@ export function SettingsPage() {
           </button>
           <button
             type="button"
-            onClick={() => markSynced()}
-            className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
-          >
-            Mark synced now
-          </button>
-          <button
-            type="button"
+            disabled={Boolean(user)}
+            title={
+              user
+                ? 'Sign out first — demo data would overwrite your synced portfolio'
+                : undefined
+            }
             onClick={() => {
               if (
                 confirm(
@@ -146,7 +144,7 @@ export function SettingsPage() {
                 resetDemo()
               }
             }}
-            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20"
+            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Reset demo data
           </button>
@@ -279,42 +277,6 @@ export function SettingsPage() {
           <li>Restart <code className="text-ink-300">npm run dev</code> after env changes</li>
           <li>Sign in here — write backend becomes <code className="text-ink-300">supabase</code></li>
         </ol>
-      </section>
-
-      <section className="surface-elevated space-y-3 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-          Earnings sync (local — no cloud)
-        </h2>
-        <p className="text-sm text-ink-400">
-          Pull real Finnhub earnings into the app without Supabase. Run this on your machine, then
-          click <span className="text-ink-200">Reload data</span>.
-        </p>
-        <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
-{`$env:FINNHUB_API_KEY="your_key"
-npm run sync:events
-# optional: npm run sync:events -- CRWD MSFT`}
-        </pre>
-        <p className="text-xs text-ink-500">
-          Writes <code className="text-ink-400">public/data/events-sync.json</code>. Edit tickers in{' '}
-          <code className="text-ink-400">scripts/tickers.txt</code>. Cloud Edge Function exists for
-          later deploy — see <code className="text-ink-400">supabase/functions/sync-events</code>.
-        </p>
-      </section>
-
-      <section className="surface-elevated space-y-3 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-          Deferred / later
-        </h2>
-        <ul className="space-y-2 text-sm text-ink-400">
-          <li>
-            <span className="text-ink-200">Cloud mode</span> — Supabase Auth + client remote backend
-            (wired, not required now)
-          </li>
-          <li>
-            <span className="text-ink-200">Edge deploy + cron</span> — when you want hands-off nightly
-            sync into Postgres
-          </li>
-        </ul>
       </section>
 
       <section className="surface rounded-2xl p-5 text-sm text-ink-400">

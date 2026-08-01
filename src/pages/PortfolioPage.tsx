@@ -1,7 +1,7 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import { portfolioTotalValue, positionWeightPct } from '@/lib/scoring'
-import { holdingsToCsv, parseHoldingsCsv } from '@/lib/csv'
+import { holdingsToCsv, parseHoldingsCsv, planCsvImport } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Trash2, Upload } from 'lucide-react'
@@ -63,8 +63,20 @@ export function PortfolioPage() {
         setCsvError(errors[0] ?? 'No holdings parsed')
         return
       }
-      replaceHoldings(parsed)
-      setCsvInfo(`Imported ${parsed.length} holdings${errors.length ? ` (${errors.length} warnings)` : ''}`)
+      const plan = planCsvImport(holdings, parsed)
+      replaceHoldings(plan.next)
+      setCsvInfo(
+        [
+          `Imported ${plan.imported} holdings`,
+          plan.protectedSynced ? `${plan.protectedSynced} brokerage-synced rows protected` : null,
+          plan.skipped
+            ? `${plan.skipped} row(s) skipped — already synced from your brokerage`
+            : null,
+          errors.length ? `${errors.length} warnings` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      )
       if (errors.length) setCsvError(errors.slice(0, 3).join('; '))
     }
     reader.readAsText(file)

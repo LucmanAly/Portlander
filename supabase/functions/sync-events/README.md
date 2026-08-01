@@ -2,19 +2,10 @@
 
 Finnhub → `public.events` + `public.sync_runs` (Supabase Edge Function).
 
-**Status:** implemented (`index.ts`).
+**Status:** deployed and live (`index.ts`, v13), driven by the daily `pg_cron` job
+`daily-sync-events`. Needs `FINNHUB_API_KEY` set as an Edge secret.
 
-> **SPA cloud mode (magic-link / client Supabase) is deferred.**  
-> This function only needs a Supabase project + service role + Finnhub key when you deploy it.  
-> For day-to-day dogfooding without cloud, use the **local** path:
-
-```bash
-# Local (no Supabase)
-$env:FINNHUB_API_KEY="your_key"   # PowerShell
-npm run sync:events
-# optional: npm run sync:events -- CRWD MSFT
-# writes public/data/events-sync.json — app merges on boot / Reload
-```
+> **Never redeploy without diffing production first** — see `AGENTS.md`.
 
 ---
 
@@ -23,7 +14,9 @@ npm run sync:events
 1. Load distinct tickers from `holdings` ∪ `watchlist` (service role, all users).
 2. For each ticker, call Finnhub `GET /calendar/earnings?from&to&symbol`.
 3. Upsert global event rows (`user_id = null`, deterministic UUID by `earnings|TICKER|date`).
-4. Upsert approximate macro seeds (FOMC / CPI / NFP).
+4. Upsert macro seeds (FOMC / CPI / NFP) — **currently generated from heuristics, not
+   published dates**. Being replaced by a static published calendar; see
+   `docs/PLAN-2026-08.md` PR 4.
 5. Write `sync_runs` with status `ok` | `partial` | `error`.
 
 Window: **−7 days → +90 days**.
@@ -59,9 +52,7 @@ Or `supabase/config.toml` cron if you use config-as-code.
 
 ## Client rule
 
-Browser **never** calls Finnhub.  
-- Cloud later: UI reads `events` from Postgres after this job runs.  
-- Local now: UI merges `public/data/events-sync.json` produced by `npm run sync:events`.
+Browser **never** calls Finnhub. The UI reads `events` from Postgres after this job runs.
 
 ## RLS note
 
