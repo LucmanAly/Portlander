@@ -51,13 +51,14 @@ export function formatSignedPct(n: number | undefined, digits = 1): string {
 /** Compact dollar figure (e.g. "$1.2M") for revenue-scale numbers. `undefined` → em dash. */
 export function formatCompactMoney(n: number | undefined): string {
   if (n == null || Number.isNaN(n)) return '—'
-  return new Intl.NumberFormat('en-US', {
+  const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     notation: 'compact',
     maximumFractionDigits: 1,
-    trailingZeroDisplay: 'stripIfInteger',
   }).format(n)
+  // TS's lib target predates `trailingZeroDisplay`, so strip a bare ".0" by hand.
+  return formatted.replace(/\.0([A-Za-z]?)$/, '$1')
 }
 
 /** EPS dollar figure, always 2 decimals, sign before the dollar sign (e.g. "-$0.42"). `undefined` → em dash. */

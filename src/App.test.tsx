@@ -34,7 +34,7 @@ function renderAt(path: string) {
 describe('App routing', () => {
   it('renders Today at /', async () => {
     renderAt('/')
-    expect(await screen.findByRole('heading', { name: /your next 14 days/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^today$/i, level: 1 })).toBeInTheDocument()
   })
 
   it('renders Earnings at /earnings', async () => {

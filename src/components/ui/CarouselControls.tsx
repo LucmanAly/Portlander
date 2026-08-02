@@ -9,6 +9,7 @@ export function CarouselControls({
   onPrev,
   onNext,
   labelForIndex,
+  arrowsHiddenBelowLg = false,
 }: {
   count: number
   activeIndex: number
@@ -16,6 +17,8 @@ export function CarouselControls({
   onPrev: () => void
   onNext: () => void
   labelForIndex?: (index: number) => string
+  /** Hide the prev/next buttons below the `lg:` breakpoint — useful once touch swipe covers mobile. */
+  arrowsHiddenBelowLg?: boolean
 }) {
   if (count <= 1) return null
 
@@ -26,7 +29,10 @@ export function CarouselControls({
         onClick={onPrev}
         disabled={activeIndex === 0}
         aria-label="Previous"
-        className="focus-ring rounded-lg p-1 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30"
+        className={clsx(
+          'focus-ring rounded-lg p-1 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30',
+          arrowsHiddenBelowLg && 'hidden lg:inline-flex',
+        )}
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -53,7 +59,10 @@ export function CarouselControls({
         onClick={onNext}
         disabled={activeIndex === count - 1}
         aria-label="Next"
-        className="focus-ring rounded-lg p-1 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30"
+        className={clsx(
+          'focus-ring rounded-lg p-1 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30',
+          arrowsHiddenBelowLg && 'hidden lg:inline-flex',
+        )}
       >
         <ChevronRight className="h-4 w-4" />
       </button>
