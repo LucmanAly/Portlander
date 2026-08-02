@@ -44,10 +44,10 @@ describe('SettingsPage information architecture', () => {
     expect(screen.getByText(/sign in under/i)).toBeInTheDocument()
   })
 
-  it('Earnings intelligence section discloses fixture-sourced data honestly', () => {
+  it('Earnings intelligence section discloses the real Finnhub data source honestly', () => {
     renderWithPortfolio(<SettingsPage />)
-    expect(screen.getByText('Interim fixture data')).toBeInTheDocument()
-    expect(screen.getByText(/no live provider populates consensus/i)).toBeInTheDocument()
+    expect(screen.getByText('Live Finnhub data')).toBeInTheDocument()
+    expect(screen.getByText(/guidance and reaction honestly render as unavailable/i)).toBeInTheDocument()
     expect(screen.getByText(/never blended into the/i)).toBeInTheDocument()
   })
 
@@ -69,7 +69,7 @@ describe('SettingsPage information architecture', () => {
 
   it('About this build keeps the real release metadata, not a placeholder', () => {
     renderWithPortfolio(<SettingsPage />)
-    expect(screen.getByText('v1.0')).toBeInTheDocument()
+    expect(screen.getByText('v2.0')).toBeInTheDocument()
     expect(screen.queryByText(/v1\.4/)).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatRelativeSync } from '@/lib/format'
-import { APP_LAST_UPDATED, APP_PHASE, APP_VERSION, formatAppUpdatedAt } from '@/lib/appMeta'
+import { APP_LAST_UPDATED, APP_RELEASE_NAME, APP_VERSION, formatAppUpdatedAt } from '@/lib/appMeta'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { AlertCircle, CheckCircle2, CircleHelp, RefreshCw, Sparkles } from 'lucide-react'
 import clsx from 'clsx'
@@ -352,19 +352,18 @@ export function SettingsPage() {
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-ink-450">Verified facts</dt>
-            <dd className="font-medium text-ink-100">Finnhub (once wired) — never an LLM</dd>
+            <dd className="font-medium text-ink-100">Finnhub — never an LLM</dd>
           </div>
           <div>
             <dt className="text-ink-450">Current status</dt>
-            <dd className="font-medium text-amber-300">Interim fixture data</dd>
+            <dd className="font-medium text-positive">Live Finnhub data</dd>
           </div>
         </dl>
         <p className="text-sm leading-relaxed text-ink-400">
-          No live provider populates consensus, actual results, surprise, guidance, or reaction
-          yet — Finnhub's earnings-calendar response has EPS estimate/actual, but wiring it into
-          this app's data model is future backend work. Until then, cards show a small typed
-          fixture set for a handful of tickers; any other ticker honestly renders "no estimate
-          available" rather than a fabricated number.
+          Consensus, actual results, surprise, and historical beat/miss come from Finnhub's
+          earnings-calendar data, synced daily, for every ticker in your book. Guidance and
+          reaction honestly render as unavailable — Finnhub's endpoint doesn't return either
+          field — rather than showing a fabricated number.
         </p>
         <div className="flex items-start gap-2 rounded-xl border border-dashed border-accent-500/30 bg-accent-glow/40 p-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-400" aria-hidden="true" />
@@ -492,8 +491,8 @@ export function SettingsPage() {
       >
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-ink-450">Phase</dt>
-            <dd className="font-medium text-ink-100">{APP_PHASE}</dd>
+            <dt className="text-ink-450">Release</dt>
+            <dd className="font-medium text-ink-100">{APP_RELEASE_NAME}</dd>
           </div>
           <div>
             <dt className="text-ink-450">Last updated</dt>

@@ -196,9 +196,10 @@ Product name: **Portlander**. Do not rename unless owner requests.
 - Phase completion versions use major numbers: Phase 1 final = `1.0`, Phase 2 final = `2.0`, Phase 3 final = `3.0`.
 - User-facing feature releases between phase finals increment the minor number: `1.1`, `1.2`, `1.3`, and so on.
 - Small bug fixes or maintenance releases increment the patch number: `1.2.1`, `1.2.2`, etc.
-- When promoting a release to `main`, update `APP_VERSION` and `APP_LAST_UPDATED` together in the same commit. `APP_LAST_UPDATED` must be an ISO-8601 UTC timestamp for that promotion; Settings formats it for Eastern Time.
+- When promoting a release to `main`, update `APP_VERSION`, `APP_RELEASE_NAME`, and `APP_LAST_UPDATED` together in the same commit. `APP_LAST_UPDATED` must be an ISO-8601 UTC timestamp for that promotion; Settings formats it for Eastern Time.
 - Do not bump the version for every internal commit on `develop`; bump it for a user-facing release or hotfix that is intended to ship.
-- Keep the version, phase label, and last-updated timestamp visible in Settings under **About this build**.
+- Keep the version, release name, and last-updated timestamp visible in Settings under **About this build**.
+- `APP_RELEASE_NAME` is a short descriptive name for the release (e.g. "Portfolio Event Intelligence" for `v2.0`) — never "Phase N". "Phase" numbering is internal project-planning language for this file and `PROGRESS.md`; it doesn't belong in front of the owner in the app itself (owner's call, 2026-08-02).
 
 ---
 ## How to choose and hand off work
