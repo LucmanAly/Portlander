@@ -42,6 +42,17 @@ export function isEstimatedValue(h: Holding): boolean {
   return h.lastPrice == null && h.costBasis != null
 }
 
+/**
+ * True when a position has neither an observed price nor a cost basis to fall
+ * back to — holdingMarketValue silently returns 0 for shares × $0 in this
+ * case, which reads as "this position is worth nothing" rather than "value
+ * unknown." Callers displaying market value per-row should check this first
+ * and render an honest unknown state instead of a fabricated $0.00.
+ */
+export function hasNoPriceData(h: Holding): boolean {
+  return h.lastPrice == null && h.costBasis == null
+}
+
 export function portfolioTotalValue(holdings: Holding[]): number {
   return holdings.reduce((sum, h) => sum + holdingMarketValue(h), 0)
 }

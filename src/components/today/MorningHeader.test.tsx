@@ -40,4 +40,21 @@ describe('MorningHeader', () => {
       screen.getByText((_, el) => el?.textContent === '-$50.00 (-5.0% today)'),
     ).toBeInTheDocument()
   })
+
+  it('flags a stale sync (>24h old) distinctly from a fresh one', () => {
+    const staleIso = new Date(Date.now() - 25 * 3_600_000).toISOString()
+    render(<MorningHeader totalValue={1000} lastSyncAt={staleIso} holdingsCount={1} />)
+    expect(screen.getByText(/· stale/)).toBeInTheDocument()
+  })
+
+  it('does not flag a recent sync as stale', () => {
+    const freshIso = new Date(Date.now() - 60_000).toISOString()
+    render(<MorningHeader totalValue={1000} lastSyncAt={freshIso} holdingsCount={1} />)
+    expect(screen.queryByText(/· stale/)).not.toBeInTheDocument()
+  })
+
+  it('does not flag "never synced" as stale', () => {
+    render(<MorningHeader totalValue={1000} lastSyncAt={null} holdingsCount={1} />)
+    expect(screen.queryByText(/· stale/)).not.toBeInTheDocument()
+  })
 })

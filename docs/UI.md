@@ -88,6 +88,40 @@ raw error text, and retry action unchanged. Release metadata stays wired to
 - Per-row provenance/freshness (source + last-updated) is a `title` tooltip on the Source
   badge (`provenanceTitle()` in `PortfolioTable.tsx`) rather than a separate icon/date column.
 
+## Truthful states audit (UX-09)
+
+State matrix per route — what each named state looks like and where it's implemented.
+"—" means the state can't occur on that route given its data shape.
+
+| Route | Loading | Empty | Stale | Partial | Disconnected/degraded | Error |
+|---|---|---|---|---|---|---|
+| Today | `AppShell`'s boot skeleton while `booting` | `EmptyState` (0 holdings) | `MorningHeader` flags `lastSyncAt` >24h old (amber, `isStaleSync`) | Day change → honest "unavailable" text, never a fabricated 0% (`portfolioDayChange`) | Local/Demo banner (`AppShell`) when `backend==='local'` | `AppShell`'s global `remoteError` banner |
+| Earnings | boot skeleton | `EmptyState` (0 holdings); separately "No reports match this filter" (0 after filter) | — (per-card `FreshnessLabel` already surfaces provenance age) | Cards with no fixture entry show "no estimate available" per field (`MetricPair`), never fabricated | Local/Demo banner | global banner |
+| Calendar | boot skeleton | empty days render plainly, no dots; `SelectedDayDetail` prompts "Select a day…" before any pick, "No events this day" after picking an empty one | — | — | Local/Demo banner | global banner |
+| Portfolio | boot skeleton | table/cards show `emptyMessage` (0 holdings, or 0 after search/filter) | — (see Diagnostics) | Day change and Total gain/loss both honest-`—` unless the *whole* book qualifies (`portfolioDayChange`/`portfolioTotalGainLoss`); per-row Value shows "No price yet" instead of a fabricated $0.00 when a position has neither price nor cost basis (`hasNoPriceData`) | Local/Demo banner | global banner |
+| Settings | boot skeleton (via shared shell) | Account/Brokerage explain *why* instead of disappearing when not configured/signed in (UX-08) | Diagnostics rows show `formatRelativeSync` per provider (visually plain, but the timestamp itself makes staleness legible) | n/a — Settings shows raw state, not aggregates | Diagnostics' `local`/`not-run` states | Diagnostics' `error` state + raw `remoteError`/`quotesError`/`brokerageError` text, not just a status pill |
+
+Two things audited and found already correct, not just asserted:
+- **No demo-data flash**: `AppShell` renders the boot skeleton, not routed content, until
+  `booting` resolves (Phase 1 work, reverified by screenshot on every PR this session).
+- **No fabricated fallback metrics**: audited every `?? 0`/similar fallback added or touched
+  this session. The one real gap found — `holdingMarketValue` silently returning `$0` for a
+  position with neither price nor cost basis — is fixed via `hasNoPriceData` above; the
+  underlying `$0` still feeds totals/weights math (a real, if incomplete, number), but the
+  per-row *display* no longer presents it as an observed value.
+
+**DeepSeek resilience**: not applicable yet — no live DeepSeek integration exists in this
+codebase (per AGENTS.md's phase ordering, that's backend work after UX-11). `GeneratedInsight`
+already degrades correctly for the one state that *is* reachable today (`interpretation`
+absent → renders `null`, verified sections unaffected, see UX-05's `EarningsDetailDrawer`
+tests). Delayed/rate-limited/malformed-response handling has to be re-verified against the
+real integration once it exists — this note exists so that task doesn't skip it.
+
+**Demo/fixture privacy**: `src/data/demo.ts` and `src/data/earningsFixtures.ts` audited —
+synthetic tickers/share counts/prices only, no real email, account identifier, or portfolio
+value. No screenshot taken during this project's development has shown a real signed-in
+book (verified: every screenshot this session was Local/Demo mode).
+
 ## Quality bar
 
 - No layout jump when data arrives

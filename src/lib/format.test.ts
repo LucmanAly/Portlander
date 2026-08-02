@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCompactMoney, formatEps, formatSignedPct } from '@/lib/format'
+import { formatCompactMoney, formatEps, formatSignedPct, isStaleSync } from '@/lib/format'
 
 describe('formatSignedPct', () => {
   it('prefixes a + on positive values', () => {
@@ -44,5 +44,25 @@ describe('formatEps', () => {
 
   it('returns an em dash for undefined', () => {
     expect(formatEps(undefined)).toBe('—')
+  })
+})
+
+describe('isStaleSync', () => {
+  it('is false for a recent timestamp', () => {
+    expect(isStaleSync(new Date(Date.now() - 60_000).toISOString())).toBe(false)
+  })
+
+  it('is true once the default 24h threshold is exceeded', () => {
+    expect(isStaleSync(new Date(Date.now() - 25 * 3_600_000).toISOString())).toBe(true)
+  })
+
+  it('is false for null (that is "never synced", a distinct empty state)', () => {
+    expect(isStaleSync(null)).toBe(false)
+  })
+
+  it('respects a custom threshold', () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000).toISOString()
+    expect(isStaleSync(twoHoursAgo, 1)).toBe(true)
+    expect(isStaleSync(twoHoursAgo, 3)).toBe(false)
   })
 })

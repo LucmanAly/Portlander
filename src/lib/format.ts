@@ -41,6 +41,18 @@ export function formatRelativeShort(iso: string | null): string {
   return `Updated ${format(new Date(iso), 'MMM d')}`
 }
 
+/**
+ * True when a sync timestamp is old enough that the on-screen numbers might
+ * no longer reflect reality — a distinct state from "never synced" (null),
+ * which is its own honest empty state elsewhere. Default threshold is a full
+ * trading day.
+ */
+export function isStaleSync(iso: string | null, thresholdHours = 24): boolean {
+  if (!iso) return false
+  const hours = (Date.now() - new Date(iso).getTime()) / 3_600_000
+  return hours >= thresholdHours
+}
+
 /** Signed percent for surprise/reaction values. No leading '+' on exactly 0.0%. `undefined` → em dash. */
 export function formatSignedPct(n: number | undefined, digits = 1): string {
   if (n == null || Number.isNaN(n)) return '—'

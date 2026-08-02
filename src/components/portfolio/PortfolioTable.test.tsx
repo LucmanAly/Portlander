@@ -41,4 +41,21 @@ describe('PortfolioTable', () => {
     expect(header.closest('tr')).toHaveClass('text-ink-450')
     expect(header.closest('tr')).not.toHaveClass('uppercase')
   })
+
+  it('shows an honest "No price yet" instead of a fabricated $0.00 for a fully unpriced position', () => {
+    render(
+      <PortfolioTable
+        holdings={[holding({ lastPrice: undefined, costBasis: undefined })]}
+        weightBasis={0}
+        onRemove={() => {}}
+      />,
+    )
+    expect(screen.getAllByText('No price yet').length).toBeGreaterThan(0)
+    expect(screen.queryByText('$0.00')).not.toBeInTheDocument()
+  })
+
+  it('still shows a real value (not "No price yet") when a price or cost basis exists', () => {
+    render(<PortfolioTable holdings={[holding({ lastPrice: 200 })]} weightBasis={2000} onRemove={() => {}} />)
+    expect(screen.queryByText('No price yet')).not.toBeInTheDocument()
+  })
 })

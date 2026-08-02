@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeExposure,
+  hasNoPriceData,
   holdingMarketValue,
   isEstimatedValue,
   portfolioDayChange,
@@ -60,8 +61,17 @@ describe('market value and weights', () => {
     expect(isEstimatedValue(holding('AAA', 10, 5))).toBe(false)
   })
 
-  it('treats a holding with neither price nor cost as worthless', () => {
+  it('holdingMarketValue treats a holding with neither price nor cost as $0 for totals/weights math', () => {
     expect(holdingMarketValue(holding('AAA', 10))).toBe(0)
+  })
+
+  // UX-09: that $0 is a real number for totals/weights, but display code must not
+  // present it as "this position is worth nothing" — hasNoPriceData flags the case
+  // so the UI can show an honest unknown state instead of a fabricated $0.00.
+  it('hasNoPriceData flags a holding with neither price nor cost basis', () => {
+    expect(hasNoPriceData(holding('AAA', 10))).toBe(true)
+    expect(hasNoPriceData(holding('AAA', 10, 5))).toBe(false)
+    expect(hasNoPriceData(holding('AAA', 10, undefined, { costBasis: 4 }))).toBe(false)
   })
 
   it('computes weight as a share of the portfolio total', () => {

@@ -4,6 +4,7 @@ import { GripVertical, SlidersHorizontal, Trash2 } from 'lucide-react'
 import type { Holding } from '@/types'
 import { formatFullDate, formatMoney, formatPct } from '@/lib/format'
 import {
+  hasNoPriceData,
   holdingDayChange,
   holdingMarketValue,
   holdingTotalGainLoss,
@@ -289,6 +290,13 @@ function Cell({
       return <GainLoss value={change} pct={h.dayChangePct} />
     }
     case 'value':
+      if (hasNoPriceData(h)) {
+        return (
+          <span className="text-ink-500" title="No price or cost basis on record for this position">
+            No price yet
+          </span>
+        )
+      }
       return (
         <span
           className="tabular font-medium text-ink-100"
@@ -394,13 +402,19 @@ function HoldingCard({
         </div>
         <div>
           <div className="text-[10px] text-ink-450">Value</div>
-          <div
-            className="tabular font-medium text-ink-100"
-            title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
-          >
-            {estimated ? '~' : ''}
-            {formatMoney(value)}
-          </div>
+          {hasNoPriceData(h) ? (
+            <div className="text-ink-500" title="No price or cost basis on record for this position">
+              No price yet
+            </div>
+          ) : (
+            <div
+              className="tabular font-medium text-ink-100"
+              title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
+            >
+              {estimated ? '~' : ''}
+              {formatMoney(value)}
+            </div>
+          )}
         </div>
         {dayChange != null ? (
           <div>

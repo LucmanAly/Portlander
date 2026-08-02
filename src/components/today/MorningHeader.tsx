@@ -1,4 +1,5 @@
-import { formatMoney, formatRelativeSync, formatSignedPct } from '@/lib/format'
+import { formatMoney, formatRelativeSync, formatSignedPct, isStaleSync } from '@/lib/format'
+import { AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 
 export function MorningHeader({
@@ -15,6 +16,7 @@ export function MorningHeader({
   holdingsCount: number
 }) {
   const tone = dayChange == null ? 'text-ink-300' : dayChange >= 0 ? 'text-positive' : 'text-critical'
+  const stale = isStaleSync(lastSyncAt)
 
   return (
     <header className="surface-elevated rounded-2xl p-5">
@@ -36,8 +38,10 @@ export function MorningHeader({
             </p>
           )}
         </div>
-        <p className="text-xs text-ink-500">
+        <p className={clsx('flex items-center gap-1 text-xs', stale ? 'text-amber-300' : 'text-ink-500')}>
+          {stale ? <AlertTriangle className="h-3 w-3" aria-hidden="true" /> : null}
           {holdingsCount} holdings · {formatRelativeSync(lastSyncAt)}
+          {stale ? ' · stale' : ''}
         </p>
       </div>
     </header>
