@@ -1,8 +1,8 @@
 # PROGRESS.md — Portlander live status
 
-**Last updated:** 2026-08-01
-**Last agent:** codex (session 17)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics/release metadata and the Portfolio table-first UI refinements, are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
+**Last updated:** 2026-08-02
+**Last agent:** codex (session 18)
+**Current phase:** Phase 2 — UI/UX overhaul planning and implementation on `develop`. Phase 1 `v1.0` was promoted to `main` in PRs #25/#26; its remaining manual checks are post-release acceptance. The approved visual baseline is the Portlander Magic Patterns event-intelligence prototype, refined by the master queue below rather than copied blindly.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -25,7 +25,10 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Portfolio table + CSV | ✅ Rebuilt | Table-first opening view with total value + whole-book daily gain/loss, management controls below the table, drag-and-drop desktop column ordering, per-row writes (PR 5), CSV Merge/Replace picker, `~` estimated-value marker, search/sort/source filter + mobile compact cards |
 | Impact score | ✅ Recalibrated (PR 6) | Portfolio-relative anchor (`max(5, p90weight × 1.5)`) replaced the fixed `/20` clamp; High/Med/Low tiers; `EventCard` leads with weight, not the score |
 | Calendar | ✅ Weight-aware (PR 7) | `MonthCalendar` dot size now tracks position weight; agenda dates go through `formatEventDay` |
-| Phase 1 exit criteria | 🟡 2 of 5 met | See checklist below |
+| Phase 1 v1.0 promotion | ✅ Merged to `main` | PR #25 promoted `develop`; PR #26 recorded the final release metadata |
+| Phase 1 acceptance | 🟡 Manual verification remains | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning still need owner confirmation |
+| Phase 2 UI/UX overhaul | ⬜ Queued | Approved Magic Patterns direction; ordered implementation begins at `UX-01` below |
+| Phase 2 earnings intelligence | ⬜ Not started | UI contracts first; Finnhub supplies facts and DeepSeek may later interpret evidence into labeled structured output |
 
 ---
 
@@ -33,6 +36,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 - [x] Scaffold, cloud deploy (Netlify + Supabase + `sync-events` + cron), owner signed in with a real synced book
 - [x] Calendar/Today UI fixes + manual "Refresh prices" (PR #4 → `develop`)
+- [x] Promote the Phase 1 `v1.0` candidate from `develop` to `main` (PRs #25/#26)
 - [ ] Phase 1 exit criteria formally signed off:
   - [x] Real portfolio loadable; earnings from Finnhub, not demo offsets
   - [ ] Weight ranking + exposure % sanity (math unchanged, not yet owner-verified)
@@ -47,14 +51,134 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 ---
 
+## Phase 2 UI/UX overhaul master queue
+
+This is the authoritative implementation order. Each task should normally be one focused PR to
+`develop`. Preserve working data behavior while replacing presentation; do not copy prototype
+demo values, account details, or invented financials into production code.
+
+Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](https://project-portlander-portfolio-event-intelligence-323.magicpatterns.app/). It is a direction and interaction reference, not a source of production data or code.
+
+**NEXT_TASK:** `UX-01`
+
+**ACTIVE_CLAIM:** None
+
+- [ ] **UX-01 — Visual foundation and application shell**
+  - First reconcile the release-only `main` commits back into `develop`; `main` currently contains
+    the final `v1.0` promotion metadata and must not be regressed by later Phase 2 work.
+  - Consolidate typography, spacing, borders, surfaces, focus states, semantic colors, and number
+    formatting into the existing design tokens; improve small-text contrast and reduce excessive
+    all-caps micro-labels/background-grid noise.
+  - Update desktop/mobile navigation to `Today / Earnings / Calendar / Portfolio / Settings`, add
+    the Earnings route, and remove the redundant Book Value card from the desktop rail.
+  - Preserve Local/Demo, loading, sync-failure, Refresh prices, and mobile mode indicators.
+  - **Done when:** all five routes render in the new shell at desktop and mobile widths with no
+    data-behavior regression; build, lint, and tests pass.
+
+- [ ] **UX-02 — Shared event-intelligence presentation model and primitives**
+  - Add typed view states for `upcoming`, `awaiting results`, and `reported`; support timing,
+    portfolio weight, consensus, actuals, surprise, guidance, reaction, provenance, and optional
+    generated interpretation without making those fields mandatory.
+  - Build reusable status badges, metric pairs, freshness labels, report cards, carousel controls,
+    and verified-vs-generated section treatments.
+  - Replace unexplained `R/E` boxes with a readable compact history treatment such as explicit
+    revenue/EPS beat counts and accessible labels.
+  - **Done when:** fixtures exercise every state, missing values render honestly, and primitives
+    have keyboard/focus behavior plus unit tests for formatting/state mapping.
+
+- [ ] **UX-03 — Today: Morning Desk and focused earnings deck**
+  - Lead with total portfolio value, daily dollar and percentage move, freshness, and near-term
+    reporting exposure.
+  - Implement one dominant earnings card with a visible next-card peek, dots/arrows on desktop,
+    and horizontal swipe on touch; cards remain active from D-1 through D+1.
+  - Keep Today focused on the deck, `Needs attention`, and one compact forward-exposure panel.
+    Move the full schedule and cluster exploration to Earnings/Calendar.
+  - **Done when:** the page answers “what matters to my book today?” above the fold without a
+    dense generic event feed, and all empty/single/multiple-card states work.
+
+- [ ] **UX-04 — Earnings workspace**
+  - Build the dedicated Earnings page with exposure summary, filters for Active/Upcoming/Recently
+    reported/All, and quantitative cards ranked by timing and portfolio relevance.
+  - Before release show date/session, weight, consensus revenue/EPS, and source freshness; after
+    release show actual vs estimate, dollar/percentage surprise, guidance state, and reaction.
+  - Include cluster/session grouping without duplicating Today’s full hierarchy.
+  - **Done when:** navigation, filters, sorting, cards, loading/empty/error states, and mobile layout
+    work from current or typed fixture data without requiring DeepSeek.
+
+- [ ] **UX-05 — Earnings intelligence detail drawer**
+  - Card selection opens an immediate right-side drawer on desktop and bottom sheet on mobile;
+    support close button, Escape, focus management, and return focus.
+  - Show verified financials, portfolio exposure, guidance, source/freshness, and compact historical
+    context first; place model interpretation in a separately labeled generated section.
+  - Never hide the detail at the bottom of the page or blend generated prose with source facts.
+  - **Done when:** upcoming/awaiting/reported details are usable by mouse, touch, and keyboard and
+    missing/failed generated content does not damage the verified experience.
+
+- [ ] **UX-06 — Calendar overhaul**
+  - Restyle the month view inside the new system while preserving position-weighted dots and
+    chronological agenda behavior.
+  - Add clear selected-day detail and multi-report/cluster cues; keep the calendar scannable rather
+    than turning each cell into a miniature dashboard.
+  - **Done when:** event type, relative weight, selected day, clusters, and empty days remain clear
+    at desktop and mobile widths with correct dates.
+
+- [ ] **UX-07 — Portfolio workspace refinement**
+  - Preserve the table-first order: summary, holdings table/cards, then management controls.
+  - Show total value and truthful whole-book daily gain/loss in dollars and percent; only show total
+    gain/loss when cost-basis completeness makes it honest.
+  - Preserve search/filter/sort, CSV/manual/SnapTrade safety, mobile compact cards, and drag-and-drop
+    desktop column ordering below the table.
+  - Remove or clarify noisy per-row Evidence UI; expose provenance/freshness through a labeled
+    tooltip or detail treatment rather than an unexplained icon/date column.
+  - **Done when:** existing mutation and import protections still pass and a 40-position book is
+    faster to scan, not merely more decorative.
+
+- [ ] **UX-08 — Settings information architecture**
+  - Organize Settings into Account, Brokerage, Data & sync, Earnings intelligence, Diagnostics, and
+    About this build with clear local navigation.
+  - Keep all health checks/retry actions in Diagnostics and retain actionable raw error details.
+  - Keep release metadata tied to `src/lib/appMeta.ts`; display `v1.0` until a real later release is
+    promoted—never copy the prototype’s placeholder `v1.4 / Phase 2` label.
+  - **Done when:** brokerage/sync/auth controls retain behavior, diagnostics are easy to find, and
+    Settings works without becoming one unbroken wall of cards.
+
+- [ ] **UX-09 — Truthful states, privacy-safe demo data, and resilience**
+  - Audit loading, empty, stale, partial, disconnected, degraded, and error states on every route.
+  - Ensure public/demo fixtures contain no real email, account count, share count, holdings, or
+    portfolio value; never expose private data through screenshots or committed fixtures.
+  - Keep verified values usable when DeepSeek is absent, delayed, rate-limited, or malformed.
+  - **Done when:** every route has an intentional state matrix and failure recovery path, with no
+    demo-data flash or fabricated fallback metrics.
+
+- [ ] **UX-10 — Mobile, accessibility, and interaction polish**
+  - Validate phone/tablet breakpoints, five-item bottom navigation, touch targets, swipe behavior,
+    scroll containment, safe areas, drawers/sheets, and fixed navigation.
+  - Meet readable contrast and minimum text sizes; add semantic labels, keyboard order, visible
+    focus, reduced-motion support, and screen-reader names for charts/history indicators.
+  - **Done when:** core Today → earnings card → detail and Portfolio flows are comfortable on a real
+    phone and pass automated accessibility checks plus manual keyboard review.
+
+- [ ] **UX-11 — Full regression, visual QA, and Phase 2 UI release handoff**
+  - Compare every route against the approved design intent at representative desktop/mobile widths;
+    remove accidental density, inconsistent tokens, placeholder copy, and dead interactions.
+  - Run build, lint, unit tests, end-to-end smoke flows, data-truth checks, and a real-book privacy
+    review; record screenshots using anonymized data only.
+  - Update roadmap/docs with the completed UI contract and create the next ordered backend queue for
+    Finnhub normalization and DeepSeek structured interpretation.
+  - **Done when:** the owner can approve the overhaul as the Phase 2 frontend baseline; version is
+    bumped only when a user-facing release is intentionally promoted to `main`.
+
+---
+
 ## Next up (ordered)
 
-1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
-2. **Owner:** click-test "Refresh prices" too, if not already done.
-3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
-4. **Owner:** merge `develop` → `main` when ready to deploy the final Phase 1 UI (costs a Netlify build minute, so deliberate, not automatic).
-5. On the deployed build, verify real-book weight/exposure sanity, sign-out clearing, mobile layout, and one real morning of use; then mark Phase 1 exit criteria formally.
-6. Phase 2 (prep cards, journal, alerts) can begin after that sign-off.
+1. **Agent:** claim and implement `UX-01` from the master queue on `develop`.
+2. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
+   the deployed `v1.0` build.
+3. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
+   one real morning; then close Phase 1 acceptance.
+4. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
+   from production pushes.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
@@ -72,7 +196,10 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |\n| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
+| 2026-08-02 | Phase 2 is the event-intelligence overhaul; the old Phase 2/3 roadmaps are canceled | The Magic Patterns prototype is the visual baseline, refined through `UX-01`–`UX-11`. Finnhub/provider data remains the source of financial facts; DeepSeek is limited to labeled structured interpretation after the UI/data contracts are truthful. |
+| 2026-08-02 | UI work uses a single claim-and-advance queue | `NEXT_TASK` and `ACTIVE_CLAIM` make the next safe task explicit for every new agent. One focused queue item per PR prevents parallel agents from silently duplicating or skipping work. |
+| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
+| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
 | 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
 | 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
 | 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The dashboard "Schedules" tab this file used to reference doesn't exist. A real sync takes ~16s server-side; `pg_net`'s 5s default was logging a misleading timeout even though the function completed fine |
@@ -95,6 +222,11 @@ Single source of truth for current state. If it's here, don't re-explain it else
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-02 — codex (session 18)
+- Replaced the canceled Phase 2/3 program in `AGENTS.md` with the approved Phase 2 event-intelligence direction and explicit Finnhub/DeepSeek truth boundaries.
+- Added the ordered `UX-01`–`UX-11` overhaul queue plus mandatory `NEXT_TASK` / `ACTIVE_CLAIM` handoff protocol.
+- Corrected current status: Phase 1 `v1.0` was promoted to `main` in PRs #25/#26; manual production acceptance checks remain open.
 
 ### 2026-08-01 — codex (session 17)
 - Portfolio now opens on the holdings table with total value plus whole-book daily dollar and percentage change; incomplete price refreshes show an honest unavailable state.

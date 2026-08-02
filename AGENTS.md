@@ -75,38 +75,46 @@ If you cannot finish a task, still update PROGRESS with partial state and blocke
 
 ---
 
-## Three-phase program (summary)
+## Product program (current)
 
-### Phase 1 — Foundation (CURRENT unless PROGRESS says otherwise)
+### Phase 1 — Foundation (`v1.0`, released)
 
-**Promise:** Useful every morning — next 14 days ranked by impact + exposure %.
+The foundation is on `main`: real holdings, portfolio-relative impact ranking, Today,
+Calendar, table-first Portfolio, Settings diagnostics, Supabase/Finnhub sync, SnapTrade,
+truthful Local/Demo states, and release metadata. A few owner acceptance checks remain in
+`PROGRESS.md`; they are post-release verification, not permission to redesign Phase 1.
 
-**In scope:**
-- Auth-ready schema with `user_id` (local/demo mode OK until Supabase wired)
-- Holdings CRUD + CSV import
-- Events: earnings (+ ex-div if easy), macro seed (FOMC/CPI/NFP)
-- Home **Today**: Next 14 days impact-ranked
-- Month **Calendar** (color by type)
-- **Exposure strip**: 7d / 30d portfolio % with earnings
-- Impact score v0: weight × type × recency
-- Confirmed vs estimated badge
-- Filters: All / Earnings / Dividends / Macro / Holdings only
-- Premium dark shell, tokens, skeletons
-- Nightly sync design (Edge Function stub or documented); mock data until API keys exist
+### Phase 2 — Portfolio event intelligence (CURRENT)
 
-**Out of Phase 1:** prep cards, journal, PEG, AI, push, clusters UI (light chip OK), brokerage, options IV, multi-portfolio.
+The old "Ritual" and "Intelligence" phase plans were canceled by the owner. Phase 2 is now
+one coherent product direction:
 
-**Exit criteria:** real portfolio loadable; earnings visible; heavy weight ranks above tiny weight; exposure % sane; snappy UI; dogfood mornings.
+1. Rebuild the UI/UX around the approved Magic Patterns event-intelligence concept.
+2. Add an Earnings workspace and a D-1 through D+1 quantitative report-card deck.
+3. Show consensus before a report and actual-vs-consensus after it, always tied to portfolio
+   weight and timing.
+4. Add a detail drawer that clearly separates verified financial facts from generated
+   interpretation.
+5. Integrate DeepSeek only after the underlying provider data and UI contracts are truthful.
 
-### Phase 2 — Ritual
+The ordered UI work is the master queue in `PROGRESS.md`. Do not improvise a parallel redesign
+or revive the canceled Phase 2/3 lists.
 
-Prep cards, checklists, post-earnings journal, tags, T-7/T-1 email, watchlist on calendar, week view polish, cluster strip v0, command palette optional.
+### Phase 3 — Unplanned
 
-### Phase 3 — Intelligence
+There is no approved Phase 3 scope. Do not invent one. It will be defined only after the owner
+uses and signs off Phase 2.
 
-Daily briefing, theme/indirect exposure, thesis tracker, risk radar, valuation/PEG snapshot, scenarios, PWA push, AI only on structured outputs.
+### Phase 2 data truth rules
 
-Do not implement Phase 2/3 features unless Phase 1 exit criteria are marked met in PROGRESS.md, except for **schema hooks** that cost nothing (empty tables reserved in SQL is fine).
+- Finnhub (or a later explicitly approved market-data provider) owns earnings dates, consensus,
+  reported revenue/EPS, and other source facts. An LLM is not a market-data provider.
+- Portfolio value, weight, gain/loss, surprise percentages, and exposure are deterministic code,
+  never LLM calculations.
+- DeepSeek may extract or interpret supplied evidence into a strict structured output. Generated
+  content must be labeled and visually separated from verified facts.
+- Missing data renders as unavailable/pending. Never generate a plausible-looking number to fill
+  a card.
 
 ---
 
@@ -193,12 +201,27 @@ Product name: **Portlander**. Do not rename unless owner requests.
 - Keep the version, phase label, and last-updated timestamp visible in Settings under **About this build**.
 
 ---
-## How to choose work
+## How to choose and hand off work
 
-1. Look at **PROGRESS.md → Next up**
-2. Pick the highest unchecked item you can complete in this session
-3. If blocked (API keys, credentials), implement mock/fallback and document in PROGRESS
-4. Prefer finishing a vertical slice over starting five half-slices
+`PROGRESS.md → Phase 2 UI/UX overhaul master queue` is the authoritative task sequence.
+
+1. Read `NEXT_TASK` and `ACTIVE_CLAIM`. Take `NEXT_TASK` unless it is explicitly blocked.
+2. Before changing code, set `ACTIVE_CLAIM` to your agent name, date, task ID, and working
+   branch/PR. Make the claim visible remotely before substantial implementation work when more
+   than one agent may be active. Never start a second queue item while another agent owns the
+   active one.
+3. Keep one queue ID per focused PR. A task is not complete merely because code was written;
+   its listed acceptance criteria and required checks must pass.
+4. On completion, check the task `[x]`, clear `ACTIVE_CLAIM`, advance `NEXT_TASK` to the next
+   unchecked item, and add a short Session log entry in the same commit/PR.
+5. If blocked, clear `ACTIVE_CLAIM`, add the precise blocker under Blockers, and either leave
+   `NEXT_TASK` in place or advance it only when the following task is genuinely independent.
+6. If scope is discovered mid-task, add a child checkbox beneath that task. Do not silently
+   expand another task or create an unordered side quest.
+7. Prefer finishing the current vertical slice over starting several partial screens.
+
+This claim-and-advance update is mandatory so a newly arriving agent can determine the next safe
+task by reading two lines instead of reconstructing the project from git history.
 
 ---
 
