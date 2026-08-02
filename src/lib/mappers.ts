@@ -105,6 +105,34 @@ export function watchlistFromRow(row: WatchlistRow): WatchlistItem {
   }
 }
 
+/**
+ * Merges `events`' typed `eps_estimate`/`eps_actual`/`revenue_estimate`/
+ * `revenue_actual` columns over the `raw` jsonb payload into one object, so
+ * `earningsIntel.ts`'s `earningsFactsFromRaw()`/`earningsHistoryFromEvents()`
+ * have a single shape to read regardless of which one actually holds a given
+ * row's numbers. The typed columns are the more authoritative, freshly
+ * written source (`sync-events`' `toEventRow()` sets both on every sync); the
+ * jsonb fallback covers fields the typed columns don't carry, like `quarter`/
+ * `year` for history's quarter labels. Returns undefined for rows with
+ * neither (macro rows, pre-sync placeholders) — same honest-undefined rule
+ * as everywhere else.
+ */
+function mergedRaw(row: EventRow): Record<string, unknown> | undefined {
+  const jsonbRaw = (row.raw as Record<string, unknown> | null) ?? null
+  const typed: Record<string, unknown> = {}
+  const epsEstimate = num(row.eps_estimate)
+  const epsActual = num(row.eps_actual)
+  const revenueEstimate = num(row.revenue_estimate)
+  const revenueActual = num(row.revenue_actual)
+  if (epsEstimate != null) typed.epsEstimate = epsEstimate
+  if (epsActual != null) typed.epsActual = epsActual
+  if (revenueEstimate != null) typed.revenueEstimate = revenueEstimate
+  if (revenueActual != null) typed.revenueActual = revenueActual
+
+  if (jsonbRaw == null && Object.keys(typed).length === 0) return undefined
+  return { ...(jsonbRaw ?? {}), ...typed }
+}
+
 export function eventFromRow(row: EventRow): PortfolioEvent {
   return {
     id: row.id,
@@ -117,7 +145,8 @@ export function eventFromRow(row: EventRow): PortfolioEvent {
     status: asStatus(row.status),
     source: row.source ?? undefined,
     description: row.description ?? undefined,
-    raw: (row.raw as Record<string, unknown> | null) ?? undefined,
+    raw: mergedRaw(row),
     updatedAt: row.updated_at,
+    interpretation: (row.ai_interpretation as Record<string, unknown> | null) ?? undefined,
   }
 }

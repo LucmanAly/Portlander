@@ -2,11 +2,15 @@
 
 **Last updated:** 2026-08-02
 **Last agent:** claude (session 20)
-**Current phase:** Phase 2 UI/UX overhaul (`UX-01`–`UX-11`) approved and merged to `develop`. Now
-mid-way through the earnings intelligence backend queue: `BE-01`–`BE-03` done (real Finnhub
-consensus/actual/surprise now reach the client; guidance/reaction stay honestly undefined). Phase 1
-`v1.0` was promoted to `main` in PRs #25/#26; its remaining manual checks are post-release
-acceptance. Next: `BE-04` (real historical beat/miss).
+**Current phase:** Phase 2 UI/UX overhaul (`UX-01`–`UX-11`) approved and merged to `develop`. The
+earnings intelligence backend queue is now fully built: `BE-01`–`BE-06` done. Real consensus/
+actual/surprise/history reach the client from `events`' typed columns; DeepSeek interpretation
+(`BE-06`) is built and deployed but **not enabled** — it needs owner-chosen `DEEPSEEK_*` secrets
+before it does anything (see "DeepSeek / `earnings-interpret`" below). Phase 1 `v1.0` was promoted
+to `main` in PRs #25/#26; its remaining manual checks are post-release acceptance. **Owner action
+needed:** review/merge the `BE-01`–`BE-06` PR, decide on `earnings-interpret`'s DeepSeek secrets
+(or don't — it stays inert either way), and decide what to do with the stale, unmerged PR #28 (see
+Decisions) — this session did not touch it.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -22,7 +26,8 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Settings diagnostics + release metadata | ✅ Done on `main` (`v1.0`) | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
-| `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
+| `sync-events` Edge Function | ✅ Live (v16) | Global/unscoped, `verify_jwt: true`. Writes `eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual` typed columns (not just `raw` jsonb) and now looks back 380 days (was 7) to backfill real historical quarters for `BE-04`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
+| `earnings-interpret` Edge Function | ✅ Deployed (v2), **not enabled** | `BE-06`. Global/unscoped, `verify_jwt: true`. Turns a caller-specified batch (≤5) of already-reported events' verified facts into a strict, validated DeepSeek interpretation written to `events.ai_interpretation`. Returns "Missing secrets" until `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`/`DEEPSEEK_MODEL` are set — none are, on purpose (see Decisions) |
 | Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
 | `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
 | `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner click-test still pending — see Blockers |
@@ -32,7 +37,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 1 v1.0 promotion | ✅ Merged to `main` | PR #25 promoted `develop`; PR #26 recorded the final release metadata |
 | Phase 1 acceptance | 🟡 Manual verification remains | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning still need owner confirmation |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
-| Phase 2 earnings intelligence (backend) | 🟡 `BE-01`–`BE-03` done | Real consensus/actual/surprise now read from `events.raw` (Finnhub payload `sync-events` already stored); real facts take priority over the demo fixture per ticker. Guidance/reaction left honestly undefined — Finnhub's calendar endpoint has neither. `BE-04`–`BE-06` (history backfill, fixture retirement, DeepSeek) remain — see queue below |
+| Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is built, validated, rate-limited, and deployed but dormant until the owner configures secrets — see Decisions |
 
 ---
 
@@ -179,9 +184,9 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 `UX-01`–`UX-11` built the full UI contract (`src/types/earnings.ts`, `EarningsCardModel`) against
 typed fixtures (`src/data/earningsFixtures.ts`) because no live source populates consensus,
 actual results, surprise, guidance, or reaction — see UX-02's and UX-09's notes in this file and
-in `docs/UI.md`. This is the ordered work to make that data real, one focused PR per item, same
-discipline as the UI queue above. The owner approved the UI overhaul branch and it's merged to
-`develop`, so `BE-01`–`BE-03` are now done (below); `BE-04` is next.
+in `docs/UI.md`. This was the ordered work to make that data real. All six items are done as of
+session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for what "done" means for
+`BE-06` specifically (built and deployed, deliberately not enabled).
 
 - [x] **BE-01 — Read the Finnhub payload the app already fetches.** `sync-events`'s `toEventRow()`
   was already storing the full `FinnhubEarning` object (`epsEstimate`/`epsActual`/
@@ -203,34 +208,53 @@ discipline as the UI queue above. The owner approved the UI overhaul branch and 
   nothing (`EarningsReportCard`'s guidance/reaction blocks are already conditional — several demo
   fixtures already lack one or both), so no UI removal was needed. Revisit as its own task if
   guidance/reaction turn out to matter enough to justify a real source.
-- [ ] **BE-04 — Real historical beat/miss.** `HistoricalBeatStrip` needs the last N quarters'
-  actual-vs-consensus per ticker; Finnhub's earnings-calendar `from`/`to` range can be widened
-  backward per ticker to backfill this instead of inventing a new provider call.
-- [ ] **BE-05 — Retire `earningsFixtures.ts` incrementally, not in one PR.** Once BE-01–BE-04
-  land, real tickers stop needing the fixture lookup in `buildEarningsCards`/`selectDeckCards`;
-  keep fixtures only for the 8 states unit tests rely on (`src/components/earnings/*.test.tsx`),
-  delete the "decorate real events with fixture data" fallback path once real data covers it.
-- [ ] **BE-06 — DeepSeek structured interpretation, only after BE-01–BE-04.** Per
-  `AGENTS.md`'s Phase 2 data truth rules: DeepSeek extracts/interprets *supplied* verified
-  evidence into a strict structured output, it is never itself a source of facts. Feed it
-  BE-01–BE-04's real `EarningsFacts` for one ticker/quarter, validate the structured-output
-  schema strictly (reject and fall back to `interpretation: undefined` on any malformed
-  response — `GeneratedInsight` already renders nothing when absent, so this fails safe by
-  construction), then wire it behind a rate limit before enabling broadly.
+- [x] **BE-04 — Real historical beat/miss.** `sync-events`' `LOOKBACK_DAYS` widened 7 → 380 (zero
+  extra Finnhub calls — same one request per symbol, wider `from`/`to`) so ~5 quarters of past
+  earnings land in `events` on the next sync. `earningsHistoryFromEvents()`
+  (`src/lib/earningsIntel.ts`) reads the last 4 real quarters for a ticker from sibling rows
+  already in the events array — no new provider call, no new table. `buildEarningsCards()` (and
+  `selectDeckCards()`, via a new `historyEvents` parameter carrying the *unwindowed* events array —
+  Today's D-1..D+1 display window is too narrow to ever contain a ticker's own history) attach it
+  automatically. `HistoricalBeatStrip` needed no changes; it already rendered whatever `history`
+  array it was given.
+- [x] **BE-05 — Retired `earningsFixtures.ts`'s production fallback.** `buildEarningsCards()` no
+  longer looks up a ticker-matched fixture at all — real facts (`BE-01`) or an honest
+  `facts: undefined`, never a demo decoration. This turned out to matter for real, not just in
+  theory: 2 of the 8 fixture tickers (NVDA, META) collide with the Local/Demo seed data in
+  `src/data/demo.ts`, so before this fix Demo mode randomly showed rich fake numbers for 2 of 7
+  demo tickers and nothing for the other 5 — an accidental, confusing inconsistency, not a designed
+  demo state. `EARNINGS_FIXTURES`/`EARNINGS_FIXTURE_EVENTS` stay in the codebase, now purely as
+  fixtures for `EarningsReportCard.test.tsx`/`EarningsDetailDrawer.test.tsx`/`EarningsDeck.test.tsx`
+  (call `buildEarningsCardModel()` directly, bypassing `buildEarningsCards()`, so removing the
+  fallback didn't break them). `EarningsPage.test.tsx`'s events were rewritten to carry real `raw`
+  payloads instead of relying on the ticker-name coincidence.
+- [x] **BE-06 — DeepSeek structured interpretation.** Built, validated, rate-limited, and deployed
+  — **but deliberately not enabled**. See the dedicated Decisions entry below for what's built, why
+  it stops short of live, and what the owner needs to do to turn it on.
 
 ---
 
 ## Next up (ordered)
 
-1. **Owner:** review and merge the PR carrying `BE-01`–`BE-03` (real Finnhub consensus/actual/
-   surprise; guidance/reaction honestly undefined) into `develop`.
-2. **Agent:** once merged, claim and implement `BE-04` (real historical beat/miss) from the
-   earnings intelligence backend queue above.
-3. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
+1. **Owner:** review and merge the PR carrying `BE-01`–`BE-06` (real Finnhub consensus/actual/
+   surprise/history; DeepSeek interpretation built and deployed but dormant) into `develop`.
+2. **Owner:** decide what to do with **PR #28** (`claude/phase-2-signal-eps-revenue-w7euc5`) —
+   open, unmerged, targets the pre-`UX-01` "Signal"/`EventCard` UI that the merged Phase 2 overhaul
+   superseded. Its infra changes (the `eps_estimate`/etc. columns + `sync-events` v15 write path)
+   are already live and have been reconciled into this branch (see Decisions); its UI changes were
+   not adopted. Likely just needs closing as superseded, but that's an owner call, not this
+   session's to make.
+3. **Owner, if you want live AI interpretation:** read PR #15's `docs/AI.md` writeup (unmerged,
+   fuller tradeoff analysis than the summary in this file), pick a `DEEPSEEK_BASE_URL` host and a
+   currently-live `DEEPSEEK_MODEL`, set the three `DEEPSEEK_*` secrets in the Supabase dashboard,
+   then invoke `earnings-interpret` manually for a few event ids to sanity-check quality/cost
+   before considering any automation. Skippable indefinitely — the feature stays fully dormant and
+   harmless with no secrets set.
+4. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
    the deployed `v1.0` build.
-4. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
+5. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
    one real morning; then close Phase 1 acceptance.
-5. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
+6. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
    from production pushes.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
@@ -250,7 +274,11 @@ discipline as the UI queue above. The owner approved the UI overhaul branch and 
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-08-02 | `BE-01` read `events.raw` instead of adding typed DB columns/a migration | `sync-events`'s `toEventRow()` already stored the full Finnhub row into `raw` (confirmed by reading the deployed function's own source), and `portfolioRepository.ts` already `select('*')`s the row — so no schema change, no migration, no redeploy was needed to get real numbers to the client. Also avoided a hard dependency on Supabase MCP tooling being connected, which it wasn't this session. |
-| 2026-08-02 | Real per-ticker facts (from `raw`) take priority over `earningsFixtures.ts`, but a fixture's `interpretation` never attaches to real facts | `buildEarningsCards()` now computes `earningsFactsFromRaw()` first and only falls back to the ticker's fixture when there's no raw payload (macro rows, fixture-only synthetic events). If real facts exist, `interpretation` is forced to `undefined` rather than reused from the fixture — a DeepSeek summary written against demo numbers must never get attached to a real event's numbers. `GeneratedInsight` already renders nothing when `interpretation` is absent, so this fails safe by construction, matching `BE-06`'s eventual real-facts-only rule. |
+| 2026-08-02 | *(superseded same day by `BE-05`, kept for history)* `buildEarningsCards()` initially fell back to `earningsFixtures.ts` when a real event had no `raw` payload | Correct for the `BE-01`-only state that session started in. `BE-04`/`BE-05` (same session) removed the fallback entirely once real facts/history could stand alone — see the `BE-05` row below for the real reason this mattered (a ticker-collision bug, not just tidiness). |
+| 2026-08-02 | `BE-04`: widened `sync-events`' `LOOKBACK_DAYS` (7 → 380) instead of adding a second Finnhub endpoint/table for history | The `/calendar/earnings` response for a `from`/`to` range already includes every report in that window per call — one request per symbol either way, so widening it is free (no extra Finnhub calls, no rate-limit impact) and reuses the exact same upsert path. `earningsHistoryFromEvents()` then reads history from events already sitting in the same `events` array/query, no new table. |
+| 2026-08-02 | `BE-05`: removed `buildEarningsCards()`'s ticker-matched fixture fallback entirely, not just deprioritized it | Found a real bug while implementing this, not just a theoretical honesty concern: `src/data/demo.ts`'s Local/Demo seed tickers (MSFT, META, CRWD, PANW, NVDA, FTNT, ZS) happen to include 2 of the 8 `earningsFixtures.ts` keys (NVDA, META) by coincidence. Before this fix, Demo mode showed rich fake consensus/actual/surprise for those 2 tickers and an honest empty state for the other 5 — an accidental, unintentional inconsistency a real portfolio ticker could just as easily hit (e.g. a real AAPL or TSLA holding). Fixtures are unit-test-only now; `EarningsPage.test.tsx` was rewritten to use real `raw` payloads instead of the ticker-name coincidence it depended on. |
+| 2026-08-02 | Discovered mid-session: `events.eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual` typed columns already existed live in Supabase, applied via migrations `20260802025048`/`20260802025609` from PR #28 (`claude/phase-2-signal-eps-revenue-w7euc5`, branched off a pre-UX-overhaul commit, still open/unmerged, targets the now-superseded old "Signal"/`EventCard` UI) | `sync-events` was already deployed at v15 writing these columns — `get_edge_function` showed real drift between the deployed function and this repo's `git` source that no branch's `PROGRESS.md` had recorded. Reconciled rather than ignored: added the columns to `supabase/schema.sql`/`src/types/database.ts`, and `mappers.ts`'s new `mergedRaw()` merges the typed columns (authoritative, freshly written) over `raw` jsonb (kept for `quarter`/`year`, which the typed columns don't carry) into the one shape `earningsIntel.ts` already reads — so `BE-01`–`BE-04`'s logic needed zero changes once the mapper was fixed. **Still open:** PR #28's *UI* changes (`EventCard` beat/miss badges) were not adopted — they duplicate/predate the merged `EarningsReportCard` UI — and PR #28 itself was neither merged nor closed this session; that's an owner call, flagged in "Next up." |
+| 2026-08-02 | DeepSeek / `earnings-interpret` (`BE-06`): built, strictly validated, rate-limited, and deployed — but no secrets were set, so it is inert | Two reasons to stop at "built and dormant" rather than push further: (1) PR #15 (`claude/deepseek-api-integration-k9rwbp`, open, unmerged) explicitly escalated DeepSeek host jurisdiction (first-party PRC-hosted vs. a US-hosted OpenAI-compatible proxy) to the owner as "the load-bearing" open question, and it was never answered — picking one myself would make a privacy-adjacent decision on a real financial app the previous session deliberately didn't make. (2) No Supabase MCP tool can set secrets (`DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`/`DEEPSEEK_MODEL`) — only the owner can, via the dashboard. Resolved the jurisdiction question **by construction, not by picking**: `DEEPSEEK_BASE_URL` has no default, so the function calls whatever OpenAI-compatible endpoint the owner's own secret points at — the host decision lives entirely in their config, never in this code. `DEEPSEEK_MODEL` also has no default: PR #15 found `deepseek-chat`/`deepseek-reasoner` already deprecated (2026-07-24), so hardcoding any model id risked being wrong on arrival. Surprise % is computed server-side in the Edge Function with the same formula as `earningsIntel.ts`'s `surprisePct()` (duplicated, not imported — separate Deno runtime) and only already-reported quarters (`eps_actual`/`revenue_actual` present) are eligible, so the model is only ever asked to describe numbers, never compute or invent them, per `AGENTS.md`'s Phase 2 data truth rules. Rate limit: hard cap of 5 event ids per call, skips events that already have an `ai_interpretation`, and nothing (no cron, no chain from `sync-events`) calls it automatically — every dollar spent is an explicit, owner-initiated call. |
 | 2026-08-02 | `BE-03`: guidance/reaction stay undefined for real events rather than removed from the UI | Finnhub's `/calendar/earnings` endpoint returns neither field; sourcing them for real (a second provider for guidance, a timed post-report quote pull via `refresh-quotes` for reaction) is scope beyond this pass. Chose "honestly absent" over "remove from the UI" because the UI already renders both conditionally — several fixture tickers (NVDA, RIVN, ARM, GOOGL) already omit one or both with no broken layout, so there was no unconditional rendering to remove. |
 | 2026-08-02 | Phase 2 is the event-intelligence overhaul; the old Phase 2/3 roadmaps are canceled | The Magic Patterns prototype is the visual baseline, refined through `UX-01`–`UX-11`. Finnhub/provider data remains the source of financial facts; DeepSeek is limited to labeled structured interpretation after the UI/data contracts are truthful. |
 | 2026-08-02 | UI work uses a single claim-and-advance queue | `NEXT_TASK` and `ACTIVE_CLAIM` make the next safe task explicit for every new agent. One focused queue item per PR prevents parallel agents from silently duplicating or skipping work. |
@@ -301,6 +329,37 @@ Keep entries short — a few bullets, key files, PR/commit pointer for detail. D
   precedence. `npm run build`/`lint`/`test` all green — 264/264 tests.
 - Not done: `BE-04`–`BE-06` (historical beat/miss backfill, fixture retirement, DeepSeek
   interpretation) — next up per the queue above.
+
+### 2026-08-02 — claude (session 20, continued)
+- Implemented `BE-04`–`BE-06`, completing the earnings intelligence backend queue.
+- Before starting, discovered real drift: the live `sync-events` (v15) and `events` table already
+  had `eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual` typed columns from PR #28
+  (`claude/phase-2-signal-eps-revenue-w7euc5`), an older, still-open/unmerged branch targeting the
+  now-superseded pre-`UX-01` UI, applied directly to production outside git. Reconciled rather than
+  overwritten — see the dedicated Decisions row.
+- `BE-04`: widened `sync-events`' `LOOKBACK_DAYS` 7 → 380 (redeployed as v16) and added
+  `earningsHistoryFromEvents()` + a `historyEvents` parameter threaded through
+  `buildEarningsCards()`/`selectDeckCards()`/`TodayPage.tsx`/`EarningsPage.tsx` so history reads
+  from the full, unwindowed events array rather than Today's narrow display window.
+- `BE-05`: removed `buildEarningsCards()`'s ticker-matched fixture fallback — found and fixed a
+  real bug doing it (NVDA/META ticker collisions between `earningsFixtures.ts` and
+  `src/data/demo.ts` were producing inconsistent Demo-mode behavior, not by design).
+- `BE-06`: new `earnings-interpret` Edge Function (deployed v2) — strict JSON-schema validation,
+  server-computed surprise (never model-computed), 5-events-per-call rate limit, skips
+  already-interpreted events, no cron. `DEEPSEEK_BASE_URL`/`DEEPSEEK_MODEL` have no defaults on
+  purpose so the function stays inert (and the host-jurisdiction question PR #15 raised stays the
+  owner's to answer via secrets, not this session's to guess). New
+  `interpretationFromRaw()`/`events.ai_interpretation` round trip on the client side, validated
+  again on every read.
+- 23 new unit tests (`earningsIntel.test.ts` history/interpretation coverage, new
+  `mappers.test.ts` for the `raw`/typed-column merge and `ai_interpretation` mapping). `npm run
+  build`/`lint`/`test` all green — 287/287 tests.
+- Applied 2 Supabase migrations (`events_add_ai_interpretation`; the eps/revenue columns were
+  already live from PR #28) and deployed 2 Edge Functions (`sync-events` v16,
+  `earnings-interpret` v2 — new). `get_advisors` clean (same pre-existing findings as before).
+- Not done, deliberately: PR #28 was neither merged nor closed (owner call); `earnings-interpret`
+  was not invoked against real data (no secrets to invoke it meaningfully with, and doing so
+  wasn't necessary to verify the build); no cron/automation for interpretation.
 
 ### 2026-08-02 — claude (session 19, continued)
 - Implemented `UX-06`–`UX-11` on the same branch, completing the master queue: Calendar overhaul

@@ -1,8 +1,13 @@
 import { startOfDay } from 'date-fns'
-import type { ScoredEvent } from '@/types'
-import type { EarningsCardModel, EarningsFacts, EarningsViewState, GeneratedInterpretation } from '@/types/earnings'
+import type { PortfolioEvent, ScoredEvent } from '@/types'
+import type {
+  EarningsCardModel,
+  EarningsFacts,
+  EarningsViewState,
+  GeneratedInterpretation,
+  HistoricalBeat,
+} from '@/types/earnings'
 import { sortEventsByImpact } from '@/lib/scoring'
-import { EARNINGS_FIXTURES } from '@/data/earningsFixtures'
 
 function numOrUndefined(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined
@@ -74,6 +79,92 @@ export function earningsFactsFromRaw(
   }
 }
 
+function quarterLabel(raw: unknown, eventDate: string): string {
+  if (raw && typeof raw === 'object') {
+    const r = raw as Record<string, unknown>
+    const quarter = numOrUndefined(r.quarter)
+    const year = numOrUndefined(r.year)
+    if (quarter != null && year != null) return `Q${quarter} ${year}`
+  }
+  return eventDate
+}
+
+function beatFromRaw(
+  raw: unknown,
+  actualKey: 'epsActual' | 'revenueActual',
+  estimateKey: 'epsEstimate' | 'revenueEstimate',
+): boolean | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const actual = numOrUndefined(r[actualKey])
+  const estimate = numOrUndefined(r[estimateKey])
+  if (actual == null || estimate == null) return null
+  return actual >= estimate
+}
+
+/**
+ * Last `limit` confirmed quarters' actual-vs-consensus for one ticker, newest
+ * first, read from other real events already present in `events` — no new
+ * provider call needed since `sync-events`'s widened lookback (BE-04) means
+ * these rows already exist once synced. Only events with a raw payload count
+ * (demo/fixture-only rows never contribute real history); a past event whose
+ * sync hasn't landed an actual yet correctly renders as an unknown quarter
+ * (`epsBeat`/`revenueBeat`: null), not a miss.
+ */
+export function earningsHistoryFromEvents(
+  ticker: string,
+  beforeDate: string,
+  events: PortfolioEvent[],
+  limit = 4,
+): HistoricalBeat[] {
+  return events
+    .filter((e) => e.eventType === 'earnings' && e.ticker === ticker && e.eventDate < beforeDate && e.raw)
+    .sort((a, b) => (a.eventDate < b.eventDate ? 1 : a.eventDate > b.eventDate ? -1 : 0))
+    .slice(0, limit)
+    .map((e) => ({
+      quarter: quarterLabel(e.raw, e.eventDate),
+      epsBeat: beatFromRaw(e.raw, 'epsActual', 'epsEstimate'),
+      revenueBeat: beatFromRaw(e.raw, 'revenueActual', 'revenueEstimate'),
+    }))
+}
+
+function withHistory(facts: EarningsFacts | undefined, history: HistoricalBeat[]): EarningsFacts | undefined {
+  if (history.length === 0) return facts
+  return { ...facts, history }
+}
+
+const CONFIDENCE_VALUES = new Set(['low', 'medium', 'high'])
+
+/**
+ * Strictly validates a stored `events.ai_interpretation` payload into a
+ * `GeneratedInterpretation` before it ever reaches the UI (BE-06). Re-checks
+ * the shape on every read rather than trusting the write path's own
+ * validation (the `earnings-interpret` Edge Function already validates
+ * before writing) — defense in depth for a field an external model
+ * produced. Any missing/malformed/oversized summary returns undefined;
+ * `GeneratedInsight` already renders nothing when interpretation is absent,
+ * so this fails safe by construction, same as every other optional fact.
+ */
+export function interpretationFromRaw(value: unknown): GeneratedInterpretation | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const r = value as Record<string, unknown>
+  if (typeof r.summary !== 'string') return undefined
+  const summary = r.summary.trim()
+  if (summary.length === 0 || summary.length > 600) return undefined
+
+  const confidence =
+    typeof r.confidence === 'string' && CONFIDENCE_VALUES.has(r.confidence)
+      ? (r.confidence as GeneratedInterpretation['confidence'])
+      : undefined
+
+  return {
+    summary,
+    model: typeof r.model === 'string' ? r.model : undefined,
+    generatedAt: typeof r.generatedAt === 'string' ? r.generatedAt : undefined,
+    confidence,
+  }
+}
+
 /**
  * Future event date → `upcoming`. Today-or-past without an `actual` yet →
  * `awaiting` (covers real-world reporting lag between the calendar date and
@@ -121,21 +212,39 @@ export function buildEarningsCardModel(
 
 /**
  * Filters to ticker-bearing earnings events, sorts by impact, and attaches
- * facts: real numbers from the event's stored Finnhub payload when present
- * (BE-01/02), else the demo fixture for that ticker. Shared by Today's deck
- * (after its own D-1..D+1 window filter) and the Earnings workspace (no
- * window filter beyond its own query range) so both build cards the same way.
+ * facts derived only from each event's own stored provider payload
+ * (BE-01/02/04) — never a ticker-matched demo fixture (BE-05: a real AAPL or
+ * META holding must not get decorated with demo Apple/Meta numbers just
+ * because the ticker happens to collide with one of the 8 fixture states
+ * `src/data/earningsFixtures.ts` exists for — those are unit-test fixtures
+ * only now, read directly by the component tests that need all 8 states,
+ * not by this production path). A card with no raw payload renders an
+ * honest `facts: undefined`, same as any other missing-data state.
+ *
+ * `historyEvents` defaults to `events` but should be passed the full,
+ * unwindowed portfolio events array when the caller (Today's deck) has
+ * already narrowed `events` to a display window — BE-04 history needs to see
+ * quarters outside that window to find anything.
+ *
+ * `interpretation` reads and re-validates each event's own stored
+ * `ai_interpretation` (BE-06) — never a fixture's, and never generated here;
+ * it's `undefined` for every event until the owner configures DeepSeek
+ * secrets and runs the `earnings-interpret` Edge Function for that event.
+ *
+ * Shared by Today's deck (after its own D-1..D+1 window filter) and the
+ * Earnings workspace (no window filter beyond its own query range) so both
+ * build cards the same way.
  */
-export function buildEarningsCards(events: ScoredEvent[], today: Date = new Date()): EarningsCardModel[] {
+export function buildEarningsCards(
+  events: ScoredEvent[],
+  today: Date = new Date(),
+  historyEvents: PortfolioEvent[] = events,
+): EarningsCardModel[] {
   const earningsOnly = events.filter((e) => e.eventType === 'earnings' && e.ticker)
   return sortEventsByImpact(earningsOnly).map((e) => {
-    const realFacts = earningsFactsFromRaw(e.raw, e.source, e.updatedAt)
-    const fixture = EARNINGS_FIXTURES[e.ticker as string]
-    const facts = realFacts ?? fixture
-    // Interpretation stays fixture-only: a DeepSeek summary written against
-    // demo numbers must never get attached to a real event's facts (BE-06
-    // hasn't wired interpretation to real EarningsFacts yet).
-    const interpretation = realFacts ? undefined : fixture?.interpretation
-    return buildEarningsCardModel(e, facts, interpretation, today)
+    const facts = earningsFactsFromRaw(e.raw, e.source, e.updatedAt)
+    const history = earningsHistoryFromEvents(e.ticker as string, e.eventDate, historyEvents)
+    const interpretation = interpretationFromRaw(e.interpretation)
+    return buildEarningsCardModel(e, withHistory(facts, history), interpretation, today)
   })
 }
