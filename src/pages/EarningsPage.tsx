@@ -5,6 +5,7 @@ import { buildEarningsCards } from '@/lib/earningsIntel'
 import { groupEarningsCards } from '@/lib/earningsGrouping'
 import { EarningsStatusFilter, filterEarningsByStatus, type EarningsStatusFilterValue } from '@/components/earnings/EarningsStatusFilter'
 import { EarningsReportCard } from '@/components/earnings/EarningsReportCard'
+import { EarningsDetailDrawer } from '@/components/earnings/EarningsDetailDrawer'
 import { ForwardExposurePanel } from '@/components/exposure/ForwardExposurePanel'
 import { SortToggle, type SortMode } from '@/components/today/SortToggle'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -41,6 +42,7 @@ export function EarningsPage() {
   )
 
   const groups = useMemo(() => groupEarningsCards(sorted), [sorted])
+  const selectedCard = allCards.find((c) => c.id === selectedCardId) ?? null
 
   if (holdings.length === 0) {
     return (
@@ -100,6 +102,8 @@ export function EarningsPage() {
           ))}
         </div>
       )}
+
+      <EarningsDetailDrawer card={selectedCard} onClose={() => setSelectedCardId(null)} />
     </div>
   )
 }

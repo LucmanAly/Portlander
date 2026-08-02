@@ -108,13 +108,29 @@ describe('EarningsPage', () => {
     expect(screen.getByText('Earnings · 7 days')).toBeInTheDocument()
   })
 
-  it('selecting a card toggles its selected state without opening anything (drawer lands in PR-5)', async () => {
+  it('selecting a card marks it pressed and opens the detail drawer', async () => {
     const user = userEvent.setup()
     renderPage()
     const card = screen.getByRole('button', { name: /AAPL/ })
     expect(card).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
     await user.click(card)
+
     expect(card).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('dialog', { name: /aapl earnings/i })).toBeInTheDocument()
+  })
+
+  it('closing the drawer clears the selection', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(screen.getByRole('button', { name: /AAPL/ }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /AAPL/ })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('toggles the sort control between Impact and Date without losing any cards', async () => {

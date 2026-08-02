@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { EarningsCardModel } from '@/types/earnings'
 import { EarningsReportCard } from '@/components/earnings/EarningsReportCard'
+import { EarningsDetailDrawer } from '@/components/earnings/EarningsDetailDrawer'
 import { CarouselControls } from '@/components/ui/CarouselControls'
 import { useSwipe } from '@/lib/useSwipe'
 
@@ -9,7 +10,7 @@ import { useSwipe } from '@/lib/useSwipe'
  * One dominant hero card with a visible next-card peek. Dots are visible at
  * all widths (a cheap, useful position indicator even once swipe works);
  * arrows are desktop-only (redundant once swipe works, and risk conflicting
- * with a touch drag).
+ * with a touch drag). Card selection opens the shared detail drawer.
  */
 export function EarningsDeck({
   cards,
@@ -19,6 +20,7 @@ export function EarningsDeck({
   onSelectCard?: (card: EarningsCardModel) => void
 }) {
   const [activeIndex, setActiveIndex] = useState(0)
+  const [selectedCard, setSelectedCard] = useState<EarningsCardModel | null>(null)
   const clampedIndex = Math.min(activeIndex, Math.max(0, cards.length - 1))
 
   const goTo = (i: number) => setActiveIndex(Math.max(0, Math.min(cards.length - 1, i)))
@@ -58,7 +60,10 @@ export function EarningsDeck({
               <EarningsReportCard
                 card={card}
                 variant="hero"
-                onSelect={onSelectCard ? () => onSelectCard(card) : undefined}
+                onSelect={() => {
+                  setSelectedCard(card)
+                  onSelectCard?.(card)
+                }}
               />
             </div>
           ))}
@@ -78,6 +83,8 @@ export function EarningsDeck({
           />
         </div>
       ) : null}
+
+      <EarningsDetailDrawer card={selectedCard} onClose={() => setSelectedCard(null)} />
     </div>
   )
 }
