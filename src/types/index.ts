@@ -3,6 +3,8 @@ export type EventType = 'earnings' | 'ex_div' | 'pay_div' | 'fomc' | 'cpi' | 'nf
 export type EventTiming = 'bmo' | 'amc' | 'unknown'
 export type EventStatus = 'confirmed' | 'estimated'
 export type EventFilter = 'all' | 'earnings' | 'dividends' | 'macro' | 'holdings'
+/** Today page's forward-looking window — near-term radar vs. further-out prep. */
+export type OutlookDays = 15 | 45
 
 export type HoldingSource = 'manual' | 'csv' | 'snaptrade'
 

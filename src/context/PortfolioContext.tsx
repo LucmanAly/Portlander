@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
-import type { EventFilter } from '@/types'
+import type { EventFilter, OutlookDays } from '@/types'
 import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
 import type { CsvImportPlan } from '@/lib/csv'
 import {
@@ -42,7 +42,9 @@ interface PortfolioContextValue {
   syncTimestamps: SyncTimestamps
   filter: EventFilter
   setFilter: (f: EventFilter) => void
-  upcoming14: ReturnType<typeof scoreAndFilterEvents>
+  outlookDays: OutlookDays
+  setOutlookDays: (d: OutlookDays) => void
+  upcomingEvents: ReturnType<typeof scoreAndFilterEvents>
   exposure: ReturnType<typeof computeExposure>
   addHolding: (h: Omit<Holding, 'id' | 'createdAt' | 'updatedAt'>) => void
   updateHolding: (id: string, patch: Partial<Holding>) => void
@@ -94,6 +96,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     events: null,
   })
   const [filter, setFilter] = useState<EventFilter>('all')
+  const [outlookDays, setOutlookDays] = useState<OutlookDays>(15)
   const [booting, setBooting] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -347,15 +350,15 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     [user?.id],
   )
 
-  const upcoming14 = useMemo(() => {
+  const upcomingEvents = useMemo(() => {
     const today = startOfDay(new Date())
     return scoreAndFilterEvents(events, holdings, watchlist, {
       filter,
       fromDate: today,
-      toDate: addDays(today, 14),
+      toDate: addDays(today, outlookDays),
       today,
     })
-  }, [events, holdings, watchlist, filter])
+  }, [events, holdings, watchlist, filter, outlookDays])
 
   const exposure = useMemo(() => {
     const today = startOfDay(new Date())
@@ -501,7 +504,9 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     syncTimestamps,
     filter,
     setFilter,
-    upcoming14,
+    outlookDays,
+    setOutlookDays,
+    upcomingEvents,
     exposure,
     addHolding,
     updateHolding,

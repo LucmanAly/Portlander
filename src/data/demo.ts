@@ -96,7 +96,7 @@ export const DEMO_WATCHLIST: WatchlistItem[] = [
   },
 ]
 
-/** Relative demo events so "Next 14 days" always has content. */
+/** Relative demo events so the Today page's 15d/45d outlook always has content. */
 export const DEMO_EVENTS: PortfolioEvent[] = [
   {
     id: 'e-msft-earn',

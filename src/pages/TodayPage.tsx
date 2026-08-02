@@ -1,6 +1,7 @@
 import { ExposureStrip } from '@/components/today/ExposureStrip'
 import { EventCard } from '@/components/today/EventCard'
 import { FilterBar } from '@/components/today/FilterBar'
+import { OutlookToggle } from '@/components/today/OutlookToggle'
 import { SortToggle, type SortMode } from '@/components/today/SortToggle'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatRelativeSync } from '@/lib/format'
@@ -9,12 +10,21 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 export function TodayPage() {
-  const { upcoming14, exposure, filter, setFilter, lastSyncAt, holdings } = usePortfolio()
+  const {
+    upcomingEvents,
+    outlookDays,
+    setOutlookDays,
+    exposure,
+    filter,
+    setFilter,
+    lastSyncAt,
+    holdings,
+  } = usePortfolio()
   const [sortMode, setSortMode] = useState<SortMode>('impact')
 
   const displayed = useMemo(
-    () => (sortMode === 'date' ? sortEventsByDate(upcoming14) : upcoming14),
-    [upcoming14, sortMode],
+    () => (sortMode === 'date' ? sortEventsByDate(upcomingEvents) : upcomingEvents),
+    [upcomingEvents, sortMode],
   )
 
   return (
@@ -25,14 +35,17 @@ export function TodayPage() {
             Portfolio radar
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-100">
-            Your next 14 days
+            Your next {outlookDays} days
           </h1>
           <p className="mt-1.5 max-w-xl text-sm text-ink-400">
             Events ranked by impact on <span className="text-ink-200">your</span> book — position
             weight, event type, and how soon they land.
           </p>
         </div>
-        <p className="text-xs text-ink-500">{formatRelativeSync(lastSyncAt)}</p>
+        <div className="flex items-center gap-3">
+          <OutlookToggle value={outlookDays} onChange={setOutlookDays} />
+          <p className="text-xs text-ink-500">{formatRelativeSync(lastSyncAt)}</p>
+        </div>
       </header>
 
       {holdings.length === 0 ? (
@@ -53,7 +66,7 @@ export function TodayPage() {
 
           {displayed.length === 0 ? (
             <div className="surface rounded-2xl px-6 py-12 text-center">
-              <p className="text-ink-300">No events in the next 14 days for this filter.</p>
+              <p className="text-ink-300">No events in the next {outlookDays} days for this filter.</p>
               <p className="mt-1 text-sm text-ink-500">
                 Try All, or add tickers on the Portfolio page.
               </p>
