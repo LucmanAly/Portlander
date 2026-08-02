@@ -10,6 +10,7 @@ import {
 } from '@/lib/scoring'
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
+import { Stat } from '@/components/ui/Stat'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Search, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
@@ -49,8 +50,8 @@ export function PortfolioPage() {
   const weightBasis = portfolioWeightBasis(holdings)
   const dayChange = portfolioDayChange(holdings)
   const dayChangePct = portfolioDayChangePct(holdings)
-  const dayChangeClass =
-    dayChange == null ? 'text-ink-300' : dayChange >= 0 ? 'text-positive' : 'text-critical'
+  const dayChangeAccent: 'default' | 'positive' | 'critical' =
+    dayChange == null ? 'default' : dayChange >= 0 ? 'positive' : 'critical'
 
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<HoldingSource | 'all'>('all')
@@ -186,16 +187,16 @@ export function PortfolioPage() {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
-          <SummaryMetric label="Total value" value={formatMoney(total)} />
-          <SummaryMetric
+          <Stat label="Total value" value={formatMoney(total)} />
+          <Stat
             label="Today’s change"
             value={dayChange == null ? '—' : `${dayChange >= 0 ? '+' : ''}${formatMoney(dayChange)}`}
-            detail={
+            hint={
               dayChangePct == null
                 ? 'Refresh prices to calculate'
                 : `${dayChangePct >= 0 ? '+' : ''}${formatPct(dayChangePct)} today`
             }
-            valueClassName={dayChangeClass}
+            accent={dayChangeAccent}
           />
         </div>
       </header>
@@ -480,30 +481,10 @@ export function PortfolioPage() {
   )
 }
 
-function SummaryMetric({
-  label,
-  value,
-  detail,
-  valueClassName = 'text-ink-100',
-}: {
-  label: string
-  value: string
-  detail?: string
-  valueClassName?: string
-}) {
-  return (
-    <div className="surface-elevated min-w-0 rounded-2xl px-4 py-3">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-ink-500">{label}</div>
-      <div className={clsx('mt-1 truncate text-xl font-semibold tabular', valueClassName)}>{value}</div>
-      {detail ? <div className="mt-0.5 truncate text-xs text-ink-500">{detail}</div> : null}
-    </div>
-  )
-}
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-ink-500">{label}</span>
+      <span className="text-xs font-medium text-ink-450">{label}</span>
       {children}
     </label>
   )

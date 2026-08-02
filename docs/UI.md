@@ -21,10 +21,23 @@ Fonts: IBM Plex Sans + IBM Plex Mono (Google Fonts in `index.html`).
 
 ## Components
 
-- Shell: `AppShell` — desktop sidebar, mobile bottom nav
-- Today: `ExposureStrip`, `EventCard`, `FilterBar`
+- Shell: `AppShell` — desktop sidebar, mobile bottom nav, 5 routes: `Today / Earnings /
+  Calendar / Portfolio / Settings`. No "Book value" card in the sidebar (removed UX-01) —
+  `RefreshQuotesButton` is the sole sidebar footer content.
+- Today: `ExposureStrip`, `EventCard`, `FilterBar`, `SortToggle`
 - Calendar: `MonthCalendar`
-- Primitives: `Badge`, `Stat`, `Skeleton`, `.input`
+- Primitives: `Badge`, `Stat`, `Skeleton`, `Button`/`PillButton`, `.input`
+
+## Micro-label convention
+
+Small labels (stat-tile labels, form field labels) use sentence case, `text-xs text-ink-450`
+— not all-caps tracked `text-ink-500`. `ink-450` sits between `ink-400`/`ink-500` specifically
+for this contrast level. Accent-colored eyebrow/kicker text (page headers, e.g. "Portfolio
+radar") is a different, intentional pattern and keeps its existing all-caps `accent-500`
+styling — this convention only applies to neutral-toned micro-labels.
+
+As of UX-01 this has been applied to `Stat`, `PortfolioPage`'s `Field`, and the shell nav —
+not yet swept across every page (deferred to UX-06/07/08, which already own those pages).
 
 ## Quality bar
 

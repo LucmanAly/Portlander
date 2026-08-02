@@ -10,7 +10,8 @@ export default defineConfig({
   test: {
     // storage.ts talks to localStorage directly, so the suite needs a DOM.
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
   },
 })

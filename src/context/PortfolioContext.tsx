@@ -33,7 +33,7 @@ import {
 import { addDays, startOfDay } from 'date-fns'
 import type { Session, User } from '@supabase/supabase-js'
 
-interface PortfolioContextValue {
+export interface PortfolioContextValue {
   holdings: Holding[]
   watchlist: WatchlistItem[]
   events: PortfolioEvent[]
@@ -77,7 +77,7 @@ interface PortfolioContextValue {
   syncBrokerage: () => Promise<void>
 }
 
-const PortfolioContext = createContext<PortfolioContextValue | null>(null)
+export const PortfolioContext = createContext<PortfolioContextValue | null>(null)
 
 function uid() {
   return crypto.randomUUID()
