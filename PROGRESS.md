@@ -2,11 +2,12 @@
 
 **Last updated:** 2026-08-02
 **Last agent:** claude (session 19)
-**Current phase:** Phase 2 — UI/UX overhaul implementation. `UX-01`–`UX-05` are done on
+**Current phase:** Phase 2 UI/UX overhaul — `UX-01`–`UX-11` all complete on
 `claude/uiux-overhaul-review-yapmlj`, awaiting merge to `develop`. Phase 1 `v1.0` was promoted to
 `main` in PRs #25/#26; its remaining manual checks are post-release acceptance. The approved visual
 baseline is the Portlander Magic Patterns event-intelligence prototype, refined by the master queue
-below rather than copied blindly.
+below rather than copied blindly. Next: the Finnhub-normalization/DeepSeek backend queue below,
+once the owner approves this branch as the Phase 2 frontend baseline.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -31,8 +32,8 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Calendar | ✅ Weight-aware (PR 7) | `MonthCalendar` dot size now tracks position weight; agenda dates go through `formatEventDay` |
 | Phase 1 v1.0 promotion | ✅ Merged to `main` | PR #25 promoted `develop`; PR #26 recorded the final release metadata |
 | Phase 1 acceptance | 🟡 Manual verification remains | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning still need owner confirmation |
-| Phase 2 UI/UX overhaul | 🟡 UX-01–UX-05 done | 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk deck, Earnings workspace, detail drawer — all on `claude/uiux-overhaul-review-yapmlj`, not yet merged to `develop`. `UX-06` is next |
-| Phase 2 earnings intelligence | ⬜ Not started | UI contracts first; Finnhub supplies facts and DeepSeek may later interpret evidence into labeled structured output |
+| Phase 2 UI/UX overhaul | ✅ UX-01–UX-11 done | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass — all on `claude/uiux-overhaul-review-yapmlj`, awaiting owner approval + merge to `develop` |
+| Phase 2 earnings intelligence (backend) | ⬜ Not started | UI contracts are now truthful and done (above); see "Next: earnings intelligence backend queue" below for the ordered Finnhub/DeepSeek work |
 
 ---
 
@@ -63,7 +64,7 @@ demo values, account details, or invented financials into production code.
 
 Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](https://project-portlander-portfolio-event-intelligence-323.magicpatterns.app/). It is a direction and interaction reference, not a source of production data or code.
 
-**NEXT_TASK:** `UX-06`
+**NEXT_TASK:** None — `UX-01`-`UX-11` complete; see the backend queue below for what's next
 
 **ACTIVE_CLAIM:** None
 
@@ -118,7 +119,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
   - **Done when:** upcoming/awaiting/reported details are usable by mouse, touch, and keyboard and
     missing/failed generated content does not damage the verified experience.
 
-- [ ] **UX-06 — Calendar overhaul**
+- [x] **UX-06 — Calendar overhaul**
   - Restyle the month view inside the new system while preserving position-weighted dots and
     chronological agenda behavior.
   - Add clear selected-day detail and multi-report/cluster cues; keep the calendar scannable rather
@@ -126,7 +127,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
   - **Done when:** event type, relative weight, selected day, clusters, and empty days remain clear
     at desktop and mobile widths with correct dates.
 
-- [ ] **UX-07 — Portfolio workspace refinement**
+- [x] **UX-07 — Portfolio workspace refinement**
   - Preserve the table-first order: summary, holdings table/cards, then management controls.
   - Show total value and truthful whole-book daily gain/loss in dollars and percent; only show total
     gain/loss when cost-basis completeness makes it honest.
@@ -137,7 +138,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
   - **Done when:** existing mutation and import protections still pass and a 40-position book is
     faster to scan, not merely more decorative.
 
-- [ ] **UX-08 — Settings information architecture**
+- [x] **UX-08 — Settings information architecture**
   - Organize Settings into Account, Brokerage, Data & sync, Earnings intelligence, Diagnostics, and
     About this build with clear local navigation.
   - Keep all health checks/retry actions in Diagnostics and retain actionable raw error details.
@@ -146,7 +147,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
   - **Done when:** brokerage/sync/auth controls retain behavior, diagnostics are easy to find, and
     Settings works without becoming one unbroken wall of cards.
 
-- [ ] **UX-09 — Truthful states, privacy-safe demo data, and resilience**
+- [x] **UX-09 — Truthful states, privacy-safe demo data, and resilience**
   - Audit loading, empty, stale, partial, disconnected, degraded, and error states on every route.
   - Ensure public/demo fixtures contain no real email, account count, share count, holdings, or
     portfolio value; never expose private data through screenshots or committed fixtures.
@@ -154,7 +155,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
   - **Done when:** every route has an intentional state matrix and failure recovery path, with no
     demo-data flash or fabricated fallback metrics.
 
-- [ ] **UX-10 — Mobile, accessibility, and interaction polish**
+- [x] **UX-10 — Mobile, accessibility, and interaction polish**
   - Validate phone/tablet breakpoints, five-item bottom navigation, touch targets, swipe behavior,
     scroll containment, safe areas, drawers/sheets, and fixed navigation.
   - Meet readable contrast and minimum text sizes; add semantic labels, keyboard order, visible
@@ -162,7 +163,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
   - **Done when:** core Today → earnings card → detail and Portfolio flows are comfortable on a real
     phone and pass automated accessibility checks plus manual keyboard review.
 
-- [ ] **UX-11 — Full regression, visual QA, and Phase 2 UI release handoff**
+- [x] **UX-11 — Full regression, visual QA, and Phase 2 UI release handoff**
   - Compare every route against the approved design intent at representative desktop/mobile widths;
     remove accidental density, inconsistent tokens, placeholder copy, and dead interactions.
   - Run build, lint, unit tests, end-to-end smoke flows, data-truth checks, and a real-book privacy
@@ -174,12 +175,55 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 
 ---
 
+## Next: earnings intelligence backend queue
+
+`UX-01`–`UX-11` built the full UI contract (`src/types/earnings.ts`, `EarningsCardModel`) against
+typed fixtures (`src/data/earningsFixtures.ts`) because no live source populates consensus,
+actual results, surprise, guidance, or reaction — see UX-02's and UX-09's notes in this file and
+in `docs/UI.md`. This is the ordered work to make that data real, one focused PR per item, same
+discipline as the UI queue above. Do not start on any of these until the owner has approved the
+UI overhaul branch — this queue is additive to a merged, approved baseline, not a parallel track.
+
+- [ ] **BE-01 — Read the Finnhub payload the app already fetches.** `sync-events`'s
+  `FinnhubEarning` type already carries `epsEstimate`/`epsActual`/`revenueEstimate`/
+  `revenueActual`/`quarter`/`year`; today only EPS reaches `description` as text and the rest
+  dies in the unread `events.raw` jsonb column. Add typed columns (or read `raw` in
+  `eventFromRow()`) so `consensus`/`actual` reach the client as real numbers, not prose.
+- [ ] **BE-02 — Compute surprise server- or client-side.** `epsSurprisePct`/`revenueSurprisePct`
+  are pure math once BE-01 lands (`(actual - estimate) / |estimate| * 100`); no new provider
+  call needed. Decide once: compute in `sync-events` at write time, or derive in
+  `buildEarningsCardModel` at read time — pick one, don't do both.
+- [ ] **BE-03 — Source guidance and reaction, or drop those fields honestly.** Finnhub's
+  `/calendar/earnings` endpoint has neither. Guidance needs a different endpoint/provider (or
+  stays manually-curated, low volume); reaction needs a quote pulled shortly after the report
+  (can reuse `refresh-quotes`'s Finnhub quote call, timed off `eventDate`+`timing`). If neither
+  is worth building yet, remove the fields from the UI rather than leaving them permanently
+  empty — an honest smaller model beats a hopeful unfillable one.
+- [ ] **BE-04 — Real historical beat/miss.** `HistoricalBeatStrip` needs the last N quarters'
+  actual-vs-consensus per ticker; Finnhub's earnings-calendar `from`/`to` range can be widened
+  backward per ticker to backfill this instead of inventing a new provider call.
+- [ ] **BE-05 — Retire `earningsFixtures.ts` incrementally, not in one PR.** Once BE-01–BE-04
+  land, real tickers stop needing the fixture lookup in `buildEarningsCards`/`selectDeckCards`;
+  keep fixtures only for the 8 states unit tests rely on (`src/components/earnings/*.test.tsx`),
+  delete the "decorate real events with fixture data" fallback path once real data covers it.
+- [ ] **BE-06 — DeepSeek structured interpretation, only after BE-01–BE-04.** Per
+  `AGENTS.md`'s Phase 2 data truth rules: DeepSeek extracts/interprets *supplied* verified
+  evidence into a strict structured output, it is never itself a source of facts. Feed it
+  BE-01–BE-04's real `EarningsFacts` for one ticker/quarter, validate the structured-output
+  schema strictly (reject and fall back to `interpretation: undefined` on any malformed
+  response — `GeneratedInsight` already renders nothing when absent, so this fails safe by
+  construction), then wire it behind a rate limit before enabling broadly.
+
+---
+
 ## Next up (ordered)
 
 1. **Owner:** review and merge the PR for `claude/uiux-overhaul-review-yapmlj` → `develop`
-   (`UX-01`–`UX-05`, 5 commits, one per task). It carries the `main`→`develop` reconciliation
-   too, so merging it also closes that gap.
-2. **Agent:** claim and implement `UX-06` from the master queue once the above is merged.
+   (`UX-01`–`UX-11`, one commit per task plus a docs commit). It carries the `main`→`develop`
+   reconciliation too, so merging it also closes that gap. This is the full Phase 2 frontend
+   baseline — see the state matrix and visual-QA notes in `docs/UI.md` before approving.
+2. **Agent:** once approved and merged, claim and implement `BE-01` from the earnings
+   intelligence backend queue above.
 3. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
    the deployed `v1.0` build.
 4. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
@@ -209,6 +253,10 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 | 2026-08-02 | The `main`→`develop` v1.0-metadata reconciliation (queued in `UX-01`) landed as this branch's first commit instead of a direct push to `develop` | Same single-branch constraint as above. It's a real merge commit with resolved conflicts, not skipped — merging this branch closes the reconciliation gap too. |
 | 2026-08-02 | Added `@testing-library/react`/`user-event`/`jest-dom` and a `src/test/` seam (exported `PortfolioContext`, `renderWithPortfolio`) as part of `UX-01`, not called out in the original queue text | None of `UX-02`–`UX-05`'s "keyboard/focus behavior + unit tests" acceptance bars are achievable without component-testing infra — `vitest.config.ts` only ran `.ts` files and no RTL dependency existed. Treated as a silent hard prerequisite of `UX-01` rather than a 6th task. |
 | 2026-08-02 | Consensus/actual/surprise/guidance/reaction/history for earnings cards comes from `src/data/earningsFixtures.ts` (8 tickers), looked up by ticker against real `events` — not from a live provider | Finnhub's `/calendar/earnings` response has `epsEstimate`/`epsActual`/`revenueEstimate`/`revenueActual` but `eventFromRow()` never reads the `raw` jsonb column they land in, and Finnhub has no guidance/reaction data at all. Wiring a real source is backend work for after `UX-11`. Real event tickers that don't match a fixture entry render with `facts: undefined` — an honest empty state, not a crash or a fabricated number. Fixture values are raw numbers (not pre-formatted strings) so swapping in a live provider later is a data-source change, not a shape change. |
+| 2026-08-02 | A cell/element gets exactly one Tailwind `ring-*` and one `bg-*` utility, never two competing ones (`MonthCalendar`'s `dayRing`/`dayBg` helpers) | Tailwind's ring-width/ring-color/bg-color utilities all resolve to the same underlying CSS property (box-shadow / background-color), so e.g. `ring-1 ring-earnings/30` stacked with `ring-2 ring-accent-400` doesn't layer — one silently wins, and which one depends on generated-CSS order, not class-string order. Found by inspecting computed `box-shadow` in a real browser after a screenshot looked wrong, not by reading the JSX. Same fix applied to the hover-ring vs. selected/today-ring collision. |
+| 2026-08-02 | Swept every `text-ink-500` usage to `text-ink-450` app-wide (UX-10) | An `axe-core` scan measured `text-ink-500` (`#64748b`) at ~3.8:1 contrast against the app's dark surfaces, under WCAG AA's 4.5:1 minimum for normal text. `ink-450` (`#7c8ba1`, introduced in UX-01 for the same reason) is strictly lighter, so the swap is a monotonic contrast improvement everywhere it's used — re-scanned clean after. |
+| 2026-08-02 | `axe-core` was a one-time devDependency for the UX-10 audit, installed and removed within the same session | This project has no Playwright dependency to hang a permanent CI accessibility gate on (only available globally in dev sandboxes) — adding one is a bigger, separate decision than this overhaul. The scan and its findings are documented in `docs/UI.md` so a future session can redo it before a real release rather than trusting a stale audit. |
+| 2026-08-02 | Removed `PortfolioContext`'s `filter`/`setFilter` state, `FilterBar.tsx`, and `src/components/ui/Skeleton.tsx` (UX-11) | All three were dead: no page destructured `filter`/`setFilter` from `usePortfolio()` after UX-03/04 moved filtering into page-local state (`EarningsStatusFilter`'s own `useState`); `FilterBar` had zero remaining importers once Today stopped using it; `Skeleton` had zero importers even before this session (every loading state hand-rolls its own `animate-pulse` divs). Confirmed via grep for real import sites, not just usage-count guessing, before deleting. |
 | 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
 | 2026-08-01 | Phase 1 v1.0 promoted to `main` | PR #25 merged `develop` into `main` after CI run #24 passed build, lint, and test; the production-only SnapTrade error-detail commits already on `main` were preserved |
 | 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
@@ -234,6 +282,23 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-02 — claude (session 19, continued)
+- Implemented `UX-06`–`UX-11` on the same branch, completing the master queue: Calendar overhaul
+  (day-cell selection, `SelectedDayDetail`, cluster badges) (`UX-06`); Portfolio refinement (new
+  whole-book `portfolioTotalGainLoss` stat, per-row provenance tooltip) (`UX-07`); Settings
+  reorganized into 6 sections with a sticky nav (`UX-08`); truthful-states audit (`hasNoPriceData`,
+  `isStaleSync` — 2 real fabricated/missing-state gaps found and fixed) (`UX-09`); accessibility
+  pass using a real `axe-core` scan, not just manual review — found and fixed a genuine contrast
+  failure (`text-ink-500` swept to `text-ink-450` app-wide) and a keyboard-focus gap, plus
+  safe-area/reduced-motion/touch-target/screen-reader-label work (`UX-10`); full visual regression
+  across all 5 routes × 2 widths, dead-code removal (`FilterBar`, unused `Skeleton` primitive, dead
+  `PortfolioContext` filter state), and this backend handoff queue (`UX-11`).
+- Two real bugs found and fixed only because of browser verification, not just reading the diff:
+  stacking multiple Tailwind `ring-*`/`bg-*` utilities on one element doesn't layer, it silently
+  picks one — caught via computed `box-shadow` inspection on the calendar's selected-day ring.
+- Final state: 253/253 tests, clean build, lint clean (pre-existing warning pattern only).
+- PR carries all 11 UX commits + 2 docs commits; still needs owner review/merge (see Next up).
 
 ### 2026-08-02 — claude (session 19)
 - Implemented `UX-01`–`UX-05` end to end on `claude/uiux-overhaul-review-yapmlj`, one commit per

@@ -42,8 +42,10 @@ Fonts: IBM Plex Sans + IBM Plex Mono (Google Fonts in `index.html`).
   divs otherwise — no dead tab stops; a small count badge marks 2+ report days) +
   `SelectedDayDetail` (full per-event detail lives outside the grid, not crammed into cells).
   Weekday headers and the agenda heading use the sentence-case micro-label convention now.
-- Primitives: `Badge` (+ `EarningsStateBadge`), `Stat`, `Skeleton`, `Button`/`PillButton`,
-  `MetricPair`, `FreshnessLabel`, `CarouselControls`, `EmptyState`, `.input`
+- Primitives: `Badge` (+ `EarningsStateBadge`), `Stat`, `Button`/`PillButton`, `MetricPair`,
+  `FreshnessLabel`, `CarouselControls`, `EmptyState`, `Dialog`, `.input`. (`Skeleton` was
+  removed in UX-11 — unused everywhere; the actual boot skeleton is hand-rolled in
+  `AppShell`'s `AppSkeleton`.)
 
 ## Earnings workspace filter semantics (UX-04)
 

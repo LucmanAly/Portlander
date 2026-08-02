@@ -13,8 +13,6 @@ export function makePortfolioContextValue(
     events: [],
     lastSyncAt: null,
     syncTimestamps: { positions: null, prices: null, events: null },
-    filter: 'all',
-    setFilter: () => {},
     upcoming14: [],
     exposure: {
       earnings7dPct: 0,

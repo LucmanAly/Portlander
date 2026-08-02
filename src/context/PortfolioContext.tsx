@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react'
 import type { BrokerageConnection, Holding, PortfolioEvent, WatchlistItem } from '@/types'
-import type { EventFilter } from '@/types'
 import { computeExposure, scoreAndFilterEvents } from '@/lib/scoring'
 import type { CsvImportPlan } from '@/lib/csv'
 import {
@@ -40,8 +39,6 @@ export interface PortfolioContextValue {
   lastSyncAt: string | null
   /** Per-provider freshness: Positions (SnapTrade) / Prices (Finnhub quotes) / Events (Finnhub + macro). */
   syncTimestamps: SyncTimestamps
-  filter: EventFilter
-  setFilter: (f: EventFilter) => void
   upcoming14: ReturnType<typeof scoreAndFilterEvents>
   exposure: ReturnType<typeof computeExposure>
   addHolding: (h: Omit<Holding, 'id' | 'createdAt' | 'updatedAt'>) => void
@@ -93,7 +90,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     prices: null,
     events: null,
   })
-  const [filter, setFilter] = useState<EventFilter>('all')
   const [booting, setBooting] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -350,12 +346,11 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
   const upcoming14 = useMemo(() => {
     const today = startOfDay(new Date())
     return scoreAndFilterEvents(events, holdings, watchlist, {
-      filter,
       fromDate: today,
       toDate: addDays(today, 14),
       today,
     })
-  }, [events, holdings, watchlist, filter])
+  }, [events, holdings, watchlist])
 
   const exposure = useMemo(() => {
     const today = startOfDay(new Date())
@@ -499,8 +494,6 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
     events,
     lastSyncAt,
     syncTimestamps,
-    filter,
-    setFilter,
     upcoming14,
     exposure,
     addHolding,
