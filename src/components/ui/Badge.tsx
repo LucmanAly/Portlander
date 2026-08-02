@@ -1,5 +1,6 @@
 import clsx from 'clsx'
 import type { EventStatus, EventType } from '@/types'
+import type { EarningsViewState } from '@/types/earnings'
 import { eventTypeLabel, isDividendType, isMacroType, type ScoreTier } from '@/lib/scoring'
 
 export function TypeBadge({ type }: { type: EventType }) {
@@ -64,6 +65,30 @@ export function TierBadge({ tier }: { tier: ScoreTier }) {
       )}
     >
       {TIER_LABEL[tier]} impact
+    </span>
+  )
+}
+
+const EARNINGS_STATE_LABEL: Record<EarningsViewState, string> = {
+  upcoming: 'Upcoming',
+  awaiting: 'Awaiting results',
+  reported: 'Reported',
+}
+const EARNINGS_STATE_TONE: Record<EarningsViewState, string> = {
+  upcoming: 'border-border bg-ink-800 text-ink-300',
+  awaiting: 'border-earnings/30 bg-earnings-soft text-earnings',
+  reported: 'border-accent-500/30 bg-accent-glow text-accent-400',
+}
+
+export function EarningsStateBadge({ state }: { state: EarningsViewState }) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+        EARNINGS_STATE_TONE[state],
+      )}
+    >
+      {EARNINGS_STATE_LABEL[state]}
     </span>
   )
 }

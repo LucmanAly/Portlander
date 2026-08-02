@@ -26,7 +26,7 @@ export function SortToggle({
             'focus-ring rounded-md px-2.5 py-1 text-xs font-medium transition duration-150',
             value === opt.id
               ? 'bg-accent-500/15 text-accent-400'
-              : 'text-ink-500 hover:text-ink-300',
+              : 'text-ink-450 hover:text-ink-300',
           )}
         >
           {opt.label}

@@ -66,7 +66,21 @@ create table if not exists public.events (
   description text,
   raw jsonb,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Finnhub's calendar/earnings response already returns these; sync-events
+  -- writes them as typed columns instead of leaving them stranded in `raw`
+  -- (applied live via migrations 20260802025048/20260802025609, reconciled
+  -- into this file during BE-01/BE-04 — see PROGRESS.md Decisions).
+  eps_estimate numeric,
+  eps_actual numeric,
+  revenue_estimate numeric,
+  revenue_actual numeric,
+  -- BE-06: DeepSeek-generated structured interpretation of this row's
+  -- verified facts (summary/model/generatedAt/confidence), written only by
+  -- the earnings-interpret Edge Function after strict schema validation.
+  -- Never a source of facts — see AGENTS.md Phase 2 data truth rules. Null
+  -- until an owner-configured DeepSeek call has run for this event.
+  ai_interpretation jsonb
 );
 
 create index if not exists events_user_date_idx on public.events (user_id, event_date);

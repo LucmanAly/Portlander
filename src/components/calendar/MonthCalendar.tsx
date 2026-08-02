@@ -13,15 +13,35 @@ import {
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import type { ScoredEvent } from '@/types'
-import { isDividendType, isMacroType } from '@/lib/scoring'
+import { eventTypeLabel, isDividendType, isMacroType, scoreTier } from '@/lib/scoring'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 
-function dayTone(events: ScoredEvent[]): string {
-  if (events.some((e) => e.eventType === 'earnings')) return 'bg-earnings-soft ring-1 ring-earnings/30'
-  if (events.some((e) => isDividendType(e.eventType)))
-    return 'bg-dividend-soft ring-1 ring-dividend/25'
-  if (events.some((e) => isMacroType(e.eventType))) return 'bg-macro-soft ring-1 ring-macro/25'
+/** Background tint only — kept separate from the ring so selection/today can't visually conflict with it (see dayRing). */
+function dayBg(events: ScoredEvent[]): string {
+  if (events.some((e) => e.eventType === 'earnings')) return 'bg-earnings-soft'
+  if (events.some((e) => isDividendType(e.eventType))) return 'bg-dividend-soft'
+  if (events.some((e) => isMacroType(e.eventType))) return 'bg-macro-soft'
   return ''
+}
+
+function dayEventTone(events: ScoredEvent[]): string {
+  if (events.some((e) => e.eventType === 'earnings')) return 'ring-1 ring-earnings/30'
+  if (events.some((e) => isDividendType(e.eventType))) return 'ring-1 ring-dividend/25'
+  if (events.some((e) => isMacroType(e.eventType))) return 'ring-1 ring-macro/25'
+  return ''
+}
+
+/**
+ * Tailwind's ring-width/ring-color utilities all resolve to the same box-shadow
+ * property, so stacking e.g. `ring-1 ring-earnings/30` with `ring-2 ring-accent-400`
+ * on one element doesn't layer — one silently wins. Pick exactly one ring
+ * treatment per cell instead, in priority order: selected > today > event tone.
+ */
+function dayRing(isSelected: boolean, isToday: boolean, events: ScoredEvent[]): string {
+  if (isSelected) return 'ring-2 ring-accent-400'
+  if (isToday) return 'ring-1 ring-accent-500/50'
+  return dayEventTone(events)
 }
 
 function dotColor(e: ScoredEvent): string {
@@ -51,7 +71,26 @@ function timingTextTone(e: ScoredEvent): string {
   return 'text-ink-200'
 }
 
-export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
+/**
+ * The dot conveys type (color) and weight (size) purely visually — this gives
+ * screen-reader users the same two facts as text, so the dot itself can be
+ * aria-hidden rather than silently conveying nothing.
+ */
+function eventRowLabel(e: ScoredEvent): string {
+  const subject = e.ticker ? `${e.ticker} — ${e.title}` : e.title
+  return `${eventTypeLabel(e.eventType)}: ${subject}, ${scoreTier(e.impactScore)} impact`
+}
+
+export function MonthCalendar({
+  events,
+  selectedDate,
+  onSelectDay,
+}: {
+  events: ScoredEvent[]
+  /** yyyy-MM-dd, controlled by the caller so a "selected day" panel can live outside the grid. */
+  selectedDate?: string | null
+  onSelectDay?: (dateKey: string) => void
+}) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
 
   const days = useMemo(() => {
@@ -79,38 +118,31 @@ export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
           {format(cursor, 'MMMM yyyy')}
         </h2>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            className="focus-ring rounded-lg p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setCursor((c) => subMonths(c, 1))}
             aria-label="Previous month"
           >
             <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            className="focus-ring rounded-lg px-3 py-1.5 text-sm text-ink-400 hover:bg-ink-800 hover:text-ink-100"
-            onClick={() => setCursor(startOfMonth(new Date()))}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setCursor(startOfMonth(new Date()))}>
             Today
-          </button>
-          <button
-            type="button"
-            className="focus-ring rounded-lg p-2 text-ink-400 hover:bg-ink-800 hover:text-ink-100"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setCursor((c) => addMonths(c, 1))}
             aria-label="Next month"
           >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="mb-2 grid grid-cols-7 gap-1">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-          <div
-            key={d}
-            className="px-1 py-2 text-center text-[11px] font-medium uppercase tracking-wider text-ink-500"
-          >
+          <div key={d} className="px-1 py-2 text-center text-xs font-medium text-ink-450">
             {d}
           </div>
         ))}
@@ -122,24 +154,43 @@ export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
           const dayEvents = byDate.get(key) ?? []
           const inMonth = isSameMonth(day, cursor)
           const isToday = isSameDay(day, today)
+          const isSelected = selectedDate === key
+          const isCluster = dayEvents.length >= 2
 
-          return (
-            <div
-              key={key}
-              className={clsx(
-                'min-h-[88px] rounded-xl p-1.5 transition sm:min-h-[100px] sm:p-2',
-                inMonth ? 'bg-ink-900/50' : 'bg-ink-950/40 opacity-40',
-                dayTone(dayEvents),
-                isToday && 'ring-1 ring-accent-500/50',
-              )}
-            >
-              <div
-                className={clsx(
-                  'tabular mb-1 text-xs font-medium',
-                  isToday ? 'text-accent-400' : 'text-ink-400',
-                )}
-              >
-                {format(day, 'd')}
+          // Exactly one bg-* and one ring-* utility per cell — Tailwind's ring/bg
+          // utilities all resolve to the same underlying property, so stacking
+          // competing ones (e.g. bg-ink-900/50 + bg-earnings-soft) doesn't layer,
+          // it silently picks one. See dayRing's comment for the same issue.
+          const bgClassName = !inMonth ? 'bg-ink-950/40 opacity-40' : dayBg(dayEvents) || 'bg-ink-900/50'
+
+          const cellClassName = clsx(
+            'focus-ring relative min-h-[88px] rounded-xl p-1.5 text-left transition sm:min-h-[100px] sm:p-2',
+            bgClassName,
+            dayRing(isSelected, isToday, dayEvents),
+            onSelectDay && 'cursor-pointer',
+            // Same box-shadow-collision issue as dayRing: only add the hover ring
+            // when nothing else is already claiming the ring, so hovering a
+            // selected or today cell can't visually cancel that state.
+            onSelectDay && !isSelected && !isToday && 'hover:ring-1 hover:ring-border-strong',
+          )
+          const ariaLabel = `${format(day, 'EEEE, MMMM d')}${dayEvents.length > 0 ? `, ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}` : ', no events'}`
+
+          const cellContent = (
+            <>
+              <div className="mb-1 flex items-center justify-between">
+                <span
+                  className={clsx('tabular text-xs font-medium', isToday ? 'text-accent-400' : 'text-ink-400')}
+                >
+                  {format(day, 'd')}
+                </span>
+                {isCluster ? (
+                  <span
+                    className="rounded-full bg-ink-800 px-1 text-[9px] font-semibold text-ink-300"
+                    title={`${dayEvents.length} reports this day`}
+                  >
+                    {dayEvents.length}
+                  </span>
+                ) : null}
               </div>
               <div className="flex min-w-0 flex-col gap-0.5">
                 {dayEvents.slice(0, 3).map((e) => (
@@ -147,23 +198,45 @@ export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
                     key={e.id}
                     className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
                     title={e.title}
+                    aria-label={eventRowLabel(e)}
                   >
-                    <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} />
+                    <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} aria-hidden="true" />
                     <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
                   </div>
                 ))}
                 {dayEvents.length > 3 ? (
-                  <span className="px-1 text-[10px] text-ink-500">+{dayEvents.length - 3}</span>
+                  <span className="px-1 text-[10px] text-ink-450">+{dayEvents.length - 3}</span>
                 ) : null}
               </div>
-            </div>
+            </>
+          )
+
+          if (!onSelectDay) {
+            return (
+              <div key={key} aria-label={ariaLabel} className={cellClassName}>
+                {cellContent}
+              </div>
+            )
+          }
+
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelectDay(key)}
+              aria-pressed={isSelected}
+              aria-label={ariaLabel}
+              className={cellClassName}
+            >
+              {cellContent}
+            </button>
           )
         })}
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-4 text-xs text-ink-500">
+      <div className="mt-5 flex flex-wrap gap-4 text-xs text-ink-450">
         <Legend color="bg-earnings" label="Earnings" />
         <Legend color="bg-dividend" label="Dividends" />
         <Legend color="bg-macro" label="Macro" />
@@ -171,7 +244,8 @@ export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
       <p className="mt-2 text-[11px] text-ink-600">
         Dot size tracks position weight · Earnings ticker:{' '}
         <span className="text-ink-100">bright</span> reports before the open ·{' '}
-        <span className="text-ink-400">dim</span> reports after the close
+        <span className="text-ink-400">dim</span> reports after the close · number badge = multiple
+        reports that day
       </p>
     </div>
   )

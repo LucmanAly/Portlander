@@ -1,13 +1,18 @@
 /**
  * Release metadata shown in Settings.
  *
- * Update APP_VERSION and APP_LAST_UPDATED together whenever a release is
- * promoted to main. APP_LAST_UPDATED is an ISO-8601 UTC timestamp; the UI
- * formats it for America/New_York.
+ * Update APP_VERSION, APP_RELEASE_NAME, and APP_LAST_UPDATED together
+ * whenever a release is promoted to main. APP_LAST_UPDATED is an ISO-8601
+ * UTC timestamp; the UI formats it for America/New_York.
+ *
+ * APP_RELEASE_NAME is a short descriptive name for the release — deliberately
+ * not "Phase N", per the owner's call when promoting v2.0 (2026-08-02): the
+ * "Phase" numbering is internal project-planning language (AGENTS.md/
+ * PROGRESS.md), not something that belongs in front of a user.
  */
-export const APP_VERSION = '1.0'
-export const APP_PHASE = 'Phase 1 · Foundation'
-export const APP_LAST_UPDATED = '2026-08-01T22:51:27Z'
+export const APP_VERSION = '2.0'
+export const APP_RELEASE_NAME = 'Portfolio Event Intelligence'
+export const APP_LAST_UPDATED = '2026-08-02T23:41:35Z'
 
 export function formatAppUpdatedAt(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {

@@ -26,7 +26,13 @@ import { MACRO_CALENDAR } from '../_shared/macro-calendar.ts'
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
 const LOOKAHEAD_DAYS = 90
-const LOOKBACK_DAYS = 7
+/**
+ * Wide enough to backfill ~5 confirmed quarters per ticker (BE-04's real
+ * historical beat/miss needs the last 4) without a second provider call —
+ * one calendar/earnings request per symbol already returns everything in
+ * [from, to], so widening the window costs zero extra Finnhub calls.
+ */
+const LOOKBACK_DAYS = 380
 
 type FinnhubEarning = {
   date: string
@@ -256,6 +262,10 @@ function toEventRow(row: FinnhubEarning) {
       .filter(Boolean)
       .join(' · '),
     raw: row as unknown as Record<string, unknown>,
+    eps_estimate: row.epsEstimate ?? null,
+    eps_actual: row.epsActual ?? null,
+    revenue_estimate: row.revenueEstimate ?? null,
+    revenue_actual: row.revenueActual ?? null,
     updated_at: new Date().toISOString(),
   }
 }

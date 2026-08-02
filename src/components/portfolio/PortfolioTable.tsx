@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { GripVertical, SlidersHorizontal, Trash2 } from 'lucide-react'
 import type { Holding } from '@/types'
-import { formatMoney, formatPct } from '@/lib/format'
+import { formatFullDate, formatMoney, formatPct } from '@/lib/format'
 import {
+  hasNoPriceData,
   holdingDayChange,
   holdingMarketValue,
   holdingTotalGainLoss,
@@ -18,6 +19,17 @@ const SOURCE_LABEL: Record<Holding['source'], string> = {
   manual: 'Manual',
   csv: 'CSV',
   snaptrade: 'Synced',
+}
+
+const SOURCE_DESCRIPTION: Record<Holding['source'], string> = {
+  manual: 'Entered manually',
+  csv: 'Imported from CSV',
+  snaptrade: 'Synced from brokerage',
+}
+
+/** Per-row provenance/freshness, exposed as a plain tooltip rather than an extra icon/date column. */
+function provenanceTitle(h: Holding): string {
+  return `${SOURCE_DESCRIPTION[h.source]} · Updated ${formatFullDate(h.updatedAt)}`
 }
 
 export function PortfolioTable({
@@ -72,7 +84,7 @@ export function PortfolioTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-ink-500">
+              <tr className="border-b border-border text-xs font-medium text-ink-450">
                 <th className="px-4 py-3 font-medium">Ticker</th>
                 {orderedVisible.map((key) => (
                   <th key={key} className="px-4 py-3 font-medium">
@@ -85,7 +97,7 @@ export function PortfolioTable({
             <tbody className="divide-y divide-border">
               {holdings.length === 0 ? (
                 <tr>
-                  <td colSpan={orderedVisible.length + 2} className="px-4 py-10 text-center text-ink-500">
+                  <td colSpan={orderedVisible.length + 2} className="px-4 py-10 text-center text-ink-450">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -110,7 +122,7 @@ export function PortfolioTable({
           affordance, not worth reproducing in a one-column layout. */}
       <div className="space-y-2 sm:hidden">
         {holdings.length === 0 ? (
-          <p className="surface rounded-2xl px-4 py-10 text-center text-sm text-ink-500">
+          <p className="surface rounded-2xl px-4 py-10 text-center text-sm text-ink-450">
             {emptyMessage}
           </p>
         ) : (
@@ -142,11 +154,11 @@ export function PortfolioTable({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-ink-100">Column layout</h3>
-              <p className="mt-1 text-xs text-ink-500">
+              <p className="mt-1 text-xs text-ink-450">
                 Drag rows to reorder the desktop table. Toggle a column off to hide it.
               </p>
             </div>
-            <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500 ring-1 ring-border">
+            <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold text-ink-450 ring-1 ring-border">
               Drag and drop
             </span>
           </div>
@@ -182,7 +194,7 @@ export function PortfolioTable({
                   )}
                 >
                   <GripVertical
-                    className="h-4 w-4 shrink-0 text-ink-500"
+                    className="h-4 w-4 shrink-0 text-ink-450"
                     aria-hidden="true"
                   />
                   <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-ink-200">
@@ -194,7 +206,7 @@ export function PortfolioTable({
                     />
                     <span className="truncate">{PORTFOLIO_COLUMN_LABEL[key]}</span>
                   </label>
-                  <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-ink-500">
+                  <span className="shrink-0 text-[10px] font-medium text-ink-450">
                     {visible ? 'Visible' : 'Hidden'}
                   </span>
                 </div>
@@ -227,7 +239,7 @@ function HoldingRow({
     <tr className="hover:bg-ink-800/30">
       <td className="px-4 py-3">
         <div className="font-semibold text-accent-400">{h.ticker}</div>
-        {h.name ? <div className="text-xs text-ink-500">{h.name}</div> : null}
+        {h.name ? <div className="text-xs text-ink-450">{h.name}</div> : null}
       </td>
       {columns.map((key) => (
         <td key={key} className="px-4 py-3">
@@ -240,7 +252,7 @@ function HoldingRow({
           onClick={() => {
             if (confirm(`Remove ${h.ticker} from your holdings?`)) onRemove()
           }}
-          className="focus-ring rounded-lg p-2 text-ink-500 hover:bg-ink-800 hover:text-critical"
+          className="focus-ring rounded-lg p-2 text-ink-450 hover:bg-ink-800 hover:text-critical"
           aria-label={`Remove ${h.ticker}`}
         >
           <Trash2 className="h-4 w-4" />
@@ -274,10 +286,17 @@ function Cell({
       )
     case 'dayChange': {
       const change = holdingDayChange(h)
-      if (change == null) return <span className="text-ink-500">—</span>
+      if (change == null) return <span className="text-ink-450">—</span>
       return <GainLoss value={change} pct={h.dayChangePct} />
     }
     case 'value':
+      if (hasNoPriceData(h)) {
+        return (
+          <span className="text-ink-450" title="No price or cost basis on record for this position">
+            No price yet
+          </span>
+        )
+      }
       return (
         <span
           className="tabular font-medium text-ink-100"
@@ -289,7 +308,7 @@ function Cell({
       )
     case 'totalGainLoss': {
       const gain = holdingTotalGainLoss(h)
-      if (gain == null) return <span className="text-ink-500">—</span>
+      if (gain == null) return <span className="text-ink-450">—</span>
       return <GainLoss value={gain} pct={holdingTotalGainLossPct(h)} />
     }
     case 'weight':
@@ -309,7 +328,10 @@ function Cell({
       )
     case 'source':
       return (
-        <span className="rounded-md bg-ink-800 px-2 py-0.5 text-[11px] font-medium text-ink-300 ring-1 ring-border">
+        <span
+          className="rounded-md bg-ink-800 px-2 py-0.5 text-[11px] font-medium text-ink-300 ring-1 ring-border"
+          title={provenanceTitle(h)}
+        >
           {SOURCE_LABEL[h.source]}
         </span>
       )
@@ -352,18 +374,21 @@ function HoldingCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-accent-400">{h.ticker}</span>
-            <span className="rounded-md bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-300 ring-1 ring-border">
+            <span
+              className="rounded-md bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-300 ring-1 ring-border"
+              title={provenanceTitle(h)}
+            >
               {SOURCE_LABEL[h.source]}
             </span>
           </div>
-          {h.name ? <div className="truncate text-xs text-ink-500">{h.name}</div> : null}
+          {h.name ? <div className="truncate text-xs text-ink-450">{h.name}</div> : null}
         </div>
         <button
           type="button"
           onClick={() => {
             if (confirm(`Remove ${h.ticker} from your holdings?`)) onRemove()
           }}
-          className="focus-ring shrink-0 rounded-lg p-2 text-ink-500 hover:bg-ink-800 hover:text-critical"
+          className="focus-ring shrink-0 rounded-lg p-2 text-ink-450 hover:bg-ink-800 hover:text-critical"
           aria-label={`Remove ${h.ticker}`}
         >
           <Trash2 className="h-4 w-4" />
@@ -372,28 +397,34 @@ function HoldingCard({
 
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-ink-500">Shares</div>
+          <div className="text-[10px] text-ink-450">Shares</div>
           <div className="tabular text-ink-200">{h.shares}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-ink-500">Value</div>
-          <div
-            className="tabular font-medium text-ink-100"
-            title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
-          >
-            {estimated ? '~' : ''}
-            {formatMoney(value)}
-          </div>
+          <div className="text-[10px] text-ink-450">Value</div>
+          {hasNoPriceData(h) ? (
+            <div className="text-ink-450" title="No price or cost basis on record for this position">
+              No price yet
+            </div>
+          ) : (
+            <div
+              className="tabular font-medium text-ink-100"
+              title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
+            >
+              {estimated ? '~' : ''}
+              {formatMoney(value)}
+            </div>
+          )}
         </div>
         {dayChange != null ? (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-ink-500">Day change</div>
+            <div className="text-[10px] text-ink-450">Day change</div>
             <GainLoss value={dayChange} pct={h.dayChangePct} />
           </div>
         ) : null}
         {totalGain != null ? (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-ink-500">Total gain/loss</div>
+            <div className="text-[10px] text-ink-450">Total gain/loss</div>
             <GainLoss value={totalGain} pct={holdingTotalGainLossPct(h)} />
           </div>
         ) : null}

@@ -1,0 +1,62 @@
+import { describe, expect, it } from 'vitest'
+import { screen, within } from '@testing-library/react'
+import { Route, Routes } from 'react-router-dom'
+import { AppShell } from '@/components/layout/AppShell'
+import { renderWithPortfolio } from '@/test/testProviders'
+
+const NAV_ORDER = ['Today', 'Earnings', 'Calendar', 'Portfolio', 'Settings']
+
+function renderShell(overrides?: Parameters<typeof renderWithPortfolio>[1]) {
+  return renderWithPortfolio(
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<div>Today content</div>} />
+      </Route>
+    </Routes>,
+    overrides,
+  )
+}
+
+describe('AppShell navigation', () => {
+  it('renders all 5 routes in order on the desktop sidebar', () => {
+    renderShell()
+    const sidebarNav = screen.getAllByRole('navigation')[0]
+    const links = within(sidebarNav).getAllByRole('link')
+    expect(links.map((l) => l.textContent)).toEqual(NAV_ORDER)
+  })
+
+  it('renders all 5 routes in order on the mobile bottom nav', () => {
+    renderShell()
+    const navs = screen.getAllByRole('navigation')
+    const mobileNav = navs[navs.length - 1]
+    const links = within(mobileNav).getAllByRole('link')
+    expect(links.map((l) => l.textContent)).toEqual(NAV_ORDER)
+  })
+
+  it('never renders a Book value card', () => {
+    renderShell()
+    expect(screen.queryByText(/book value/i)).not.toBeInTheDocument()
+  })
+
+  it('still renders the Refresh prices sidebar control', () => {
+    renderShell()
+    expect(screen.getByText(/refresh prices/i)).toBeInTheDocument()
+  })
+
+  it('shows the Local/Demo banner and mobile badge when backend is local', () => {
+    renderShell({ overrides: { backend: 'local', booting: false } })
+    expect(screen.getByText(/local \/ demo portfolio/i)).toBeInTheDocument()
+    expect(screen.getByText('Local')).toBeInTheDocument()
+  })
+
+  it('does not show the Local/Demo banner when backend is supabase', () => {
+    renderShell({ overrides: { backend: 'supabase', booting: false } })
+    expect(screen.queryByText(/local \/ demo portfolio/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the boot skeleton instead of routed content while booting', () => {
+    renderShell({ overrides: { booting: true } })
+    expect(screen.getByRole('status', { name: /loading portfolio/i })).toBeInTheDocument()
+    expect(screen.queryByText('Today content')).not.toBeInTheDocument()
+  })
+})

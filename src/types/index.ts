@@ -56,6 +56,22 @@ export interface PortfolioEvent {
   source?: string
   /** Optional notes from data provider */
   description?: string
+  /**
+   * Raw provider payload as stored by sync-events (Finnhub's earnings-calendar
+   * row for `earnings` events today). Only earningsIntel.ts's
+   * earningsFactsFromRaw() interprets this shape — kept opaque here so this
+   * generic event type doesn't grow a Finnhub-specific dependency.
+   */
+  raw?: Record<string, unknown> | null
+  updatedAt?: string
+  /**
+   * `events.ai_interpretation` (BE-06) — a DeepSeek-generated structured
+   * interpretation, written only by the `earnings-interpret` Edge Function
+   * after strict schema validation. Kept opaque here for the same reason as
+   * `raw`: only earningsIntel.ts's interpretationFromRaw() parses this shape,
+   * and re-validates it on read rather than trusting the stored value.
+   */
+  interpretation?: Record<string, unknown> | null
 }
 
 export interface ScoredEvent extends PortfolioEvent {
