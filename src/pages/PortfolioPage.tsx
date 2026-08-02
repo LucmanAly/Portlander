@@ -4,12 +4,15 @@ import {
   holdingMarketValue,
   portfolioDayChange,
   portfolioDayChangePct,
+  portfolioTotalGainLoss,
+  portfolioTotalGainLossPct,
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
 } from '@/lib/scoring'
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
+import { Stat } from '@/components/ui/Stat'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Search, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
@@ -49,8 +52,16 @@ export function PortfolioPage() {
   const weightBasis = portfolioWeightBasis(holdings)
   const dayChange = portfolioDayChange(holdings)
   const dayChangePct = portfolioDayChangePct(holdings)
-  const dayChangeClass =
-    dayChange == null ? 'text-ink-300' : dayChange >= 0 ? 'text-positive' : 'text-critical'
+  const dayChangeAccent: 'default' | 'positive' | 'critical' =
+    dayChange == null ? 'default' : dayChange >= 0 ? 'positive' : 'critical'
+
+  // Whole-book total gain/loss only when every position has both a live price
+  // and a cost basis — a book with even one incomplete position shows an
+  // honest "—" rather than a total that quietly excludes that position.
+  const totalGain = portfolioTotalGainLoss(holdings)
+  const totalGainPct = portfolioTotalGainLossPct(holdings)
+  const totalGainAccent: 'default' | 'positive' | 'critical' =
+    totalGain == null ? 'default' : totalGain >= 0 ? 'positive' : 'critical'
 
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<HoldingSource | 'all'>('all')
@@ -185,17 +196,27 @@ export function PortfolioPage() {
             Your holdings and today’s move at a glance. Management tools live below the table.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
-          <SummaryMetric label="Total value" value={formatMoney(total)} />
-          <SummaryMetric
+        <div className="grid grid-cols-2 gap-3 sm:min-w-[540px] sm:grid-cols-3">
+          <Stat label="Total value" value={formatMoney(total)} />
+          <Stat
             label="Today’s change"
             value={dayChange == null ? '—' : `${dayChange >= 0 ? '+' : ''}${formatMoney(dayChange)}`}
-            detail={
+            hint={
               dayChangePct == null
                 ? 'Refresh prices to calculate'
                 : `${dayChangePct >= 0 ? '+' : ''}${formatPct(dayChangePct)} today`
             }
-            valueClassName={dayChangeClass}
+            accent={dayChangeAccent}
+          />
+          <Stat
+            label="Total gain/loss"
+            value={totalGain == null ? '—' : `${totalGain >= 0 ? '+' : ''}${formatMoney(totalGain)}`}
+            hint={
+              totalGainPct == null
+                ? 'Add cost basis to every position to calculate'
+                : `${totalGainPct >= 0 ? '+' : ''}${formatPct(totalGainPct)} since cost basis`
+            }
+            accent={totalGainAccent}
           />
         </div>
       </header>
@@ -216,7 +237,7 @@ export function PortfolioPage() {
         className="surface-elevated space-y-5 rounded-2xl p-5"
       >
         <div>
-          <h2 id="manage-holdings" className="text-sm font-semibold uppercase tracking-wider text-ink-500">
+          <h2 id="manage-holdings" className="text-sm font-semibold text-ink-450">
             Manage holdings
           </h2>
           <p className="mt-1 text-sm text-ink-400">
@@ -253,7 +274,7 @@ export function PortfolioPage() {
 
         {csvInfo ? <p className="text-sm text-accent-400">{csvInfo}</p> : null}
         {csvError ? <p className="text-sm text-critical">{csvError}</p> : null}
-        <p className="text-xs text-ink-500">
+        <p className="text-xs text-ink-450">
           CSV headers: <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
         </p>
 
@@ -262,7 +283,7 @@ export function PortfolioPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-ink-100">Import preview</h3>
-                <p className="mt-1 text-xs text-ink-500">
+                <p className="mt-1 text-xs text-ink-450">
                   Review the changes before writing them to your portfolio.
                 </p>
               </div>
@@ -284,28 +305,28 @@ export function PortfolioPage() {
                 ))}
               </div>
             </div>
-            <p className="text-xs text-ink-500">
+            <p className="text-xs text-ink-450">
               {csvMode === 'merge'
                 ? 'Adds or updates CSV rows by ticker. Existing rows the CSV does not mention stay unchanged.'
                 : 'CSV rows replace existing manual and CSV rows. Brokerage-synced rows are protected.'}
             </p>
             <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <div>
-                <dt className="text-ink-500">Imported</dt>
+                <dt className="text-ink-450">Imported</dt>
                 <dd className="tabular font-medium text-ink-100">{csvPlan.imported}</dd>
               </div>
               <div>
-                <dt className="text-ink-500">Removed</dt>
+                <dt className="text-ink-450">Removed</dt>
                 <dd className={clsx('tabular font-medium', csvPlan.replaced ? 'text-critical' : 'text-ink-100')}>
                   {csvPlan.replaced}
                 </dd>
               </div>
               <div>
-                <dt className="text-ink-500">Synced protected</dt>
+                <dt className="text-ink-450">Synced protected</dt>
                 <dd className="tabular font-medium text-ink-100">{csvPlan.protectedSynced}</dd>
               </div>
               <div>
-                <dt className="text-ink-500">Skipped</dt>
+                <dt className="text-ink-450">Skipped</dt>
                 <dd className="tabular font-medium text-ink-100">{csvPlan.skipped}</dd>
               </div>
             </dl>
@@ -384,12 +405,12 @@ export function PortfolioPage() {
 
         <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
           <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
-            <Search className="h-4 w-4 shrink-0 text-ink-500" />
+            <Search className="h-4 w-4 shrink-0 text-ink-450" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search ticker or name"
-              className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
+              className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-450 focus:outline-none"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -454,7 +475,7 @@ export function PortfolioPage() {
         </form>
         <div className="flex flex-wrap gap-2">
           {watchlist.length === 0 ? (
-            <p className="text-sm text-ink-500">No watchlist tickers.</p>
+            <p className="text-sm text-ink-450">No watchlist tickers.</p>
           ) : (
             watchlist.map((w) => (
               <span
@@ -462,10 +483,10 @@ export function PortfolioPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-ink-850 px-3 py-1.5 text-sm ring-1 ring-border"
               >
                 <span className="font-medium text-accent-400">{w.ticker}</span>
-                {w.name ? <span className="text-ink-500">{w.name}</span> : null}
+                {w.name ? <span className="text-ink-450">{w.name}</span> : null}
                 <button
                   type="button"
-                  className="text-ink-500 hover:text-critical"
+                  className="text-ink-450 hover:text-critical"
                   onClick={() => removeWatchlist(w.id)}
                   aria-label={`Remove ${w.ticker}`}
                 >
@@ -480,30 +501,10 @@ export function PortfolioPage() {
   )
 }
 
-function SummaryMetric({
-  label,
-  value,
-  detail,
-  valueClassName = 'text-ink-100',
-}: {
-  label: string
-  value: string
-  detail?: string
-  valueClassName?: string
-}) {
-  return (
-    <div className="surface-elevated min-w-0 rounded-2xl px-4 py-3">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-ink-500">{label}</div>
-      <div className={clsx('mt-1 truncate text-xl font-semibold tabular', valueClassName)}>{value}</div>
-      {detail ? <div className="mt-0.5 truncate text-xs text-ink-500">{detail}</div> : null}
-    </div>
-  )
-}
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-ink-500">{label}</span>
+      <span className="text-xs font-medium text-ink-450">{label}</span>
       {children}
     </label>
   )

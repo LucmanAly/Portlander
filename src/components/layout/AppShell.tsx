@@ -1,19 +1,20 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import clsx from 'clsx'
-import { CalendarDays, CloudOff, LayoutDashboard, Briefcase, Settings } from 'lucide-react'
+import { CalendarDays, CloudOff, LayoutDashboard, TrendingUp, Briefcase, Settings } from 'lucide-react'
 import { usePortfolio } from '@/context/PortfolioContext'
-import { formatMoney, formatRelativeSync } from '@/lib/format'
+import { formatMoney } from '@/lib/format'
 import { RefreshQuotesButton } from '@/components/layout/RefreshQuotesButton'
 
 const nav = [
   { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
+  { to: '/earnings', label: 'Earnings', icon: TrendingUp },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function AppShell() {
-  const { exposure, lastSyncAt, holdings, backend, booting, remoteError } = usePortfolio()
+  const { exposure, backend, booting, remoteError } = usePortfolio()
 
   return (
     <div className="flex min-h-dvh">
@@ -29,7 +30,7 @@ export function AppShell() {
               <div
                 className={clsx(
                   'text-[11px]',
-                  !booting && backend === 'local' ? 'text-amber-300' : 'text-ink-500',
+                  !booting && backend === 'local' ? 'text-amber-300' : 'text-ink-450',
                 )}
               >
                 {booting ? 'Loading…' : backend === 'supabase' ? 'Cloud sync' : 'Local / demo'}
@@ -66,26 +67,6 @@ export function AppShell() {
 
         <div className="mt-auto">
           <RefreshQuotesButton variant="sidebar" />
-          <div className="surface rounded-xl p-3">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-ink-500">
-              Book value
-            </div>
-            {booting ? (
-              <div className="mt-2 space-y-2" aria-label="Loading portfolio summary">
-                <div className="h-5 w-28 animate-pulse rounded bg-ink-700" />
-                <div className="h-3 w-36 animate-pulse rounded bg-ink-800" />
-              </div>
-            ) : (
-              <>
-                <div className="tabular mt-1 text-lg font-semibold text-ink-100">
-                  {formatMoney(exposure.totalPortfolioValue)}
-                </div>
-                <div className="mt-1 text-xs text-ink-500">
-                  {holdings.length} holdings · {formatRelativeSync(lastSyncAt)}
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </aside>
 
@@ -147,8 +128,9 @@ export function AppShell() {
           </div>
         </main>
 
-        {/* Mobile bottom nav */}
-        <nav className="surface sticky bottom-0 z-20 grid grid-cols-4 border-t border-border lg:hidden">
+        {/* Mobile bottom nav. pb includes the safe-area inset so the row isn't
+            obscured by the home indicator on notched phones. */}
+        <nav className="surface sticky bottom-0 z-20 grid grid-cols-5 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden">
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -157,7 +139,7 @@ export function AppShell() {
               className={({ isActive }) =>
                 clsx(
                   'flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium',
-                  isActive ? 'text-accent-400' : 'text-ink-500',
+                  isActive ? 'text-accent-400' : 'text-ink-450',
                 )
               }
             >

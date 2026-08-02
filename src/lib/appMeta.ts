@@ -7,7 +7,7 @@
  */
 export const APP_VERSION = '1.0'
 export const APP_PHASE = 'Phase 1 · Foundation'
-export const APP_LAST_UPDATED = '2026-08-01T22:10:00Z'
+export const APP_LAST_UPDATED = '2026-08-01T22:51:27Z'
 
 export function formatAppUpdatedAt(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {

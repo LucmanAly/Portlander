@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeExposure,
+  hasNoPriceData,
   holdingMarketValue,
   isEstimatedValue,
   portfolioDayChange,
   portfolioDayChangePct,
+  portfolioTotalGainLoss,
+  portfolioTotalGainLossPct,
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
@@ -58,8 +61,17 @@ describe('market value and weights', () => {
     expect(isEstimatedValue(holding('AAA', 10, 5))).toBe(false)
   })
 
-  it('treats a holding with neither price nor cost as worthless', () => {
+  it('holdingMarketValue treats a holding with neither price nor cost as $0 for totals/weights math', () => {
     expect(holdingMarketValue(holding('AAA', 10))).toBe(0)
+  })
+
+  // UX-09: that $0 is a real number for totals/weights, but display code must not
+  // present it as "this position is worth nothing" — hasNoPriceData flags the case
+  // so the UI can show an honest unknown state instead of a fabricated $0.00.
+  it('hasNoPriceData flags a holding with neither price nor cost basis', () => {
+    expect(hasNoPriceData(holding('AAA', 10))).toBe(true)
+    expect(hasNoPriceData(holding('AAA', 10, 5))).toBe(false)
+    expect(hasNoPriceData(holding('AAA', 10, undefined, { costBasis: 4 }))).toBe(false)
   })
 
   it('computes weight as a share of the portfolio total', () => {
@@ -124,6 +136,34 @@ describe('portfolio day change', () => {
   it('does not report a move for an empty book', () => {
     expect(portfolioDayChange([])).toBeUndefined()
     expect(portfolioDayChangePct([])).toBeUndefined()
+  })
+})
+
+describe('portfolio total gain/loss', () => {
+  it('calculates the whole-book unrealized gain/loss since cost basis', () => {
+    const book = [
+      holding('AAA', 10, 110, { costBasis: 100 }), // +100
+      holding('BBB', 5, 40, { costBasis: 50 }), // -50
+    ]
+
+    expect(portfolioTotalGainLoss(book)).toBe(50)
+    expect(portfolioTotalGainLossPct(book)).toBeCloseTo((50 / (10 * 100 + 5 * 50)) * 100, 8)
+  })
+
+  it('does not report a total when any position is missing cost basis (39/40-position book)', () => {
+    const book = [holding('AAA', 10, 110, { costBasis: 100 }), holding('BBB', 5, 40)]
+    expect(portfolioTotalGainLoss(book)).toBeUndefined()
+    expect(portfolioTotalGainLossPct(book)).toBeUndefined()
+  })
+
+  it('does not report a total when any position is missing a live price', () => {
+    const book = [holding('AAA', 10, undefined, { costBasis: 100 }), holding('BBB', 5, 40, { costBasis: 50 })]
+    expect(portfolioTotalGainLoss(book)).toBeUndefined()
+  })
+
+  it('does not report a total for an empty book', () => {
+    expect(portfolioTotalGainLoss([])).toBeUndefined()
+    expect(portfolioTotalGainLossPct([])).toBeUndefined()
   })
 })
 

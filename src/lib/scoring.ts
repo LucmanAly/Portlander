@@ -42,6 +42,17 @@ export function isEstimatedValue(h: Holding): boolean {
   return h.lastPrice == null && h.costBasis != null
 }
 
+/**
+ * True when a position has neither an observed price nor a cost basis to fall
+ * back to — holdingMarketValue silently returns 0 for shares × $0 in this
+ * case, which reads as "this position is worth nothing" rather than "value
+ * unknown." Callers displaying market value per-row should check this first
+ * and render an honest unknown state instead of a fabricated $0.00.
+ */
+export function hasNoPriceData(h: Holding): boolean {
+  return h.lastPrice == null && h.costBasis == null
+}
+
 export function portfolioTotalValue(holdings: Holding[]): number {
   return holdings.reduce((sum, h) => sum + holdingMarketValue(h), 0)
 }
@@ -165,6 +176,31 @@ export function holdingTotalGainLoss(h: Holding): number | undefined {
 export function holdingTotalGainLossPct(h: Holding): number | undefined {
   if (h.lastPrice == null || h.costBasis == null || h.costBasis === 0) return undefined
   return ((h.lastPrice - h.costBasis) / h.costBasis) * 100
+}
+
+/** True when a position has both an observed price and a cost basis to diff against. */
+function hasCompleteCostBasis(h: Holding): boolean {
+  return h.lastPrice != null && Number.isFinite(h.lastPrice) && h.costBasis != null && Number.isFinite(h.costBasis)
+}
+
+/**
+ * Whole-book unrealized gain/loss since cost basis. Same all-or-nothing honesty
+ * as portfolioDayChange: if even one position is missing a live price or cost
+ * basis, the total is unavailable rather than a partial number presented as
+ * complete — a book that's 39/41 priced is not "the portfolio is up $X".
+ */
+export function portfolioTotalGainLoss(holdings: Holding[]): number | undefined {
+  if (holdings.length === 0 || !holdings.every(hasCompleteCostBasis)) return undefined
+  return holdings.reduce((sum, h) => sum + (holdingTotalGainLoss(h) ?? 0), 0)
+}
+
+/** Whole-book unrealized gain/loss (%) since cost basis — total gain over total cost basis. */
+export function portfolioTotalGainLossPct(holdings: Holding[]): number | undefined {
+  const gain = portfolioTotalGainLoss(holdings)
+  if (gain == null) return undefined
+  const totalCostBasis = holdings.reduce((sum, h) => sum + (h.costBasis as number) * h.shares, 0)
+  if (!Number.isFinite(totalCostBasis) || totalCostBasis <= 0) return undefined
+  return (gain / totalCostBasis) * 100
 }
 
 function recencyBoost(eventDate: string, today = startOfDay(new Date())): number {
