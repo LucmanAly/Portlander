@@ -15,7 +15,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Area | Status | Notes |
 |------|--------|-------|
 | Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
-| Settings diagnostics + release metadata | ✅ Done on `develop` | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
+| Settings diagnostics + release metadata | ✅ Done on `main` (`v1.0`) | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
 | `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
@@ -40,7 +40,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 - [ ] Phase 1 exit criteria formally signed off:
   - [x] Real portfolio loadable; earnings from Finnhub, not demo offsets
   - [ ] Weight ranking + exposure % sanity (math unchanged, not yet owner-verified)
-  - [ ] Snappy UI (fixes live on `develop`, awaiting confirmation)
+  - [ ] Snappy UI (fixes live on `main`, awaiting confirmation)
   - [ ] Used on a real morning once
 
 ### SnapTrade (new scope, not in original AGENTS.md plan)
@@ -172,7 +172,8 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 
 ## Next up (ordered)
 
-1. **Agent:** claim and implement `UX-01` from the master queue on `develop`.
+1. **Agent:** implementing `UX-01`–`UX-05` from the master queue on `develop` in one working
+   session (this session), as five stacked PRs.
 2. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
    the deployed `v1.0` build.
 3. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
@@ -199,6 +200,7 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 | 2026-08-02 | Phase 2 is the event-intelligence overhaul; the old Phase 2/3 roadmaps are canceled | The Magic Patterns prototype is the visual baseline, refined through `UX-01`–`UX-11`. Finnhub/provider data remains the source of financial facts; DeepSeek is limited to labeled structured interpretation after the UI/data contracts are truthful. |
 | 2026-08-02 | UI work uses a single claim-and-advance queue | `NEXT_TASK` and `ACTIVE_CLAIM` make the next safe task explicit for every new agent. One focused queue item per PR prevents parallel agents from silently duplicating or skipping work. |
 | 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
+| 2026-08-01 | Phase 1 v1.0 promoted to `main` | PR #25 merged `develop` into `main` after CI run #24 passed build, lint, and test; the production-only SnapTrade error-detail commits already on `main` were preserved |
 | 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
 | 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
 | 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
@@ -228,11 +230,17 @@ Keep entries short — a few bullets, key files, PR/commit pointer for detail. D
 - Added the ordered `UX-01`–`UX-11` overhaul queue plus mandatory `NEXT_TASK` / `ACTIVE_CLAIM` handoff protocol.
 - Corrected current status: Phase 1 `v1.0` was promoted to `main` in PRs #25/#26; manual production acceptance checks remain open.
 
+### 2026-08-01 — codex (session 18)
+- PR #25 promoted `develop` into `main` as the Phase 1 `v1.0` release; the main-targeted CI run (#24) passed build, lint, and test.
+- Preserved the two production-only SnapTrade error-detail commits already on `main`.
+- Settings release metadata records the promotion timestamp `2026-08-01T22:51:27Z` (formatted for Eastern Time).
+- Remaining Phase 1 work is owner acceptance: brokerage connect/sync, Refresh prices, real-book weight/exposure sanity, sign-out clearing, mobile check, and one real morning.
+
 ### 2026-08-01 — codex (session 17)
 - Portfolio now opens on the holdings table with total value plus whole-book daily dollar and percentage change; incomplete price refreshes show an honest unavailable state.
 - Moved CSV import/export, add/update, search, source filters, and sorting below the table.
 - Replaced arrow-based desktop column ordering with native drag-and-drop rows; visibility toggles remain beside each column.
-- This remains part of the Phase 1 v1.0 candidate on `develop`; production `main`/Netlify is unchanged.
+- This became the Phase 1 v1.0 candidate promoted in session 18.
 
 ### 2026-08-01 — codex (session 16)
 - Settings refactor: added a single Diagnostics card with live Backend/Auth/Positions/Prices/Events status rows, surfaced error details, and reload/price-check actions.
