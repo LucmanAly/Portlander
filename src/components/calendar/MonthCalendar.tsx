@@ -146,10 +146,19 @@ export function MonthCalendar({ events }: { events: ScoredEvent[] }) {
                   <div
                     key={e.id}
                     className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
-                    title={e.title}
+                    title={e.ticker ?? e.title}
                   >
                     <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} />
-                    <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
+                    {/* Below `sm`, a day cell is ~35-40px of usable width — too narrow for a
+                        4-5 char ticker plus the dot without truncating to one letter (e.g. MSFT
+                        and META both collapsing to "M"). Dot-only on mobile; the always-visible
+                        Agenda list below has the full names with room to spare. */}
+                    <span
+                      className={clsx(
+                        'hidden min-w-0 flex-1 truncate sm:inline',
+                        timingTextTone(e),
+                      )}
+                    >
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
                   </div>
