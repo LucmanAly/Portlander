@@ -1,117 +1,74 @@
-# Phase 2 planning — sequencing brainstorm
+# Phase 2 ("Signal") — sequencing
 
-**Status:** brainstorm only. No option below is chosen. Owner picks one (or
-mixes stages from more than one) before the first Phase 2 PR opens.
+**Status:** the "3 brainstormed sequencing options" version of this doc
+(2026-08-01, session 19) is superseded. After a design discussion with the
+owner, Phase 2's scope itself changed — see `AGENTS.md`'s "Three-phase
+program" section for the authoritative definition, and `PROGRESS.md`
+Decisions for why. This doc now holds the concrete build order, not
+alternatives to choose between.
 
-Authoritative Phase 2 scope (from `AGENTS.md`, "Ritual"): prep cards,
-checklists, post-earnings journal, tags, T-7/T-1 email, watchlist on
-calendar, week view polish, cluster strip v0, command palette (optional).
-Every item below traces back to that list — nothing added, nothing dropped.
+Phase 3 ("Intelligence") scope, provider decision, and AI architecture live
+in `docs/AI.md` — Phase 2 ships no AI features at all.
+
+---
+
+## Build order (smallest / cheapest / most-unblocked first)
+
+### 1. Structured earnings expectations + actuals + beat/miss — recommended first PR
+
+Finnhub's `/calendar/earnings` call (`supabase/functions/sync-events/index.ts`)
+already returns `epsEstimate`, `epsActual`, `revenueEstimate`, `revenueActual`
+per row — today they're only used to flip `status` between `confirmed` and
+`estimated`, then get partially summarized into the free-text `description`
+(revenue is dropped from that summary entirely) and otherwise sit unused
+inside the `raw jsonb` column.
+
+- Add structured columns to `events` (or promote the existing values out of
+  `raw` into dedicated columns) for eps/revenue estimate + actual.
+- Add the same fields to `PortfolioEvent` in `src/types/index.ts`.
+- Compute beat/miss % locally (no AI) and show it on `EventCard`.
+- **No new external API call** — this unlocks data already being fetched
+  and stored.
+
+### 2. PEG snapshot per holding
+
+- New Finnhub call for PE ratio + growth estimate (`/stock/metric` — not
+  currently integrated; verify the free-tier endpoint and rate limit before
+  committing to it).
+- Compute PEG locally, no AI.
+- Show on `EventCard`/`PortfolioTable` so "expensive vs. cheap going into
+  the print" is visible at a glance, matching how the owner already
+  evaluates positions manually.
+
+### 3. Thesis field on Holding
+
+- Add a `thesis` text column to `holdings` (2-line freeform, e.g. "CRWD:
+  platform consolidation winner, holding while ARR growth >25%").
+- UI to write/edit it (Portfolio page, alongside the existing `notes`
+  field).
+- Capture only in Phase 2 — no AI processing here. This is the schema hook
+  Phase 3's thesis-drift-detection feature reads from.
+
+### 4. Watchlist on calendar + week view polish
+
+- Extend `MonthCalendar`/`CalendarPage` to show watchlist-only tickers
+  (not just held positions), visually distinguished from held-position
+  events.
+- Add a week view mode alongside the existing month view.
+- Both are UI-only extensions of existing components — cheap, no schema
+  changes, no AI.
 
 ---
 
 ## What Phase 2 delivers at the end
 
-The full "Ritual" promise: a repeatable pre/post-earnings routine layered on
-top of Phase 1's ranked calendar —
+Every earnings card shows what was expected, what happened, and whether the
+beat/miss was big or small — plus whether the position was cheap or
+expensive going in (PEG), a place to record why you own it (thesis), and a
+calendar that shows what you're watching, not just what you hold. All of it
+computed locally, no LLM calls, no new privacy surface.
 
-- **Prep cards** on upcoming high-impact events, with **checklists** (what to
-  check before the print: guidance history, options skew, thesis notes)
-- A **post-earnings journal** to record what happened vs. what you expected
-- **Tags** to organize holdings/events/journal entries by theme or thesis
-- **T-7/T-1 email** reminders so prep isn't missed
-- **Watchlist tickers on the calendar**, not just held positions
-- A polished **week view** alongside the existing month view
-- A first-cut **cluster strip** grouping same-week catalysts
-- Optionally, a **command palette** for keyboard-first navigation
-
-Per `AGENTS.md`'s versioning policy, Phase 2's final release ships as `v2.0`.
-Everything before that final release ships as `1.x` minor bumps (each
-shippable slice is a real release, not one big-bang merge).
-
----
-
-## Option A — Ritual loop first (build the habit, then decorate it)
-
-Build the actual daily/weekly ritual the phase is named for before anything
-else, since every later item either feeds it or is optional polish.
-
-1. **Post-earnings journal** — new data model (entries linked to
-   ticker/event: freeform notes + outcome tag). Foundational; nothing else
-   in this phase strictly needs it, but it's the smallest new-table lift.
-2. **Prep cards + checklists** — pre-earnings card summarizing what to
-   check, with a per-event checklist. Reuses the journal's event-linking.
-3. **Tags** — cross-cutting taxonomy applied to holdings/events/journal
-   entries; easier to retrofit now (2 or 3 features to attach to) than after
-   the full list exists.
-4. **T-7/T-1 email alerts** — needs email infra (a provider like Resend +
-   an Edge Function/cron). Biggest infra lift in the phase; comes after the
-   ritual it's reminding you about already exists.
-5. **Watchlist on calendar** — extend `MonthCalendar`/`CalendarPage` to
-   include watchlist-only tickers.
-6. **Week view polish** — new view mode on the same Calendar data.
-7. **Cluster strip v0** — grouping logic over existing event data.
-8. **Command palette (optional)** — pure UX, cross-cutting keyboard nav;
-   last since it depends on nothing and blocks nothing.
-
-**Trade-off:** the biggest, riskiest pieces (journal, prep cards) ship
-first, before there's a quick visible win to point to.
-
----
-
-## Option B — Quick UI wins first, infra last
-
-Ship visible value fast and build momentum; defer the heaviest lift (email)
-until there's a real ritual for it to remind people about.
-
-1. **Watchlist on calendar** — small: extend an existing component.
-2. **Week view polish** — small: new view mode, same data source.
-3. **Cluster strip v0** — moderate: grouping over existing event data, no
-   new schema.
-4. **Tags** — moderate: new schema + UI to add/filter by tag.
-5. **Prep cards + checklists** — moderate/large: new data model, new
-   page/section.
-6. **Post-earnings journal** — large: new data model, likely reuses prep
-   card infra from step 5.
-7. **T-7/T-1 email alerts** — large: email service integration + cron.
-8. **Command palette (optional)** — last, pure polish.
-
-**Trade-off:** the "Ritual" habit loop (prep → journal) doesn't exist until
-late in the phase, even though it's the phase's namesake feature.
-
----
-
-## Option C — Infra-first (alerts early)
-
-If reminders are the most-wanted feature — nudges before you forget an
-earnings date — stand up the email plumbing first; it's also reusable for
-Phase 3's daily briefing.
-
-1. **T-7/T-1 email alerts** — sets up email infra (provider + Edge Function
-   + cron) that later phases (Phase 3's daily briefing) can reuse.
-2. **Watchlist on calendar** + **week view polish** — small UI additions
-   that pair naturally with alerts (more to get alerted about, more views
-   to see it in).
-3. **Tags** — cross-cutting taxonomy before building prep cards on top of
-   it, so tags don't need retrofitting later.
-4. **Prep cards + checklists**
-5. **Post-earnings journal**
-6. **Cluster strip v0**
-7. **Command palette (optional)** — last.
-
-**Trade-off:** front-loads new external-service risk (email deliverability,
-provider setup, secrets) before any of the ritual UI exists to validate
-demand for it.
-
----
-
-## Comparison at a glance
-
-| | First thing shipped | Biggest lift deferred to | Best if... |
-|---|---|---|---|
-| **A — Ritual first** | Post-earnings journal | Email alerts (step 4) | You want the core habit loop working end-to-end ASAP, even before polish |
-| **B — Quick wins first** | Watchlist on calendar | Email alerts (step 7) | You want visible progress every session; comfortable with the "ritual" landing late |
-| **C — Infra first** | T-7/T-1 email alerts | Journal (step 5) | Reminders/alerts are the single most-wanted feature; email infra is worth building once |
-
-All three end at the same place: full "Ritual" scope, `v2.0`. The
-difference is only what ships in what order.
+Ships as `v2.0` per `AGENTS.md`'s versioning policy (phase-final releases
+get major version bumps). Phase 3's AI-driven features (thesis drift,
+morning briefing, "what moved it," guidance summaries) wait until this
+phase is complete, per `AGENTS.md`'s "don't jump phases" rule.

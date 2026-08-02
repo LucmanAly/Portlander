@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-08-01
 **Last agent:** claude (session 19)
-**Current phase:** Phase 2 planning — Phase 1 `v1.0` formally signed off 2026-08-01 (owner confirmed real-book weight/exposure sanity, snappy UI on the live `main` build, one real morning of use, and a completed "Connect brokerage" → Fidelity → sync test). See `docs/PLAN-PHASE-2.md` for Phase 2 sequencing options; no Phase 2 work has started yet.
+**Current phase:** Phase 2 planning — Phase 1 `v1.0` formally signed off 2026-08-01. Phase 2/3 scope redefined the same day around earnings intelligence (see Decisions): Phase 2 "Signal" (structured earnings expectations/actuals, PEG, thesis capture, watchlist-on-calendar, week view — no AI) and Phase 3 "Intelligence" (thesis drift, morning briefing, "what moved it," guidance summaries — DeepSeek). Build order in `docs/PLAN-PHASE-2.md`; AI architecture/data-boundary rules in `docs/AI.md`. No Phase 2 code has been written yet.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -48,11 +48,13 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 ## Next up (ordered)
 
-1. **Owner:** pick a Phase 2 sequencing option from `docs/PLAN-PHASE-2.md` (or mix them) — nothing is scoped yet beyond that brainstorm.
-2. Once an option is picked, the first PR follows AGENTS.md's normal workflow (branch off `develop`, PR into `develop`, promote to `main` when ready to ship).
-3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
+1. **Phase 2 step 1** (`docs/PLAN-PHASE-2.md`): surface Finnhub's already-fetched EPS/revenue estimates + actuals as structured fields on `events`/`PortfolioEvent`, compute beat/miss % locally, show on `EventCard`. No new API call — smallest, most-unblocked next PR.
+2. **Phase 2 step 2**: PEG snapshot per holding — new Finnhub PE + growth call (`/stock/metric`, not yet integrated; Finnhub free tier verified at 60 calls/min, no daily cap, so rate limit isn't a blocker for ~40 tickers).
+3. **Phase 2 steps 3–4**: thesis field on `Holding`; watchlist-on-calendar + week view polish.
+4. Follow AGENTS.md's normal workflow for each (branch off `develop`, PR into `develop`, promote to `main` when ready to ship).
+5. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
 
-**Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
+Phase 3 (AI features — thesis drift, morning briefing, "what moved it," guidance summaries) is scoped in `docs/AI.md` but gated behind Phase 2 shipping — don't start it early.
 
 ---
 
@@ -68,6 +70,8 @@ None outstanding.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-01 | Phase 2/3 redefined around earnings intelligence ("Signal"/"Intelligence"), replacing the original generic "Ritual" scope | Owner + Fable 5 design discussion: prep cards/journal/tags/alerts were generic productivity features written before the app existed. New Phase 2 = structured earnings expectations/actuals, beat/miss, PEG, thesis capture, watchlist-on-calendar, week view (all non-AI, mostly unlocking data already fetched). New Phase 3 = thesis drift detection, morning briefing, "what moved it" notes, guidance summaries (all AI, gated behind Phase 2). Old Phase 2 items tags/generic-journal/T-7-T-1-email/cluster-strip/command-palette are dropped; watchlist-on-calendar/week-view kept. Full detail: `AGENTS.md`, `docs/PLAN-PHASE-2.md`, `docs/AI.md` |
+| 2026-08-01 | AI provider: DeepSeek (PRC-hosted), resurrecting the deferred `docs/AI.md` plan; position-data boundary loosened for exactly one feature | Owner explicitly accepted sending `ticker + weight% + event dates` (never dollar/share data) to DeepSeek for the morning-briefing feature only; every other AI feature keeps the original strict no-position-data rule. Guidance summaries and "what moved it" notes use web-search LLM calls instead of a paid Finnhub transcript tier |
 | 2026-08-01 | Phase 1 exit criteria marked formally met; Phase 2 planning opened | Owner directly confirmed all four remaining criteria (real-book weight/exposure sanity, snappy UI on live `main`, one real morning of use, completed brokerage connect→sync) rather than a fresh in-app click-through session. Per AGENTS.md/ROADMAP.md, Phase 2 work may now begin; `docs/PLAN-PHASE-2.md` holds sequencing options, none chosen yet |
 | 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
 | 2026-08-01 | Phase 1 v1.0 promoted to `main` | PR #25 merged `develop` into `main` after CI run #24 passed build, lint, and test; the production-only SnapTrade error-detail commits already on `main` were preserved |
@@ -97,7 +101,8 @@ Keep entries short — a few bullets, key files, PR/commit pointer for detail. D
 
 ### 2026-08-01 — claude (session 19)
 - Owner confirmed the live `main` build directly (real-book weight/exposure sanity, snappy UI, one real morning of use, completed brokerage connect→sync); marked all 4 remaining Phase 1 exit-criteria boxes met and closed the SnapTrade click-test item.
-- Added `docs/PLAN-PHASE-2.md`: three brainstormed sequencing options for Phase 2's scoped items (ritual-first, quick-UI-wins-first, infra/alerts-first). No option chosen — owner decides next.
+- Added `docs/PLAN-PHASE-2.md`: three brainstormed sequencing options for Phase 2's original "Ritual" scope. Superseded later this session — see below.
+- Owner + Fable 5 design discussion redefined Phase 2/3 around earnings intelligence instead of generic productivity features. Rewrote `AGENTS.md`'s Three-phase program (Phase 2 → "Signal", Phase 3 → "Intelligence" redefined), `docs/ROADMAP.md`, and `docs/PLAN-PHASE-2.md` (now concrete build order, not options) to match. Wrote `docs/AI.md`, superseding the never-merged `claude/deepseek-api-integration-k9rwbp` branch's draft, updated for the owner's decisions: DeepSeek provider, position-data boundary loosened only for the morning briefing (ticker+weight%+dates), guidance summaries/"what moved it" via web search instead of paid transcripts.
 - No app code touched; docs-only.
 
 ### 2026-08-01 — codex (session 18)

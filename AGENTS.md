@@ -98,15 +98,35 @@ If you cannot finish a task, still update PROGRESS with partial state and blocke
 
 **Exit criteria:** real portfolio loadable; earnings visible; heavy weight ranks above tiny weight; exposure % sane; snappy UI; dogfood mornings.
 
-### Phase 2 — Ritual
+### Phase 2 — Signal (redefined 2026-08-01, supersedes the original "Ritual" scope)
 
-Prep cards, checklists, post-earnings journal, tags, T-7/T-1 email, watchlist on calendar, week view polish, cluster strip v0, command palette optional.
+**Promise:** Know what's expected, what happened, and whether it's cheap going in — no AI required.
 
-### Phase 3 — Intelligence
+**Scope:**
+- Structured earnings expectations vs. actuals (EPS + revenue, beat/miss %) — surfaced from data Finnhub's `/calendar/earnings` already returns (currently stuck in `events.raw`, unstructured)
+- PEG snapshot per holding — new Finnhub PE + growth call; pure math, no AI
+- Thesis field on `Holding` — freeform capture only in Phase 2; feeds Phase 3's drift detection
+- Watchlist tickers on the calendar, not just held positions
+- Week view polish alongside the existing month view
 
-Daily briefing, theme/indirect exposure, thesis tracker, risk radar, valuation/PEG snapshot, scenarios, PWA push, AI only on structured outputs.
+**Out of Phase 2** (cut in the 2026-08 reframe as generic productivity features, not finance-specific value): tags, a generic post-earnings journal, T-7/T-1 email alerts, cluster strip, command palette. AI features live in Phase 3, not here.
 
-Do not implement Phase 2/3 features unless Phase 1 exit criteria are marked met in PROGRESS.md, except for **schema hooks** that cost nothing (empty tables reserved in SQL is fine).
+**Exit criteria:** beat/miss visible on earnings cards; PEG shown per holding; thesis field usable; watchlist visible on calendar; week view shipped.
+
+### Phase 3 — Intelligence (redefined 2026-08-01)
+
+**Promise:** Judge fast, learn from patterns. AI only on structured or explicitly-labeled outputs — the "AI stock recommendations" non-goal still applies: the model explains and organizes events, it never has an opinion on a security.
+
+**Scope:**
+- Thesis drift detection — LLM classifies actual earnings results against your stated thesis (intact / weakening / broken); reads ticker + thesis text only, never position data
+- Morning briefing — one LLM call/day, ticker + weight % + upcoming event dates only (see `docs/AI.md`; this is the one feature allowed to touch weight data, capped to that)
+- Post-earnings "what moved it" notes — LLM + web search, rendered in a visually distinct trust-tier from Finnhub-sourced facts
+- Guidance summaries on earnings cards — LLM + web search (no paid transcript tier), same trust-tier treatment as above
+- Carried over from the original Phase 3 scope, lower priority than the above: theme/indirect exposure, risk radar, scenarios, PWA push
+
+Provider (DeepSeek), architecture (provider shim, `ai-enrich` Edge Function), and the position-data boundary rules live in `docs/AI.md` — read it before building anything in this phase.
+
+Do not implement Phase 2/3 features unless Phase 1 exit criteria are marked met in PROGRESS.md, except for **schema hooks** that cost nothing (empty tables reserved in SQL is fine). Phase 3's AI work additionally waits on Phase 2 ("Signal") shipping first.
 
 ---
 
