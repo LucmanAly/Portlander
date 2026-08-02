@@ -61,9 +61,20 @@ for this contrast level. Accent-colored eyebrow/kicker text (page headers, e.g. 
 radar") is a different, intentional pattern and keeps its existing all-caps `accent-500`
 styling — this convention only applies to neutral-toned micro-labels.
 
-As of UX-06 this has been applied to `Stat`, `PortfolioPage`'s `Field`, the shell nav, and
-Calendar's weekday headers/agenda heading — UX-07/08 still own the remaining sweeps on
-Portfolio/Settings.
+As of UX-07 this has been applied to `Stat`, `PortfolioPage`'s `Field`/"Manage holdings"
+heading, the shell nav, Calendar's weekday headers/agenda heading, and `PortfolioTable`'s
+header row/column-customization panel/mobile card labels — UX-08 still owns the Settings
+sweep.
+
+## Portfolio workspace (UX-07)
+
+- Summary grid is 3 stats: Total value, Today's change, Total gain/loss. The last is a new
+  whole-book figure (`portfolioTotalGainLoss`/`portfolioTotalGainLossPct` in `scoring.ts`) —
+  same all-or-nothing honesty as the existing day-change total: undefined (rendered as `—`)
+  unless every position has both a live price and a cost basis, never a partial sum presented
+  as complete.
+- Per-row provenance/freshness (source + last-updated) is a `title` tooltip on the Source
+  badge (`provenanceTitle()` in `PortfolioTable.tsx`) rather than a separate icon/date column.
 
 ## Quality bar
 

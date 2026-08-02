@@ -5,6 +5,8 @@ import {
   isEstimatedValue,
   portfolioDayChange,
   portfolioDayChangePct,
+  portfolioTotalGainLoss,
+  portfolioTotalGainLossPct,
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
@@ -124,6 +126,34 @@ describe('portfolio day change', () => {
   it('does not report a move for an empty book', () => {
     expect(portfolioDayChange([])).toBeUndefined()
     expect(portfolioDayChangePct([])).toBeUndefined()
+  })
+})
+
+describe('portfolio total gain/loss', () => {
+  it('calculates the whole-book unrealized gain/loss since cost basis', () => {
+    const book = [
+      holding('AAA', 10, 110, { costBasis: 100 }), // +100
+      holding('BBB', 5, 40, { costBasis: 50 }), // -50
+    ]
+
+    expect(portfolioTotalGainLoss(book)).toBe(50)
+    expect(portfolioTotalGainLossPct(book)).toBeCloseTo((50 / (10 * 100 + 5 * 50)) * 100, 8)
+  })
+
+  it('does not report a total when any position is missing cost basis (39/40-position book)', () => {
+    const book = [holding('AAA', 10, 110, { costBasis: 100 }), holding('BBB', 5, 40)]
+    expect(portfolioTotalGainLoss(book)).toBeUndefined()
+    expect(portfolioTotalGainLossPct(book)).toBeUndefined()
+  })
+
+  it('does not report a total when any position is missing a live price', () => {
+    const book = [holding('AAA', 10, undefined, { costBasis: 100 }), holding('BBB', 5, 40, { costBasis: 50 })]
+    expect(portfolioTotalGainLoss(book)).toBeUndefined()
+  })
+
+  it('does not report a total for an empty book', () => {
+    expect(portfolioTotalGainLoss([])).toBeUndefined()
+    expect(portfolioTotalGainLossPct([])).toBeUndefined()
   })
 })
 

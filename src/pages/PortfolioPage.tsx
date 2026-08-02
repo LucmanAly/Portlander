@@ -4,6 +4,8 @@ import {
   holdingMarketValue,
   portfolioDayChange,
   portfolioDayChangePct,
+  portfolioTotalGainLoss,
+  portfolioTotalGainLossPct,
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
@@ -52,6 +54,14 @@ export function PortfolioPage() {
   const dayChangePct = portfolioDayChangePct(holdings)
   const dayChangeAccent: 'default' | 'positive' | 'critical' =
     dayChange == null ? 'default' : dayChange >= 0 ? 'positive' : 'critical'
+
+  // Whole-book total gain/loss only when every position has both a live price
+  // and a cost basis — a book with even one incomplete position shows an
+  // honest "—" rather than a total that quietly excludes that position.
+  const totalGain = portfolioTotalGainLoss(holdings)
+  const totalGainPct = portfolioTotalGainLossPct(holdings)
+  const totalGainAccent: 'default' | 'positive' | 'critical' =
+    totalGain == null ? 'default' : totalGain >= 0 ? 'positive' : 'critical'
 
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState<HoldingSource | 'all'>('all')
@@ -186,7 +196,7 @@ export function PortfolioPage() {
             Your holdings and today’s move at a glance. Management tools live below the table.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:min-w-[360px]">
+        <div className="grid grid-cols-2 gap-3 sm:min-w-[540px] sm:grid-cols-3">
           <Stat label="Total value" value={formatMoney(total)} />
           <Stat
             label="Today’s change"
@@ -197,6 +207,16 @@ export function PortfolioPage() {
                 : `${dayChangePct >= 0 ? '+' : ''}${formatPct(dayChangePct)} today`
             }
             accent={dayChangeAccent}
+          />
+          <Stat
+            label="Total gain/loss"
+            value={totalGain == null ? '—' : `${totalGain >= 0 ? '+' : ''}${formatMoney(totalGain)}`}
+            hint={
+              totalGainPct == null
+                ? 'Add cost basis to every position to calculate'
+                : `${totalGainPct >= 0 ? '+' : ''}${formatPct(totalGainPct)} since cost basis`
+            }
+            accent={totalGainAccent}
           />
         </div>
       </header>
@@ -217,7 +237,7 @@ export function PortfolioPage() {
         className="surface-elevated space-y-5 rounded-2xl p-5"
       >
         <div>
-          <h2 id="manage-holdings" className="text-sm font-semibold uppercase tracking-wider text-ink-500">
+          <h2 id="manage-holdings" className="text-sm font-semibold text-ink-450">
             Manage holdings
           </h2>
           <p className="mt-1 text-sm text-ink-400">

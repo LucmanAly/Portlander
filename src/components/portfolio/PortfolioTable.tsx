@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { GripVertical, SlidersHorizontal, Trash2 } from 'lucide-react'
 import type { Holding } from '@/types'
-import { formatMoney, formatPct } from '@/lib/format'
+import { formatFullDate, formatMoney, formatPct } from '@/lib/format'
 import {
   holdingDayChange,
   holdingMarketValue,
@@ -18,6 +18,17 @@ const SOURCE_LABEL: Record<Holding['source'], string> = {
   manual: 'Manual',
   csv: 'CSV',
   snaptrade: 'Synced',
+}
+
+const SOURCE_DESCRIPTION: Record<Holding['source'], string> = {
+  manual: 'Entered manually',
+  csv: 'Imported from CSV',
+  snaptrade: 'Synced from brokerage',
+}
+
+/** Per-row provenance/freshness, exposed as a plain tooltip rather than an extra icon/date column. */
+function provenanceTitle(h: Holding): string {
+  return `${SOURCE_DESCRIPTION[h.source]} · Updated ${formatFullDate(h.updatedAt)}`
 }
 
 export function PortfolioTable({
@@ -72,7 +83,7 @@ export function PortfolioTable({
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-border text-[11px] uppercase tracking-wider text-ink-500">
+              <tr className="border-b border-border text-xs font-medium text-ink-450">
                 <th className="px-4 py-3 font-medium">Ticker</th>
                 {orderedVisible.map((key) => (
                   <th key={key} className="px-4 py-3 font-medium">
@@ -146,7 +157,7 @@ export function PortfolioTable({
                 Drag rows to reorder the desktop table. Toggle a column off to hide it.
               </p>
             </div>
-            <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500 ring-1 ring-border">
+            <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold text-ink-450 ring-1 ring-border">
               Drag and drop
             </span>
           </div>
@@ -194,7 +205,7 @@ export function PortfolioTable({
                     />
                     <span className="truncate">{PORTFOLIO_COLUMN_LABEL[key]}</span>
                   </label>
-                  <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-ink-500">
+                  <span className="shrink-0 text-[10px] font-medium text-ink-450">
                     {visible ? 'Visible' : 'Hidden'}
                   </span>
                 </div>
@@ -309,7 +320,10 @@ function Cell({
       )
     case 'source':
       return (
-        <span className="rounded-md bg-ink-800 px-2 py-0.5 text-[11px] font-medium text-ink-300 ring-1 ring-border">
+        <span
+          className="rounded-md bg-ink-800 px-2 py-0.5 text-[11px] font-medium text-ink-300 ring-1 ring-border"
+          title={provenanceTitle(h)}
+        >
           {SOURCE_LABEL[h.source]}
         </span>
       )
@@ -352,7 +366,10 @@ function HoldingCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-accent-400">{h.ticker}</span>
-            <span className="rounded-md bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-300 ring-1 ring-border">
+            <span
+              className="rounded-md bg-ink-800 px-1.5 py-0.5 text-[10px] font-medium text-ink-300 ring-1 ring-border"
+              title={provenanceTitle(h)}
+            >
               {SOURCE_LABEL[h.source]}
             </span>
           </div>
@@ -372,11 +389,11 @@ function HoldingCard({
 
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-ink-500">Shares</div>
+          <div className="text-[10px] text-ink-450">Shares</div>
           <div className="tabular text-ink-200">{h.shares}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-ink-500">Value</div>
+          <div className="text-[10px] text-ink-450">Value</div>
           <div
             className="tabular font-medium text-ink-100"
             title={estimated ? 'Estimated from cost basis — no live price yet' : undefined}
@@ -387,13 +404,13 @@ function HoldingCard({
         </div>
         {dayChange != null ? (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-ink-500">Day change</div>
+            <div className="text-[10px] text-ink-450">Day change</div>
             <GainLoss value={dayChange} pct={h.dayChangePct} />
           </div>
         ) : null}
         {totalGain != null ? (
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-ink-500">Total gain/loss</div>
+            <div className="text-[10px] text-ink-450">Total gain/loss</div>
             <GainLoss value={totalGain} pct={holdingTotalGainLossPct(h)} />
           </div>
         ) : null}
