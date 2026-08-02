@@ -28,7 +28,7 @@ export function NeedsAttention({ events }: { events: ScoredEvent[] }) {
                   {e.ticker ? `${e.ticker} · ${e.title}` : e.title}
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-ink-500">{formatEventDay(e.eventDate)}</p>
+              <p className="mt-0.5 text-xs text-ink-450">{formatEventDay(e.eventDate)}</p>
             </div>
             <div className="tabular shrink-0 text-right text-sm font-semibold text-ink-100">
               {formatPct(e.positionWeightPct)}

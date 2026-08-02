@@ -14,7 +14,7 @@ function dotTone(beat: boolean | null): string {
 
 export function HistoricalBeatStrip({ history }: { history?: HistoricalBeat[] }) {
   if (!history || history.length === 0) {
-    return <p className="text-xs text-ink-500">No earnings history available.</p>
+    return <p className="text-xs text-ink-450">No earnings history available.</p>
   }
 
   const known = history.filter((h) => h.epsBeat != null)

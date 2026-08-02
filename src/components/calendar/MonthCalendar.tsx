@@ -13,7 +13,7 @@ import {
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import type { ScoredEvent } from '@/types'
-import { isDividendType, isMacroType } from '@/lib/scoring'
+import { eventTypeLabel, isDividendType, isMacroType, scoreTier } from '@/lib/scoring'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
@@ -69,6 +69,16 @@ function timingTextTone(e: ScoredEvent): string {
   if (e.timing === 'bmo') return 'text-ink-100'
   if (e.timing === 'amc') return 'text-ink-400'
   return 'text-ink-200'
+}
+
+/**
+ * The dot conveys type (color) and weight (size) purely visually — this gives
+ * screen-reader users the same two facts as text, so the dot itself can be
+ * aria-hidden rather than silently conveying nothing.
+ */
+function eventRowLabel(e: ScoredEvent): string {
+  const subject = e.ticker ? `${e.ticker} — ${e.title}` : e.title
+  return `${eventTypeLabel(e.eventType)}: ${subject}, ${scoreTier(e.impactScore)} impact`
 }
 
 export function MonthCalendar({
@@ -188,15 +198,16 @@ export function MonthCalendar({
                     key={e.id}
                     className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
                     title={e.title}
+                    aria-label={eventRowLabel(e)}
                   >
-                    <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} />
+                    <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} aria-hidden="true" />
                     <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
                   </div>
                 ))}
                 {dayEvents.length > 3 ? (
-                  <span className="px-1 text-[10px] text-ink-500">+{dayEvents.length - 3}</span>
+                  <span className="px-1 text-[10px] text-ink-450">+{dayEvents.length - 3}</span>
                 ) : null}
               </div>
             </>
@@ -225,7 +236,7 @@ export function MonthCalendar({
         })}
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-4 text-xs text-ink-500">
+      <div className="mt-5 flex flex-wrap gap-4 text-xs text-ink-450">
         <Legend color="bg-earnings" label="Earnings" />
         <Legend color="bg-dividend" label="Dividends" />
         <Legend color="bg-macro" label="Macro" />

@@ -28,12 +28,12 @@ export function MetricPair({
         ) : hasEstimate ? (
           <span className="text-ink-400">{emptyText}</span>
         ) : (
-          <span className="text-ink-500">{emptyText}</span>
+          <span className="text-ink-450">{emptyText}</span>
         )}
         {hasEstimate ? (
-          <span className="text-xs text-ink-500">est. {format(estimate)}</span>
+          <span className="text-xs text-ink-450">est. {format(estimate)}</span>
         ) : (
-          <span className="text-xs text-ink-500">no estimate available</span>
+          <span className="text-xs text-ink-450">no estimate available</span>
         )}
       </div>
     </div>

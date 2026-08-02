@@ -30,7 +30,7 @@ export function MorningHeader({
             {formatMoney(totalValue)}
           </div>
           {dayChange == null ? (
-            <p className="mt-1 text-sm text-ink-500">Day change unavailable — refresh prices</p>
+            <p className="mt-1 text-sm text-ink-450">Day change unavailable — refresh prices</p>
           ) : (
             <p className={clsx('tabular mt-1 text-sm font-medium', tone)}>
               {dayChange >= 0 ? '+' : ''}
@@ -38,7 +38,7 @@ export function MorningHeader({
             </p>
           )}
         </div>
-        <p className={clsx('flex items-center gap-1 text-xs', stale ? 'text-amber-300' : 'text-ink-500')}>
+        <p className={clsx('flex items-center gap-1 text-xs', stale ? 'text-amber-300' : 'text-ink-450')}>
           {stale ? <AlertTriangle className="h-3 w-3" aria-hidden="true" /> : null}
           {holdingsCount} holdings · {formatRelativeSync(lastSyncAt)}
           {stale ? ' · stale' : ''}

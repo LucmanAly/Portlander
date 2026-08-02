@@ -274,7 +274,7 @@ export function PortfolioPage() {
 
         {csvInfo ? <p className="text-sm text-accent-400">{csvInfo}</p> : null}
         {csvError ? <p className="text-sm text-critical">{csvError}</p> : null}
-        <p className="text-xs text-ink-500">
+        <p className="text-xs text-ink-450">
           CSV headers: <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
         </p>
 
@@ -283,7 +283,7 @@ export function PortfolioPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-ink-100">Import preview</h3>
-                <p className="mt-1 text-xs text-ink-500">
+                <p className="mt-1 text-xs text-ink-450">
                   Review the changes before writing them to your portfolio.
                 </p>
               </div>
@@ -305,28 +305,28 @@ export function PortfolioPage() {
                 ))}
               </div>
             </div>
-            <p className="text-xs text-ink-500">
+            <p className="text-xs text-ink-450">
               {csvMode === 'merge'
                 ? 'Adds or updates CSV rows by ticker. Existing rows the CSV does not mention stay unchanged.'
                 : 'CSV rows replace existing manual and CSV rows. Brokerage-synced rows are protected.'}
             </p>
             <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <div>
-                <dt className="text-ink-500">Imported</dt>
+                <dt className="text-ink-450">Imported</dt>
                 <dd className="tabular font-medium text-ink-100">{csvPlan.imported}</dd>
               </div>
               <div>
-                <dt className="text-ink-500">Removed</dt>
+                <dt className="text-ink-450">Removed</dt>
                 <dd className={clsx('tabular font-medium', csvPlan.replaced ? 'text-critical' : 'text-ink-100')}>
                   {csvPlan.replaced}
                 </dd>
               </div>
               <div>
-                <dt className="text-ink-500">Synced protected</dt>
+                <dt className="text-ink-450">Synced protected</dt>
                 <dd className="tabular font-medium text-ink-100">{csvPlan.protectedSynced}</dd>
               </div>
               <div>
-                <dt className="text-ink-500">Skipped</dt>
+                <dt className="text-ink-450">Skipped</dt>
                 <dd className="tabular font-medium text-ink-100">{csvPlan.skipped}</dd>
               </div>
             </dl>
@@ -405,12 +405,12 @@ export function PortfolioPage() {
 
         <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
           <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
-            <Search className="h-4 w-4 shrink-0 text-ink-500" />
+            <Search className="h-4 w-4 shrink-0 text-ink-450" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search ticker or name"
-              className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
+              className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-450 focus:outline-none"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -475,7 +475,7 @@ export function PortfolioPage() {
         </form>
         <div className="flex flex-wrap gap-2">
           {watchlist.length === 0 ? (
-            <p className="text-sm text-ink-500">No watchlist tickers.</p>
+            <p className="text-sm text-ink-450">No watchlist tickers.</p>
           ) : (
             watchlist.map((w) => (
               <span
@@ -483,10 +483,10 @@ export function PortfolioPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-ink-850 px-3 py-1.5 text-sm ring-1 ring-border"
               >
                 <span className="font-medium text-accent-400">{w.ticker}</span>
-                {w.name ? <span className="text-ink-500">{w.name}</span> : null}
+                {w.name ? <span className="text-ink-450">{w.name}</span> : null}
                 <button
                   type="button"
-                  className="text-ink-500 hover:text-critical"
+                  className="text-ink-450 hover:text-critical"
                   onClick={() => removeWatchlist(w.id)}
                   aria-label={`Remove ${w.ticker}`}
                 >

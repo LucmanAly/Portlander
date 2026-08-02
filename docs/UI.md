@@ -122,6 +122,45 @@ synthetic tickers/share counts/prices only, no real email, account identifier, o
 value. No screenshot taken during this project's development has shown a real signed-in
 book (verified: every screenshot this session was Local/Demo mode).
 
+## Mobile, accessibility, and interaction polish (UX-10)
+
+**Automated scan**: ran `axe-core` (WCAG 2.0/2.1 A+AA ruleset) via a one-off Playwright script
+against all 5 routes at desktop (1440×900) and mobile (390×844), plus the earnings detail
+drawer open state. `axe-core` was removed from `package.json` afterward — it was a one-time
+manual audit tool, not wired into `npm test` (this project doesn't have Playwright as a real
+dependency, only available globally in dev sandboxes). Re-run the same way before a future
+release if accessibility regressions are a concern; a permanent CI gate would need Playwright
+added as a project dependency first.
+
+Findings, all fixed:
+- **Contrast (serious, 2 routes)**: `text-ink-500` (`#64748b`) on dark surfaces measured
+  ~3.8:1, under the 4.5:1 WCAG AA minimum for normal text. Swapped every `text-ink-500` usage
+  to `text-ink-450` (`#7c8ba1`, already introduced in UX-01 for exactly this contrast level)
+  app-wide — a strict, monotonic contrast improvement since ink-450 is lighter than ink-500
+  against the same dark backgrounds. Re-scanned clean afterward.
+- **Keyboard-focusable scrollable region (serious, mobile Settings)**: the Impact-score `<pre>`
+  block had horizontally-scrollable content with no focusable descendant, unreachable by
+  keyboard in Safari. Added `tabIndex={0}` + `aria-label`.
+
+Manual fixes beyond what the automated scan covers:
+- **Safe areas**: mobile bottom nav (`AppShell`) and the mobile bottom sheet (`Dialog`) both
+  add `env(safe-area-inset-bottom)` padding so content isn't obscured by the home indicator
+  on notched phones.
+- **Reduced motion**: a global `prefers-reduced-motion: reduce` rule in `index.css` cuts
+  animation/transition duration to near-zero and disables smooth scroll — a duration cut, not
+  a functionality cut, nothing depends on motion to be usable.
+- **Touch targets**: `CarouselControls`' dots and prev/next arrows now pad out to a real
+  tappable area (`p-2.5`) instead of the tiny visible dot itself being the only hit target —
+  the dot's small visual size stays unchanged (an inner `<span>`, decoupled from the outer
+  `<button>`'s hit area).
+- **Screen-reader names for the calendar's visual indicators**: `MonthCalendar`'s per-event
+  dots convey type (color) and weight (size) purely visually. Each event row now carries a
+  real `aria-label` ("Earnings: MSFT — Microsoft earnings, high impact") and the dot itself is
+  `aria-hidden` — matches `HistoricalBeatStrip`'s existing per-dot `aria-label` pattern (UX-02).
+- **Keyboard tab order**: manually walked Tab through Today/Earnings/Portfolio — order follows
+  visual layout (nav → page controls → content), no traps, no illogical jumps; verified via a
+  Playwright script that logs `document.activeElement` on each Tab press.
+
 ## Quality bar
 
 - No layout jump when data arrives

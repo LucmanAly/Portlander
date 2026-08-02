@@ -45,4 +45,10 @@ describe('CarouselControls', () => {
     expect(onNext).toHaveBeenCalledTimes(1)
     expect(onPrev).toHaveBeenCalledTimes(1)
   })
+
+  it('gives dot buttons real touch-target padding, not just the tiny visible dot', () => {
+    render(<CarouselControls count={2} activeIndex={0} onSelect={() => {}} onPrev={() => {}} onNext={() => {}} />)
+    const dot = screen.getByRole('tab', { name: 'Card 1 of 2' })
+    expect(dot).toHaveClass('p-2.5')
+  })
 })

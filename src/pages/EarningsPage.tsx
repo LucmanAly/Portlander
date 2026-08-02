@@ -70,7 +70,7 @@ export function EarningsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <EarningsStatusFilter value={filter} onChange={setFilter} />
         <div className="flex items-center gap-2.5">
-          <p className="text-xs text-ink-500">
+          <p className="text-xs text-ink-450">
             <span className="tabular text-ink-300">{sorted.length}</span> reports
           </p>
           <SortToggle value={sortMode} onChange={setSortMode} />
@@ -80,7 +80,7 @@ export function EarningsPage() {
       {groups.length === 0 ? (
         <div className="surface rounded-2xl px-6 py-12 text-center">
           <p className="text-ink-300">No reports match this filter.</p>
-          <p className="mt-1 text-sm text-ink-500">Try All, or check back closer to the next report.</p>
+          <p className="mt-1 text-sm text-ink-450">Try All, or check back closer to the next report.</p>
         </div>
       ) : (
         <div className="space-y-6">

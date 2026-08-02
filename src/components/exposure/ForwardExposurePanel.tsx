@@ -68,7 +68,7 @@ function Column({
       >
         {value}
       </div>
-      <div className="mt-0.5 truncate text-xs text-ink-500">{hint}</div>
+      <div className="mt-0.5 truncate text-xs text-ink-450">{hint}</div>
     </div>
   )
 }

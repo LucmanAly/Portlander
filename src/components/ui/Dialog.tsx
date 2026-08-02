@@ -44,7 +44,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         tabIndex={-1}
-        className="surface-elevated fixed inset-x-0 bottom-0 z-10 max-h-[85dvh] overflow-y-auto rounded-t-2xl p-5 outline-none lg:inset-x-auto lg:right-0 lg:top-0 lg:h-dvh lg:max-h-none lg:w-[420px] lg:rounded-l-2xl lg:rounded-t-none"
+        className="surface-elevated fixed inset-x-0 bottom-0 z-10 max-h-[85dvh] overflow-y-auto rounded-t-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] outline-none lg:inset-x-auto lg:right-0 lg:top-0 lg:h-dvh lg:max-h-none lg:w-[420px] lg:rounded-l-2xl lg:rounded-t-none lg:pb-5"
       >
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 id="dialog-title" className="text-lg font-semibold text-ink-100">

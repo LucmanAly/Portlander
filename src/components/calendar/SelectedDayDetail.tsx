@@ -16,7 +16,7 @@ export function SelectedDayDetail({
 }) {
   if (!dateKey) {
     return (
-      <div className="surface rounded-2xl px-4 py-6 text-center text-sm text-ink-500">
+      <div className="surface rounded-2xl px-4 py-6 text-center text-sm text-ink-450">
         Select a day on the calendar to see its events.
       </div>
     )
@@ -26,7 +26,7 @@ export function SelectedDayDetail({
     <div className="surface rounded-2xl p-4">
       <h3 className="text-sm font-semibold text-ink-100">{formatFullDate(dateKey)}</h3>
       {events.length === 0 ? (
-        <p className="mt-2 text-sm text-ink-500">No events this day.</p>
+        <p className="mt-2 text-sm text-ink-450">No events this day.</p>
       ) : (
         <div className="mt-3 divide-y divide-border">
           {events.map((e) => (
@@ -43,7 +43,7 @@ export function SelectedDayDetail({
               <div className="tabular shrink-0 text-right text-sm">
                 <div className="font-semibold text-ink-200">{e.impactScore}</div>
                 {e.isHolding ? (
-                  <div className="text-[11px] text-ink-500">{formatPct(e.positionWeightPct)}</div>
+                  <div className="text-[11px] text-ink-450">{formatPct(e.positionWeightPct)}</div>
                 ) : null}
               </div>
             </div>

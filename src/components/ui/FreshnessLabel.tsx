@@ -4,11 +4,11 @@ import { formatRelativeShort } from '@/lib/format'
 
 export function FreshnessLabel({ provenance }: { provenance?: ProvenanceInfo }) {
   if (!provenance) {
-    return <span className="text-xs text-ink-500">Source unknown</span>
+    return <span className="text-xs text-ink-450">Source unknown</span>
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-ink-500">
+    <span className="inline-flex items-center gap-1 text-xs text-ink-450">
       <span>
         {provenance.source} · {formatRelativeShort(provenance.fetchedAt ?? null)}
       </span>

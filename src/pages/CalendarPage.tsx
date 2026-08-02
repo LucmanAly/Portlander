@@ -63,7 +63,7 @@ export function CalendarPage() {
         <h2 className="mb-3 text-sm font-semibold text-ink-450">Agenda · next 30 days</h2>
         <div className="surface divide-y divide-border overflow-hidden rounded-2xl">
           {agenda.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-ink-500">No upcoming events.</p>
+            <p className="px-4 py-8 text-center text-sm text-ink-450">No upcoming events.</p>
           ) : (
             agenda.map((e) => (
               <div
@@ -77,12 +77,12 @@ export function CalendarPage() {
                       {e.ticker ? `${e.ticker} · ${e.title}` : e.title}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-ink-500">{formatEventDay(e.eventDate)}</p>
+                  <p className="mt-0.5 text-xs text-ink-450">{formatEventDay(e.eventDate)}</p>
                 </div>
                 <div className="tabular shrink-0 text-right text-sm">
                   <div className="font-semibold text-ink-200">{e.impactScore}</div>
                   {e.isHolding ? (
-                    <div className="text-[11px] text-ink-500">
+                    <div className="text-[11px] text-ink-450">
                       {formatPct(e.positionWeightPct)}
                     </div>
                   ) : null}

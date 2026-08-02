@@ -60,13 +60,13 @@ export function RefreshQuotesButton({ variant }: { variant: 'sidebar' | 'compact
         disabled={quotesSyncing}
         className={clsx(
           'focus-ring flex w-full items-center gap-2 rounded-lg px-1 py-1 text-sm font-medium transition disabled:cursor-wait',
-          gated ? 'text-ink-500' : 'text-ink-100 hover:text-accent-400',
+          gated ? 'text-ink-450' : 'text-ink-100 hover:text-accent-400',
         )}
       >
         {icon}
         {quotesSyncing ? 'Refreshing…' : 'Refresh prices'}
       </button>
-      <p className={clsx('mt-1 px-1 text-[11px]', quotesError ? 'text-critical' : 'text-ink-500')}>
+      <p className={clsx('mt-1 px-1 text-[11px]', quotesError ? 'text-critical' : 'text-ink-450')}>
         {caption}
       </p>
     </div>

@@ -47,7 +47,7 @@ export function EarningsReportCard({
             <span className="font-semibold text-accent-400">{card.ticker}</span>
             <span className="truncate text-ink-300">{card.companyName ?? card.title}</span>
           </div>
-          <p className="mt-0.5 text-xs text-ink-500">{formatEventDay(card.eventDate)}</p>
+          <p className="mt-0.5 text-xs text-ink-450">{formatEventDay(card.eventDate)}</p>
         </div>
 
         {card.isHolding ? (
@@ -55,7 +55,7 @@ export function EarningsReportCard({
             <div className={clsx('tabular font-semibold text-ink-100', isHero ? 'text-3xl' : 'text-xl')}>
               {formatPct(card.positionWeightPct)}
             </div>
-            <div className="text-[11px] text-ink-500">Portfolio</div>
+            <div className="text-[11px] text-ink-450">Portfolio</div>
           </div>
         ) : null}
       </div>

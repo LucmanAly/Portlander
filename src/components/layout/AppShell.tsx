@@ -30,7 +30,7 @@ export function AppShell() {
               <div
                 className={clsx(
                   'text-[11px]',
-                  !booting && backend === 'local' ? 'text-amber-300' : 'text-ink-500',
+                  !booting && backend === 'local' ? 'text-amber-300' : 'text-ink-450',
                 )}
               >
                 {booting ? 'Loading…' : backend === 'supabase' ? 'Cloud sync' : 'Local / demo'}
@@ -128,8 +128,9 @@ export function AppShell() {
           </div>
         </main>
 
-        {/* Mobile bottom nav */}
-        <nav className="surface sticky bottom-0 z-20 grid grid-cols-5 border-t border-border lg:hidden">
+        {/* Mobile bottom nav. pb includes the safe-area inset so the row isn't
+            obscured by the home indicator on notched phones. */}
+        <nav className="surface sticky bottom-0 z-20 grid grid-cols-5 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden">
           {nav.map((item) => (
             <NavLink
               key={item.to}
@@ -138,7 +139,7 @@ export function AppShell() {
               className={({ isActive }) =>
                 clsx(
                   'flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium',
-                  isActive ? 'text-accent-400' : 'text-ink-500',
+                  isActive ? 'text-accent-400' : 'text-ink-450',
                 )
               }
             >

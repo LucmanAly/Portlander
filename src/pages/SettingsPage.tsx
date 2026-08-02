@@ -123,7 +123,7 @@ export function SettingsPage() {
 
       <SettingsSection id="account" title="Account">
         {!supabaseConfigured ? (
-          <p className="text-sm text-ink-500">
+          <p className="text-sm text-ink-450">
             Local / demo mode — sign-in is unavailable until Supabase is configured. See{' '}
             <a href="#data-sync" className="text-accent-400 hover:text-accent-300">
               Data &amp; sync
@@ -182,7 +182,7 @@ export function SettingsPage() {
         description="Connect a brokerage via SnapTrade to sync real positions into Portfolio. CSV/manual entries stay available for any ticker your brokerage doesn't cover."
       >
         {!supabaseConfigured || !user ? (
-          <p className="text-sm text-ink-500">
+          <p className="text-sm text-ink-450">
             Sign in under{' '}
             <a href="#account" className="text-accent-400 hover:text-accent-300">
               Account
@@ -199,14 +199,14 @@ export function SettingsPage() {
                     className="flex items-center justify-between rounded-lg bg-ink-850 px-3 py-2 text-sm ring-1 ring-border"
                   >
                     <span className="font-medium text-ink-100">{c.brokerageName}</span>
-                    <span className="text-xs text-ink-500">
+                    <span className="text-xs text-ink-450">
                       Connected {formatRelativeSync(c.connectedAt)}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-ink-500">No brokerage connected yet.</p>
+              <p className="text-sm text-ink-450">No brokerage connected yet.</p>
             )}
 
             <div className="flex flex-wrap gap-2">
@@ -238,11 +238,11 @@ export function SettingsPage() {
       <SettingsSection id="data-sync" title="Data & sync">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-ink-500">Mode</dt>
+            <dt className="text-ink-450">Mode</dt>
             <dd className="font-medium text-ink-100">{modeLabel}</dd>
           </div>
           <div>
-            <dt className="text-ink-500">Write backend</dt>
+            <dt className="text-ink-450">Write backend</dt>
             <dd className="font-medium text-ink-100">
               <span
                 className={clsx(
@@ -254,27 +254,27 @@ export function SettingsPage() {
               >
                 {backend}
               </span>
-              {booting ? <span className="ml-2 text-xs text-ink-500">booting…</span> : null}
+              {booting ? <span className="ml-2 text-xs text-ink-450">booting…</span> : null}
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Supabase</dt>
+            <dt className="text-ink-450">Supabase</dt>
             <dd className="font-medium text-ink-100">
               {supabaseConfigured ? (
                 <span className="text-accent-400">{supabaseHost}</span>
               ) : (
-                <span className="text-ink-500">Not configured</span>
+                <span className="text-ink-450">Not configured</span>
               )}
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Account</dt>
+            <dt className="text-ink-450">Account</dt>
             <dd className="truncate font-medium text-ink-100">
               {user?.email ?? (supabaseConfigured ? 'Signed out' : '—')}
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Holdings / events</dt>
+            <dt className="text-ink-450">Holdings / events</dt>
             <dd className="tabular font-medium text-ink-100">
               {holdings.length} · {events.length}
             </dd>
@@ -283,19 +283,19 @@ export function SettingsPage() {
 
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-ink-500">Positions</dt>
+            <dt className="text-ink-450">Positions</dt>
             <dd className="font-medium text-ink-100">
               {formatRelativeSync(syncTimestamps.positions)}
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Prices</dt>
+            <dt className="text-ink-450">Prices</dt>
             <dd className="font-medium text-ink-100">
               {formatRelativeSync(syncTimestamps.prices)}
             </dd>
           </div>
           <div>
-            <dt className="text-ink-500">Events</dt>
+            <dt className="text-ink-450">Events</dt>
             <dd className="font-medium text-ink-100">
               {formatRelativeSync(syncTimestamps.events)}
             </dd>
@@ -351,11 +351,11 @@ export function SettingsPage() {
       >
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-ink-500">Verified facts</dt>
+            <dt className="text-ink-450">Verified facts</dt>
             <dd className="font-medium text-ink-100">Finnhub (once wired) — never an LLM</dd>
           </div>
           <div>
-            <dt className="text-ink-500">Current status</dt>
+            <dt className="text-ink-450">Current status</dt>
             <dd className="font-medium text-amber-300">Interim fixture data</dd>
           </div>
         </dl>
@@ -452,7 +452,7 @@ export function SettingsPage() {
             </ul>
           </div>
         ) : (
-          <p className="text-xs text-ink-500">
+          <p className="text-xs text-ink-450">
             No current errors have been reported. The actions below re-run the relevant checks.
           </p>
         )}
@@ -492,24 +492,28 @@ export function SettingsPage() {
       >
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-ink-500">Phase</dt>
+            <dt className="text-ink-450">Phase</dt>
             <dd className="font-medium text-ink-100">{APP_PHASE}</dd>
           </div>
           <div>
-            <dt className="text-ink-500">Last updated</dt>
+            <dt className="text-ink-450">Last updated</dt>
             <dd className="font-medium text-ink-100">
               {formatAppUpdatedAt(APP_LAST_UPDATED)}
             </dd>
           </div>
         </dl>
-        <p className="text-xs leading-relaxed text-ink-500">
+        <p className="text-xs leading-relaxed text-ink-450">
           The timestamp is updated with the release metadata when a version is promoted to
           <code className="mx-1 text-ink-300">main</code>.
         </p>
 
         <div className="rounded-xl bg-ink-950/30 p-3">
           <h3 className="mb-2 text-xs font-medium text-ink-450">Impact score v0</h3>
-          <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
+          <pre
+            tabIndex={0}
+            aria-label="Impact score formula, horizontally scrollable"
+            className="focus-ring overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300"
+          >
 {`impact =
   65% × position_weight (norm to anchor)
 + 25% × event_type_weight
@@ -604,7 +608,7 @@ function DiagnosticRow({
     <div className="flex items-center justify-between gap-4 py-3">
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-200">{label}</p>
-        <p className="mt-0.5 truncate text-xs text-ink-500">{detail}</p>
+        <p className="mt-0.5 truncate text-xs text-ink-450">{detail}</p>
       </div>
       <span
         className={clsx(

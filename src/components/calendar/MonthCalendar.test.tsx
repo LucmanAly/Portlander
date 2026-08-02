@@ -77,4 +77,12 @@ describe('MonthCalendar', () => {
       screen.getByRole('button', { name: new RegExp(`^${monthStartLabel}, no events$`) }),
     ).toBeInTheDocument()
   })
+
+  it('gives each event dot a screen-reader label (type + subject + impact) and hides the decorative dot itself', () => {
+    render(<MonthCalendar events={[scoredEvent({ ticker: 'MSFT', title: 'Microsoft earnings', impactScore: 80 })]} />)
+    const row = screen.getByLabelText('Earnings: MSFT — Microsoft earnings, high impact')
+    expect(row).toBeInTheDocument()
+    const dot = row.querySelector('span[aria-hidden="true"]')
+    expect(dot).not.toBeNull()
+  })
 })

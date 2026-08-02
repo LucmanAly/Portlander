@@ -26,7 +26,7 @@ export function Stat({
       >
         {value}
       </span>
-      {hint ? <span className="text-xs text-ink-500">{hint}</span> : null}
+      {hint ? <span className="text-xs text-ink-450">{hint}</span> : null}
     </div>
   )
 }

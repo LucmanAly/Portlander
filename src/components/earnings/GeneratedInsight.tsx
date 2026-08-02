@@ -13,7 +13,7 @@ export function GeneratedInsight({ interpretation }: { interpretation?: Generate
       </div>
       <p className="text-sm leading-relaxed text-ink-200">{interpretation.summary}</p>
       {interpretation.model || interpretation.confidence ? (
-        <p className="mt-1.5 text-xs text-ink-500">
+        <p className="mt-1.5 text-xs text-ink-450">
           {[interpretation.model, interpretation.confidence ? `${interpretation.confidence} confidence` : null]
             .filter(Boolean)
             .join(' · ')}

@@ -30,15 +30,17 @@ export function CarouselControls({
         disabled={activeIndex === 0}
         aria-label="Previous"
         className={clsx(
-          'focus-ring rounded-lg p-1 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30',
+          'focus-ring rounded-lg p-2.5 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30',
           arrowsHiddenBelowLg && 'hidden lg:inline-flex',
         )}
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
 
-      <div className="flex items-center gap-1.5" role="tablist" aria-label="Cards">
+      <div className="flex items-center" role="tablist" aria-label="Cards">
         {Array.from({ length: count }, (_, i) => (
+          // Visible dot stays small/dense; the button itself pads out to a
+          // real touch target rather than growing the dot to match.
           <button
             key={i}
             type="button"
@@ -46,11 +48,15 @@ export function CarouselControls({
             aria-selected={i === activeIndex}
             aria-label={labelForIndex ? labelForIndex(i) : `Card ${i + 1} of ${count}`}
             onClick={() => onSelect(i)}
-            className={clsx(
-              'focus-ring h-1.5 rounded-full transition-all',
-              i === activeIndex ? 'w-4 bg-accent-500' : 'w-1.5 bg-ink-700 hover:bg-ink-600',
-            )}
-          />
+            className="focus-ring flex items-center justify-center p-2.5"
+          >
+            <span
+              className={clsx(
+                'h-1.5 rounded-full transition-all',
+                i === activeIndex ? 'w-4 bg-accent-500' : 'w-1.5 bg-ink-700',
+              )}
+            />
+          </button>
         ))}
       </div>
 
@@ -60,7 +66,7 @@ export function CarouselControls({
         disabled={activeIndex === count - 1}
         aria-label="Next"
         className={clsx(
-          'focus-ring rounded-lg p-1 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30',
+          'focus-ring rounded-lg p-2.5 text-ink-400 transition hover:bg-ink-800 hover:text-ink-100 disabled:pointer-events-none disabled:opacity-30',
           arrowsHiddenBelowLg && 'hidden lg:inline-flex',
         )}
       >

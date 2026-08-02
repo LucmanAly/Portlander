@@ -42,7 +42,7 @@ function DrawerBody({ card }: { card: EarningsCardModel }) {
 
       <div>
         <p className="text-sm text-ink-300">{card.companyName ?? card.title}</p>
-        <p className="mt-0.5 text-xs text-ink-500">{formatEventDay(card.eventDate)}</p>
+        <p className="mt-0.5 text-xs text-ink-450">{formatEventDay(card.eventDate)}</p>
       </div>
 
       <section>
