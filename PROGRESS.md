@@ -1,16 +1,15 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-02
-**Last agent:** claude (session 20)
-**Current phase:** Phase 2 UI/UX overhaul (`UX-01`–`UX-11`) approved and merged to `develop`. The
-earnings intelligence backend queue is now fully built: `BE-01`–`BE-06` done. Real consensus/
-actual/surprise/history reach the client from `events`' typed columns; DeepSeek interpretation
-(`BE-06`) is built and deployed but **not enabled** — it needs owner-chosen `DEEPSEEK_*` secrets
-before it does anything (see "DeepSeek / `earnings-interpret`" below). Phase 1 `v1.0` was promoted
-to `main` in PRs #25/#26; its remaining manual checks are post-release acceptance. **Owner action
-needed:** review/merge the `BE-01`–`BE-06` PR, decide on `earnings-interpret`'s DeepSeek secrets
-(or don't — it stays inert either way), and decide what to do with the stale, unmerged PR #28 (see
-Decisions) — this session did not touch it.
+**Last agent:** claude (session 20, continued)
+**Current phase:** Phase 1 and Phase 2 are both fully closed out. `BE-01`–`BE-06` merged to
+`develop` via PR #32. Phase 1 acceptance (SnapTrade connect/sync, Refresh prices, real-book math,
+sign-out, mobile, one real morning) is **owner-confirmed complete**. **PR #28** (the stale,
+pre-overhaul "Signal" branch) is **closed as superseded** — its infra was already reconciled into
+`develop` during `BE-01`–`BE-06`. The only open item is optional: DeepSeek interpretation
+(`BE-06`/`earnings-interpret`) is deployed but **not enabled** — it needs owner-chosen
+`DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`/`DEEPSEEK_MODEL` secrets before it does anything, and stays
+fully harmless indefinitely without them. See "Next up" for what enabling it actually involves.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -30,12 +29,12 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | `earnings-interpret` Edge Function | ✅ Deployed (v2), **not enabled** | `BE-06`. Global/unscoped, `verify_jwt: true`. Turns a caller-specified batch (≤5) of already-reported events' verified facts into a strict, validated DeepSeek interpretation written to `events.ai_interpretation`. Returns "Missing secrets" until `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`/`DEEPSEEK_MODEL` are set — none are, on purpose (see Decisions) |
 | Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
 | `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
-| `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner click-test still pending — see Blockers |
+| `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner-confirmed working end to end |
 | Portfolio table + CSV | ✅ Rebuilt | Table-first opening view with total value + whole-book daily gain/loss, management controls below the table, drag-and-drop desktop column ordering, per-row writes (PR 5), CSV Merge/Replace picker, `~` estimated-value marker, search/sort/source filter + mobile compact cards |
 | Impact score | ✅ Recalibrated (PR 6) | Portfolio-relative anchor (`max(5, p90weight × 1.5)`) replaced the fixed `/20` clamp; High/Med/Low tiers; `EventCard` leads with weight, not the score |
 | Calendar | ✅ Weight-aware (PR 7) | `MonthCalendar` dot size now tracks position weight; agenda dates go through `formatEventDay` |
 | Phase 1 v1.0 promotion | ✅ Merged to `main` | PR #25 promoted `develop`; PR #26 recorded the final release metadata |
-| Phase 1 acceptance | 🟡 Manual verification remains | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning still need owner confirmation |
+| Phase 1 acceptance | ✅ Owner-confirmed complete | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning all confirmed by the owner |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is built, validated, rate-limited, and deployed but dormant until the owner configures secrets — see Decisions |
 
@@ -46,17 +45,17 @@ Single source of truth for current state. If it's here, don't re-explain it else
 - [x] Scaffold, cloud deploy (Netlify + Supabase + `sync-events` + cron), owner signed in with a real synced book
 - [x] Calendar/Today UI fixes + manual "Refresh prices" (PR #4 → `develop`)
 - [x] Promote the Phase 1 `v1.0` candidate from `develop` to `main` (PRs #25/#26)
-- [ ] Phase 1 exit criteria formally signed off:
+- [x] Phase 1 exit criteria formally signed off (owner-confirmed 2026-08-02):
   - [x] Real portfolio loadable; earnings from Finnhub, not demo offsets
-  - [ ] Weight ranking + exposure % sanity (math unchanged, not yet owner-verified)
-  - [ ] Snappy UI (fixes live on `main`, awaiting confirmation)
-  - [ ] Used on a real morning once
+  - [x] Weight ranking + exposure % sanity
+  - [x] Snappy UI
+  - [x] Used on a real morning once
 
 ### SnapTrade (new scope, not in original AGENTS.md plan)
 - [x] Schema (`snaptrade_users` lockbox, `snaptrade_connections`, `holdings.source`/`day_change_*`), both Edge Functions, Settings "Brokerage" UI
 - [x] Personal-vs-Commercial auth root cause found and fixed (`SNAPTRADE_AUTH_MODE`, defaults to `personal`) — see Decisions
-- [x] "Position fully sold" gap fixed (v18) — reconciliation not yet exercised against a real sell, since the connect→sync flow has never completed end-to-end
-- [ ] **Owner: click "Connect brokerage" once more.** Nothing to configure — needs no new secrets. If it errors, the message names the SnapTrade code and the fix.
+- [x] "Position fully sold" gap fixed (v18)
+- [x] **Owner confirmed Connect brokerage → Fidelity → Sync now works end to end.** Phase 1 acceptance closed.
 
 ---
 
@@ -236,26 +235,16 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ## Next up (ordered)
 
-1. **Owner:** review and merge the PR carrying `BE-01`–`BE-06` (real Finnhub consensus/actual/
-   surprise/history; DeepSeek interpretation built and deployed but dormant) into `develop`.
-2. **Owner:** decide what to do with **PR #28** (`claude/phase-2-signal-eps-revenue-w7euc5`) —
-   open, unmerged, targets the pre-`UX-01` "Signal"/`EventCard` UI that the merged Phase 2 overhaul
-   superseded. Its infra changes (the `eps_estimate`/etc. columns + `sync-events` v15 write path)
-   are already live and have been reconciled into this branch (see Decisions); its UI changes were
-   not adopted. Likely just needs closing as superseded, but that's an owner call, not this
-   session's to make.
-3. **Owner, if you want live AI interpretation:** read PR #15's `docs/AI.md` writeup (unmerged,
-   fuller tradeoff analysis than the summary in this file), pick a `DEEPSEEK_BASE_URL` host and a
-   currently-live `DEEPSEEK_MODEL`, set the three `DEEPSEEK_*` secrets in the Supabase dashboard,
-   then invoke `earnings-interpret` manually for a few event ids to sanity-check quality/cost
-   before considering any automation. Skippable indefinitely — the feature stays fully dormant and
-   harmless with no secrets set.
-4. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
-   the deployed `v1.0` build.
-5. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
-   one real morning; then close Phase 1 acceptance.
-6. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
+1. **Owner, optional, if you want live AI interpretation:** read PR #15's `docs/AI.md` writeup
+   (unmerged, fuller tradeoff analysis than the summary in this file), pick a `DEEPSEEK_BASE_URL`
+   host and a currently-live `DEEPSEEK_MODEL`, set the three `DEEPSEEK_*` secrets in the Supabase
+   dashboard, then invoke `earnings-interpret` manually for a few event ids to sanity-check
+   quality/cost before considering any automation. Skippable indefinitely — the feature stays
+   fully dormant and harmless with no secrets set.
+2. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
    from production pushes.
+3. **No open Phase 3 scope.** Per `AGENTS.md`, Phase 3 is undefined until the owner uses Phase 2 in
+   production and decides what's next — don't invent one.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
@@ -263,7 +252,7 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ## Blockers
 
-- **None outstanding on SnapTrade code.** What remains is verification, not a blocker: the connect → Fidelity → sync path has never run end-to-end, so treat it as unproven until the owner confirms a real sync.
+None outstanding. The SnapTrade connect → Fidelity → sync path is owner-confirmed working end to end (Phase 1 acceptance, 2026-08-02) — the previous entry here is resolved and deleted per this file's own protocol below.
 
 (Resolved blockers are deleted, not kept. Ambient MCP-connector disconnects/reconnects are not a project blocker.)
 
@@ -273,6 +262,7 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-02 | PR #28 (`claude/phase-2-signal-eps-revenue-w7euc5`) closed as superseded, not merged | Owner call after `BE-01`–`BE-06` landed. Its infra (the `eps_estimate`/etc. columns, `sync-events`'s typed-column write path) was already reconciled into `develop` — see the "Discovered mid-session" row below — so merging it would have re-applied the same migration/deploy and reintroduced its old `EventCard` UI, which the merged Phase 2 overhaul already replaced with `EarningsReportCard`. Closed with a comment pointing at the reconciliation, not silently. |
 | 2026-08-02 | `BE-01` read `events.raw` instead of adding typed DB columns/a migration | `sync-events`'s `toEventRow()` already stored the full Finnhub row into `raw` (confirmed by reading the deployed function's own source), and `portfolioRepository.ts` already `select('*')`s the row — so no schema change, no migration, no redeploy was needed to get real numbers to the client. Also avoided a hard dependency on Supabase MCP tooling being connected, which it wasn't this session. |
 | 2026-08-02 | *(superseded same day by `BE-05`, kept for history)* `buildEarningsCards()` initially fell back to `earningsFixtures.ts` when a real event had no `raw` payload | Correct for the `BE-01`-only state that session started in. `BE-04`/`BE-05` (same session) removed the fallback entirely once real facts/history could stand alone — see the `BE-05` row below for the real reason this mattered (a ticker-collision bug, not just tidiness). |
 | 2026-08-02 | `BE-04`: widened `sync-events`' `LOOKBACK_DAYS` (7 → 380) instead of adding a second Finnhub endpoint/table for history | The `/calendar/earnings` response for a `from`/`to` range already includes every report in that window per call — one request per symbol either way, so widening it is free (no extra Finnhub calls, no rate-limit impact) and reuses the exact same upsert path. `earningsHistoryFromEvents()` then reads history from events already sitting in the same `events` array/query, no new table. |
@@ -329,6 +319,16 @@ Keep entries short — a few bullets, key files, PR/commit pointer for detail. D
   precedence. `npm run build`/`lint`/`test` all green — 264/264 tests.
 - Not done: `BE-04`–`BE-06` (historical beat/miss backfill, fixture retirement, DeepSeek
   interpretation) — next up per the queue above.
+
+### 2026-08-02 — claude (session 20, wrap-up)
+- Merged PR #32 (`BE-01`–`BE-06`) into `develop` at the owner's request.
+- Closed PR #28 as superseded, with a comment pointing at the reconciliation (see Decisions) —
+  owner call, made after confirming.
+- Owner confirmed Phase 1 acceptance complete (SnapTrade connect/sync, Refresh prices, real-book
+  math, sign-out, mobile, one real morning) — checked off in the Phase 1 checklist and Snapshot;
+  the SnapTrade Blockers entry is resolved and removed.
+- Remaining open item, owner's discretion, no urgency: configure `DEEPSEEK_*` secrets to turn on
+  `earnings-interpret` — see "Next up."
 
 ### 2026-08-02 — claude (session 20, continued)
 - Implemented `BE-04`–`BE-06`, completing the earnings intelligence backend queue.
