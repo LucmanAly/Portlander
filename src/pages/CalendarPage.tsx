@@ -1,14 +1,16 @@
 import { MonthCalendar } from '@/components/calendar/MonthCalendar'
+import { SelectedDayDetail } from '@/components/calendar/SelectedDayDetail'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { scoreAndFilterEvents, sortEventsByDate } from '@/lib/scoring'
 import { addDays, startOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { formatEventDay, formatPct } from '@/lib/format'
 import { TypeBadge } from '@/components/ui/Badge'
 
 export function CalendarPage() {
   const { events, holdings, watchlist, exposure } = usePortfolio()
   const today = startOfDay(new Date())
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const monthEvents = useMemo(() => {
     const from = startOfMonth(today)
@@ -18,6 +20,11 @@ export function CalendarPage() {
     // to do by hand.
     return scoreAndFilterEvents(events, holdings, watchlist, { fromDate: from, toDate: to, today })
   }, [events, holdings, watchlist, today])
+
+  const selectedDayEvents = useMemo(
+    () => (selectedDate ? monthEvents.filter((e) => e.eventDate === selectedDate) : []),
+    [monthEvents, selectedDate],
+  )
 
   const agenda = useMemo(() => {
     const scored = scoreAndFilterEvents(events, holdings, watchlist, {
@@ -47,12 +54,13 @@ export function CalendarPage() {
         </p>
       </header>
 
-      <MonthCalendar events={monthEvents} />
+      <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-start">
+        <MonthCalendar events={monthEvents} selectedDate={selectedDate} onSelectDay={setSelectedDate} />
+        <SelectedDayDetail dateKey={selectedDate} events={selectedDayEvents} />
+      </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-500">
-          Agenda · next 30 days
-        </h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink-450">Agenda · next 30 days</h2>
         <div className="surface divide-y divide-border overflow-hidden rounded-2xl">
           {agenda.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-ink-500">No upcoming events.</p>

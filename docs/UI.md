@@ -38,7 +38,10 @@ Fonts: IBM Plex Sans + IBM Plex Mono (Google Fonts in `index.html`).
   `GeneratedInsight` — see `src/types/earnings.ts` for the model. No live data source
   populates consensus/actual/surprise/guidance/reaction yet; `src/data/earningsFixtures.ts`
   is the interim source.
-- Calendar: `MonthCalendar`
+- Calendar (UX-06): `MonthCalendar` (day cells are buttons when `onSelectDay` is passed, plain
+  divs otherwise — no dead tab stops; a small count badge marks 2+ report days) +
+  `SelectedDayDetail` (full per-event detail lives outside the grid, not crammed into cells).
+  Weekday headers and the agenda heading use the sentence-case micro-label convention now.
 - Primitives: `Badge` (+ `EarningsStateBadge`), `Stat`, `Skeleton`, `Button`/`PillButton`,
   `MetricPair`, `FreshnessLabel`, `CarouselControls`, `EmptyState`, `.input`
 
@@ -58,8 +61,9 @@ for this contrast level. Accent-colored eyebrow/kicker text (page headers, e.g. 
 radar") is a different, intentional pattern and keeps its existing all-caps `accent-500`
 styling — this convention only applies to neutral-toned micro-labels.
 
-As of UX-01 this has been applied to `Stat`, `PortfolioPage`'s `Field`, and the shell nav —
-not yet swept across every page (deferred to UX-06/07/08, which already own those pages).
+As of UX-06 this has been applied to `Stat`, `PortfolioPage`'s `Field`, the shell nav, and
+Calendar's weekday headers/agenda heading — UX-07/08 still own the remaining sweeps on
+Portfolio/Settings.
 
 ## Quality bar
 
