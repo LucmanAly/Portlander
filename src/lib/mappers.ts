@@ -117,5 +117,9 @@ export function eventFromRow(row: EventRow): PortfolioEvent {
     status: asStatus(row.status),
     source: row.source ?? undefined,
     description: row.description ?? undefined,
+    epsEstimate: num(row.eps_estimate),
+    epsActual: num(row.eps_actual),
+    revenueEstimate: num(row.revenue_estimate),
+    revenueActual: num(row.revenue_actual),
   }
 }

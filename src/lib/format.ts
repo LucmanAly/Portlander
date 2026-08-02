@@ -12,6 +12,22 @@ export function formatPct(n: number, digits = 1): string {
   return `${n.toFixed(digits)}%`
 }
 
+/** Signed percent, e.g. "+4.2%" / "-1.0%" — for beat/miss deltas. */
+export function formatSignedPct(n: number, digits = 1): string {
+  const sign = n > 0 ? '+' : ''
+  return `${sign}${n.toFixed(digits)}%`
+}
+
+/** Compact currency for large figures (revenue), e.g. "$2.1B". */
+export function formatCompactMoney(n: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(n)
+}
+
 export function formatEventDay(isoDate: string): string {
   const d = parseISO(isoDate)
   if (isToday(d)) return `Today · ${format(d, 'EEE, MMM d')}`

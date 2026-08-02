@@ -56,6 +56,14 @@ export interface PortfolioEvent {
   source?: string
   /** Optional notes from data provider */
   description?: string
+  /** Consensus EPS estimate for the reporting quarter, from Finnhub */
+  epsEstimate?: number
+  /** Reported EPS, once the quarter's earnings are out */
+  epsActual?: number
+  /** Consensus revenue estimate ($) for the reporting quarter, from Finnhub */
+  revenueEstimate?: number
+  /** Reported revenue ($), once the quarter's earnings are out */
+  revenueActual?: number
 }
 
 export interface ScoredEvent extends PortfolioEvent {

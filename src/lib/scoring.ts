@@ -329,6 +329,29 @@ export function computeExposure(
   }
 }
 
+/**
+ * EPS beat/miss as a percent of the estimate's magnitude — `abs(estimate)` in
+ * the denominator so a beat on a negative (loss) estimate still reads as
+ * positive. Undefined when either side is missing (no report yet) or the
+ * estimate is exactly zero (percent is undefined at that point).
+ */
+export function epsBeatMissPct(
+  event: Pick<PortfolioEvent, 'epsEstimate' | 'epsActual'>,
+): number | undefined {
+  const { epsEstimate, epsActual } = event
+  if (epsEstimate == null || epsActual == null || epsEstimate === 0) return undefined
+  return ((epsActual - epsEstimate) / Math.abs(epsEstimate)) * 100
+}
+
+/** Revenue beat/miss as a percent of the estimate. Same shape as `epsBeatMissPct`. */
+export function revenueBeatMissPct(
+  event: Pick<PortfolioEvent, 'revenueEstimate' | 'revenueActual'>,
+): number | undefined {
+  const { revenueEstimate, revenueActual } = event
+  if (revenueEstimate == null || revenueActual == null || revenueEstimate === 0) return undefined
+  return ((revenueActual - revenueEstimate) / Math.abs(revenueEstimate)) * 100
+}
+
 export function eventTypeLabel(t: EventType): string {
   const map: Record<EventType, string> = {
     earnings: 'Earnings',

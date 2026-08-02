@@ -256,6 +256,10 @@ function toEventRow(row: FinnhubEarning) {
       .filter(Boolean)
       .join(' · '),
     raw: row as unknown as Record<string, unknown>,
+    eps_estimate: row.epsEstimate ?? null,
+    eps_actual: row.epsActual ?? null,
+    revenue_estimate: row.revenueEstimate ?? null,
+    revenue_actual: row.revenueActual ?? null,
     updated_at: new Date().toISOString(),
   }
 }

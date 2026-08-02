@@ -65,6 +65,12 @@ create table if not exists public.events (
   source text,
   description text,
   raw jsonb,
+  -- Promoted out of `raw` (Phase 2 "Signal"): Finnhub's calendar/earnings call already
+  -- returns these; beat/miss % is computed client-side from estimate + actual.
+  eps_estimate numeric,
+  eps_actual numeric,
+  revenue_estimate numeric,
+  revenue_actual numeric,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

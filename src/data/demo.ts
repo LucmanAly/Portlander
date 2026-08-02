@@ -107,6 +107,10 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'confirmed',
     source: 'demo',
+    epsEstimate: 3.1,
+    epsActual: 3.22,
+    revenueEstimate: 68_500_000_000,
+    revenueActual: 69_800_000_000,
   },
   {
     id: 'e-meta-earn',
@@ -117,6 +121,10 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'confirmed',
     source: 'demo',
+    epsEstimate: 5.2,
+    epsActual: 4.95,
+    revenueEstimate: 42_000_000_000,
+    revenueActual: 41_200_000_000,
   },
   {
     id: 'e-crwd-earn',
@@ -127,6 +135,10 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'confirmed',
     source: 'demo',
+    epsEstimate: 0.93,
+    epsActual: 1.01,
+    revenueEstimate: 1_100_000_000,
+    revenueActual: 1_080_000_000,
   },
   {
     id: 'e-panw-earn',
@@ -137,6 +149,8 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'estimated',
     source: 'demo',
+    epsEstimate: 1.55,
+    revenueEstimate: 2_400_000_000,
   },
   {
     id: 'e-nvda-earn',
@@ -147,6 +161,8 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'estimated',
     source: 'demo',
+    epsEstimate: 0.98,
+    revenueEstimate: 33_000_000_000,
   },
   {
     id: 'e-ftnt-earn',
@@ -157,6 +173,8 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'estimated',
     source: 'demo',
+    epsEstimate: 0.62,
+    revenueEstimate: 1_600_000_000,
   },
   {
     id: 'e-zs-earn',
@@ -167,6 +185,8 @@ export const DEMO_EVENTS: PortfolioEvent[] = [
     timing: 'amc',
     status: 'estimated',
     source: 'demo',
+    epsEstimate: 0.75,
+    revenueEstimate: 620_000_000,
   },
   {
     id: 'e-msft-div',

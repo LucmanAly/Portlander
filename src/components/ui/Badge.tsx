@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import type { EventStatus, EventType } from '@/types'
 import { eventTypeLabel, isDividendType, isMacroType, type ScoreTier } from '@/lib/scoring'
+import { formatSignedPct } from '@/lib/format'
 
 export function TypeBadge({ type }: { type: EventType }) {
   const tone = isMacroType(type)
@@ -43,6 +44,33 @@ export function TimingBadge({ timing }: { timing: 'bmo' | 'amc' | 'unknown' }) {
   return (
     <span className="inline-flex items-center rounded-md border border-border bg-ink-800 px-1.5 py-0.5 text-[11px] font-medium text-ink-300">
       {timing === 'bmo' ? 'BMO' : 'AMC'}
+    </span>
+  )
+}
+
+/** EPS/revenue beat (green) or miss (red) as a percent of estimate. Renders nothing pre-report. */
+export function BeatMissBadge({ label, pct }: { label: string; pct: number | undefined }) {
+  if (pct == null || !Number.isFinite(pct)) return null
+  const beat = pct >= 0
+  return (
+    <span
+      className={clsx(
+        'tabular inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium',
+        beat
+          ? 'border-positive/30 bg-positive-soft text-positive'
+          : 'border-critical/30 bg-critical-soft text-critical',
+      )}
+    >
+      {label} {formatSignedPct(pct)}
+    </span>
+  )
+}
+
+/** Neutral pre-report estimate chip — "know what's expected" before there's an actual to compare. */
+export function EstimateBadge({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-center rounded-md border border-border bg-ink-800 px-1.5 py-0.5 text-[11px] text-ink-400">
+      {label} est {value}
     </span>
   )
 }

@@ -1,8 +1,8 @@
 # PROGRESS.md — Portlander live status
 
-**Last updated:** 2026-08-01
-**Last agent:** codex (session 17)
-**Current phase:** Phase 1.5 — SnapTrade brokerage sync live (Personal-auth mode, `snaptrade-sync` v18 / `snaptrade-connect` v17). Owner still needs to click "Connect brokerage" end-to-end at least once — that's the only unverified step left. `docs/PLAN-2026-08.md`'s full PR 1–7 sequence plus final boot-skeleton and Local/Demo truthfulness fixes (#20/#21), plus Settings Diagnostics/release metadata and the Portfolio table-first UI refinements, are on `develop`; `main`/Netlify has not been updated (deliberate — see the `develop`-workflow Decisions row).
+**Last updated:** 2026-08-02
+**Last agent:** claude (session 18)
+**Current phase:** Phase 2 — "Signal" (redefined 2026-08-01; scope in `docs/PLAN-PHASE-2.md`, superseded phase-3 AI plan in `docs/AI.md` — both merge via PR #27). Phase 1 promoted to `main` as v1.0 (PR #25/#26). Build order step 1 (structured EPS/revenue + beat/miss on `EventCard`) shipped this session; steps 2–4 (PEG snapshot, `Holding.thesis`, watchlist-on-calendar + week view) are next.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -16,9 +16,10 @@ Single source of truth for current state. If it's here, don't re-explain it else
 |------|--------|-------|
 | Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
 | Settings diagnostics + release metadata | ✅ Done on `develop` | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, phase and last-updated metadata |
-| Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
+| Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied, now including `events.eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual`. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
-| `sync-events` Edge Function | ✅ Live (v14) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
+| `sync-events` Edge Function | ✅ Live (v15) | Global/unscoped, `verify_jwt: true`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation. Now writes EPS/revenue estimate+actual to dedicated columns (previously `raw`-only) |
+| Phase 2 Signal — structured EPS/revenue beat/miss | ✅ Shipped (this session) | `events` table + `PortfolioEvent` carry `epsEstimate`/`epsActual`/`revenueEstimate`/`revenueActual`; `scoring.ts` computes `epsBeatMissPct`/`revenueBeatMissPct` locally (no AI); `EventCard` shows beat/miss badges post-report and a neutral "EPS est" chip pre-report. Existing live rows backfilled from `raw` so it's visible immediately, not just after tomorrow's cron |
 | Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
 | `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
 | `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner click-test still pending — see Blockers |
@@ -49,14 +50,13 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 ## Next up (ordered)
 
-1. **Owner:** click "Connect brokerage" → link Fidelity → "Sync now". Nothing to configure first.
-2. **Owner:** click-test "Refresh prices" too, if not already done.
-3. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
-4. **Owner:** merge `develop` → `main` when ready to deploy the final Phase 1 UI (costs a Netlify build minute, so deliberate, not automatic).
-5. On the deployed build, verify real-book weight/exposure sanity, sign-out clearing, mobile layout, and one real morning of use; then mark Phase 1 exit criteria formally.
-6. Phase 2 (prep cards, journal, alerts) can begin after that sign-off.
-
-**Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
+1. Phase 2 Signal, build order step 2: PEG snapshot per holding — new Finnhub `/stock/metric` call (verify free-tier endpoint + rate limit before committing), pure-math PEG, shown on `EventCard`/`PortfolioTable`.
+2. Build order step 3: `thesis` text column on `holdings` + Portfolio-page UI to write/edit it (freeform capture only — feeds Phase 3's drift detection, no AI processing in Phase 2).
+3. Build order step 4: watchlist tickers on the calendar (not just held positions) + a week view alongside the existing month view.
+4. Phase 3 ("Intelligence" — thesis drift, morning briefing, "what moved it", guidance summaries; see `docs/AI.md`) starts only once all of Phase 2 ships as `v2.0`.
+5. **Owner (background, not blocking):** DeepSeek API key + prepaid balance → Supabase Edge secrets `LLM_API_KEY`/`LLM_BASE_URL`/`LLM_MODEL` (generic names, not `DEEPSEEK_*`, so the provider shim stays swappable). No code depends on these until Phase 3.
+6. **Owner (still open since session 5):** check Netlify → Deploy contexts — Deploy Previews for PRs may burn build minutes separately from `main` pushes.
+7. **Owner, still pending:** click "Connect brokerage" → link Fidelity → "Sync now" end-to-end at least once (SnapTrade code has shipped but this path has never been exercised against a real sell/reconcile).
 
 ---
 
@@ -72,7 +72,8 @@ Single source of truth for current state. If it's here, don't re-explain it else
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |\n| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
+| 2026-08-01 | Portfolio opens on the book, not its management controls | Holdings/table plus total value and a complete-refresh daily gain/loss summary come first; import/export/add/search/filter/sort controls remain below the table, and desktop column ordering uses drag-and-drop instead of arrow buttons |
+| 2026-08-01 | Settings owns diagnostics and release metadata | Settings now has one Diagnostics card for backend/auth/positions/prices/events errors and retries, plus About this build. Version policy lives in AGENTS.md and `src/lib/appMeta.ts`; Phase 1 candidate is `v1.0`. |
 | 2026-08-01 | Daily sync moved to 9:31 a.m. `America/New_York`, DST-safe | Supabase's pg_cron scheduler stays on GMT. The single job wakes at both possible UTC equivalents (`31 13,14 * * *`) and its command runs only when New York local time is `09:31`, avoiding twice-yearly manual retuning without changing the database timezone |
 | 2026-07-31 | Cloud mode un-deferred; `develop` branch workflow adopted | Netlify's production branch is `main`; pushing to `develop` costs no build minutes, so PRs target `develop` and only merge to `main` when ready to ship |
 | 2026-07-31 | Daily cron via `pg_cron`/`pg_net` (SQL), not a dashboard tab; `net.http_post` timeout raised to 60s | The dashboard "Schedules" tab this file used to reference doesn't exist. A real sync takes ~16s server-side; `pg_net`'s 5s default was logging a misleading timeout even though the function completed fine |
@@ -89,12 +90,20 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | 2026-08-01 | `weightAnchor` (`max(5, p90weight × 1.5)`) is recomputed per book inside `scoreEvent` rather than memoized per render | Cheap at this portfolio's scale (tens of holdings, tens of events) — recomputing beats threading another precomputed value through every call site for no measurable benefit |
 | 2026-08-01 | Portfolio's mobile card layout ignores the desktop table's column customization (show/hide + reorder) — always the same fixed compact field set | Drag/reorder doesn't map cleanly onto a single column of cards, and the plan only asked for compact cards, not customizable ones. Column prefs stay a `sm:`-and-up affordance |
 | 2026-08-01 | Fixed the weight bar's undocumented `× 3` saturation (`PortfolioTable.tsx`, confirmed in `docs/PLAN-2026-08.md`'s verification table but never assigned to a PR) while already touching that file for PR 7's mobile cards | It silently maxed the bar out around 33% weight instead of 100%, on both the desktop cell and the new mobile card that shares its logic. Plain `min(100, weight)` now — same drive-by-fix-while-in-the-file precedent as PR 1's `resetDemo()` fix |
+| 2026-08-02 | Phase 2 Signal step 1's schema migration + `sync-events` redeploy applied directly to the live Supabase project (v14 → v15), plus a one-time backfill of `eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual` from existing rows' `raw` jsonb | Purely additive/nullable columns, zero risk to existing data; matches this file's own standing guidance ("`deploy_edge_function` works... don't hand the owner a deploy step you can do yourself"). Diffed `get_edge_function`'s live source against the repo before deploying, per AGENTS.md's mandatory rule — no drift found. Backfilling from `raw` means the 5 already-reported earnings in the live book show beat/miss immediately instead of waiting on tomorrow's cron |
 
 ---
 
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-02 — claude (session 18)
+- Phase 2 "Signal" build order step 1: promoted Finnhub's EPS/revenue estimate+actual out of `events.raw` into dedicated columns; `PortfolioEvent` carries them; `scoring.ts` computes `epsBeatMissPct`/`revenueBeatMissPct` (pure math, estimate-magnitude denominator so a beat on a loss-estimate reads positive); `EventCard` shows green/red beat-miss badges post-report and a neutral "EPS est" chip pre-report, plus an actual-vs-estimate detail line. No new Finnhub call.
+- Applied the schema migration and redeployed `sync-events` (v14 → v15) directly to the live Supabase project, diffing production source first per AGENTS.md; backfilled existing rows' new columns from `raw` so the 5 already-reported earnings in the real book show beat/miss immediately. See Decisions.
+- Demo data (`src/data/demo.ts`) got matching sample estimate/actual figures so Local/Demo mode demonstrates the feature too. 76 tests green (9 net new, `scoring.test.ts`); verified in a real browser (Playwright) — badges and colors render correctly on Today.
+- Key files: `supabase/schema.sql`, `supabase/functions/sync-events/index.ts`, `src/types/{index,database}.ts`, `src/lib/{mappers,scoring,format}.ts`, `src/components/ui/Badge.tsx`, `src/components/today/EventCard.tsx`, `src/data/demo.ts`.
+- PR: branch `claude/phase-2-signal-eps-revenue-w7euc5` → `develop` (draft).
 
 ### 2026-08-01 — codex (session 17)
 - Portfolio now opens on the holdings table with total value plus whole-book daily dollar and percentage change; incomplete price refreshes show an honest unavailable state.

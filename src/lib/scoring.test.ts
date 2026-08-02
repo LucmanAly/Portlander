@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeExposure,
+  epsBeatMissPct,
   holdingMarketValue,
   isEstimatedValue,
   portfolioDayChange,
@@ -8,6 +9,7 @@ import {
   portfolioTotalValue,
   portfolioWeightBasis,
   positionWeightPct,
+  revenueBeatMissPct,
   scoreAndFilterEvents,
   scoreEvent,
   scoreTier,
@@ -396,5 +398,38 @@ describe('date handling', () => {
   it('gives a same-day event full recency credit', () => {
     const scored = scoreEvent(earnings('AAA', '2026-08-01'), [], [], 0, TODAY)
     expect(scored.impactBreakdown.recencyComponent).toBe(10)
+  })
+})
+
+describe('beat/miss %', () => {
+  it('computes a positive EPS beat', () => {
+    expect(epsBeatMissPct({ epsEstimate: 1.0, epsActual: 1.1 })).toBeCloseTo(10, 5)
+  })
+
+  it('computes a negative EPS miss', () => {
+    expect(epsBeatMissPct({ epsEstimate: 1.0, epsActual: 0.9 })).toBeCloseTo(-10, 5)
+  })
+
+  it('uses the estimate magnitude so a beat on a negative (loss) estimate stays positive', () => {
+    // Loss narrower than expected (-$0.50 actual vs -$1.00 estimated) is a beat, not a miss.
+    expect(epsBeatMissPct({ epsEstimate: -1.0, epsActual: -0.5 })).toBeCloseTo(50, 5)
+  })
+
+  it('is undefined before a report (no actual yet)', () => {
+    expect(epsBeatMissPct({ epsEstimate: 1.0, epsActual: undefined })).toBeUndefined()
+    expect(epsBeatMissPct({ epsEstimate: undefined, epsActual: undefined })).toBeUndefined()
+  })
+
+  it('is undefined when the estimate is exactly zero', () => {
+    expect(epsBeatMissPct({ epsEstimate: 0, epsActual: 0.1 })).toBeUndefined()
+  })
+
+  it('computes revenue beat/miss the same way', () => {
+    expect(
+      revenueBeatMissPct({ revenueEstimate: 1_000_000_000, revenueActual: 1_050_000_000 }),
+    ).toBeCloseTo(5, 5)
+    expect(
+      revenueBeatMissPct({ revenueEstimate: 1_000_000_000, revenueActual: undefined }),
+    ).toBeUndefined()
   })
 })

@@ -105,6 +105,10 @@ export interface Database {
           source: string | null
           description: string | null
           raw: Json | null
+          eps_estimate: number | string | null
+          eps_actual: number | string | null
+          revenue_estimate: number | string | null
+          revenue_actual: number | string | null
           created_at: string
           updated_at: string
         }
@@ -121,6 +125,10 @@ export interface Database {
           source?: string | null
           description?: string | null
           raw?: Json | null
+          eps_estimate?: number | null
+          eps_actual?: number | null
+          revenue_estimate?: number | null
+          revenue_actual?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -137,6 +145,10 @@ export interface Database {
           source?: string | null
           description?: string | null
           raw?: Json | null
+          eps_estimate?: number | null
+          eps_actual?: number | null
+          revenue_estimate?: number | null
+          revenue_actual?: number | null
           created_at?: string
           updated_at?: string
         }
