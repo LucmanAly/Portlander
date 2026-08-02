@@ -1,13 +1,12 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-02
-**Last agent:** claude (session 19)
-**Current phase:** Phase 2 UI/UX overhaul — `UX-01`–`UX-11` all complete on
-`claude/uiux-overhaul-review-yapmlj`, awaiting merge to `develop`. Phase 1 `v1.0` was promoted to
-`main` in PRs #25/#26; its remaining manual checks are post-release acceptance. The approved visual
-baseline is the Portlander Magic Patterns event-intelligence prototype, refined by the master queue
-below rather than copied blindly. Next: the Finnhub-normalization/DeepSeek backend queue below,
-once the owner approves this branch as the Phase 2 frontend baseline.
+**Last agent:** claude (session 20)
+**Current phase:** Phase 2 UI/UX overhaul (`UX-01`–`UX-11`) approved and merged to `develop`. Now
+mid-way through the earnings intelligence backend queue: `BE-01`–`BE-03` done (real Finnhub
+consensus/actual/surprise now reach the client; guidance/reaction stay honestly undefined). Phase 1
+`v1.0` was promoted to `main` in PRs #25/#26; its remaining manual checks are post-release
+acceptance. Next: `BE-04` (real historical beat/miss).
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -32,8 +31,8 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Calendar | ✅ Weight-aware (PR 7) | `MonthCalendar` dot size now tracks position weight; agenda dates go through `formatEventDay` |
 | Phase 1 v1.0 promotion | ✅ Merged to `main` | PR #25 promoted `develop`; PR #26 recorded the final release metadata |
 | Phase 1 acceptance | 🟡 Manual verification remains | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning still need owner confirmation |
-| Phase 2 UI/UX overhaul | ✅ UX-01–UX-11 done | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass — all on `claude/uiux-overhaul-review-yapmlj`, awaiting owner approval + merge to `develop` |
-| Phase 2 earnings intelligence (backend) | ⬜ Not started | UI contracts are now truthful and done (above); see "Next: earnings intelligence backend queue" below for the ordered Finnhub/DeepSeek work |
+| Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
+| Phase 2 earnings intelligence (backend) | 🟡 `BE-01`–`BE-03` done | Real consensus/actual/surprise now read from `events.raw` (Finnhub payload `sync-events` already stored); real facts take priority over the demo fixture per ticker. Guidance/reaction left honestly undefined — Finnhub's calendar endpoint has neither. `BE-04`–`BE-06` (history backfill, fixture retirement, DeepSeek) remain — see queue below |
 
 ---
 
@@ -181,24 +180,29 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 typed fixtures (`src/data/earningsFixtures.ts`) because no live source populates consensus,
 actual results, surprise, guidance, or reaction — see UX-02's and UX-09's notes in this file and
 in `docs/UI.md`. This is the ordered work to make that data real, one focused PR per item, same
-discipline as the UI queue above. Do not start on any of these until the owner has approved the
-UI overhaul branch — this queue is additive to a merged, approved baseline, not a parallel track.
+discipline as the UI queue above. The owner approved the UI overhaul branch and it's merged to
+`develop`, so `BE-01`–`BE-03` are now done (below); `BE-04` is next.
 
-- [ ] **BE-01 — Read the Finnhub payload the app already fetches.** `sync-events`'s
-  `FinnhubEarning` type already carries `epsEstimate`/`epsActual`/`revenueEstimate`/
-  `revenueActual`/`quarter`/`year`; today only EPS reaches `description` as text and the rest
-  dies in the unread `events.raw` jsonb column. Add typed columns (or read `raw` in
-  `eventFromRow()`) so `consensus`/`actual` reach the client as real numbers, not prose.
-- [ ] **BE-02 — Compute surprise server- or client-side.** `epsSurprisePct`/`revenueSurprisePct`
-  are pure math once BE-01 lands (`(actual - estimate) / |estimate| * 100`); no new provider
-  call needed. Decide once: compute in `sync-events` at write time, or derive in
-  `buildEarningsCardModel` at read time — pick one, don't do both.
-- [ ] **BE-03 — Source guidance and reaction, or drop those fields honestly.** Finnhub's
-  `/calendar/earnings` endpoint has neither. Guidance needs a different endpoint/provider (or
-  stays manually-curated, low volume); reaction needs a quote pulled shortly after the report
-  (can reuse `refresh-quotes`'s Finnhub quote call, timed off `eventDate`+`timing`). If neither
-  is worth building yet, remove the fields from the UI rather than leaving them permanently
-  empty — an honest smaller model beats a hopeful unfillable one.
+- [x] **BE-01 — Read the Finnhub payload the app already fetches.** `sync-events`'s `toEventRow()`
+  was already storing the full `FinnhubEarning` object (`epsEstimate`/`epsActual`/
+  `revenueEstimate`/`revenueActual`/`quarter`/`year`) into `events.raw` — no Edge Function change
+  or migration needed, and `select('*')` already returns it. Added `raw`/`updatedAt` to
+  `PortfolioEvent` (`src/types/index.ts`), read in `eventFromRow()` (`src/lib/mappers.ts`), and a
+  new `earningsFactsFromRaw()` (`src/lib/earningsIntel.ts`) that turns it into typed
+  `consensus`/`actual` numbers. `buildEarningsCards()` now prefers real facts over the ticker's
+  demo fixture when `raw` is present, falling back to the fixture otherwise.
+- [x] **BE-02 — Compute surprise client-side.** `earningsFactsFromRaw()` computes
+  `epsSurprisePct`/`revenueSurprisePct`/`*SurpriseAbs` at read time from consensus vs actual
+  (`(actual - estimate) / |estimate| * 100`, division-by-zero guarded). Chose read-time over
+  writing it in `sync-events` — one computation point, and no Edge Function redeploy needed to
+  land it.
+- [x] **BE-03 — Guidance and reaction, dropped honestly for now.** Finnhub's `/calendar/earnings`
+  endpoint has neither field, and building a second provider integration (guidance) or a
+  timed post-report quote pull (reaction, via `refresh-quotes`) is real scope beyond this pass.
+  `earningsFactsFromRaw()` deliberately never sets them; the UI already renders their absence as
+  nothing (`EarningsReportCard`'s guidance/reaction blocks are already conditional — several demo
+  fixtures already lack one or both), so no UI removal was needed. Revisit as its own task if
+  guidance/reaction turn out to matter enough to justify a real source.
 - [ ] **BE-04 — Real historical beat/miss.** `HistoricalBeatStrip` needs the last N quarters'
   actual-vs-consensus per ticker; Finnhub's earnings-calendar `from`/`to` range can be widened
   backward per ticker to backfill this instead of inventing a new provider call.
@@ -218,12 +222,10 @@ UI overhaul branch — this queue is additive to a merged, approved baseline, no
 
 ## Next up (ordered)
 
-1. **Owner:** review and merge the PR for `claude/uiux-overhaul-review-yapmlj` → `develop`
-   (`UX-01`–`UX-11`, one commit per task plus a docs commit). It carries the `main`→`develop`
-   reconciliation too, so merging it also closes that gap. This is the full Phase 2 frontend
-   baseline — see the state matrix and visual-QA notes in `docs/UI.md` before approving.
-2. **Agent:** once approved and merged, claim and implement `BE-01` from the earnings
-   intelligence backend queue above.
+1. **Owner:** review and merge the PR carrying `BE-01`–`BE-03` (real Finnhub consensus/actual/
+   surprise; guidance/reaction honestly undefined) into `develop`.
+2. **Agent:** once merged, claim and implement `BE-04` (real historical beat/miss) from the
+   earnings intelligence backend queue above.
 3. **Owner, in parallel:** click-test Connect brokerage → Fidelity → Sync now and Refresh prices on
    the deployed `v1.0` build.
 4. **Owner, in parallel:** verify real-book weight/exposure, sign-out clearing, mobile layout, and
@@ -247,6 +249,9 @@ UI overhaul branch — this queue is additive to a merged, approved baseline, no
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-02 | `BE-01` read `events.raw` instead of adding typed DB columns/a migration | `sync-events`'s `toEventRow()` already stored the full Finnhub row into `raw` (confirmed by reading the deployed function's own source), and `portfolioRepository.ts` already `select('*')`s the row — so no schema change, no migration, no redeploy was needed to get real numbers to the client. Also avoided a hard dependency on Supabase MCP tooling being connected, which it wasn't this session. |
+| 2026-08-02 | Real per-ticker facts (from `raw`) take priority over `earningsFixtures.ts`, but a fixture's `interpretation` never attaches to real facts | `buildEarningsCards()` now computes `earningsFactsFromRaw()` first and only falls back to the ticker's fixture when there's no raw payload (macro rows, fixture-only synthetic events). If real facts exist, `interpretation` is forced to `undefined` rather than reused from the fixture — a DeepSeek summary written against demo numbers must never get attached to a real event's numbers. `GeneratedInsight` already renders nothing when `interpretation` is absent, so this fails safe by construction, matching `BE-06`'s eventual real-facts-only rule. |
+| 2026-08-02 | `BE-03`: guidance/reaction stay undefined for real events rather than removed from the UI | Finnhub's `/calendar/earnings` endpoint returns neither field; sourcing them for real (a second provider for guidance, a timed post-report quote pull via `refresh-quotes` for reaction) is scope beyond this pass. Chose "honestly absent" over "remove from the UI" because the UI already renders both conditionally — several fixture tickers (NVDA, RIVN, ARM, GOOGL) already omit one or both with no broken layout, so there was no unconditional rendering to remove. |
 | 2026-08-02 | Phase 2 is the event-intelligence overhaul; the old Phase 2/3 roadmaps are canceled | The Magic Patterns prototype is the visual baseline, refined through `UX-01`–`UX-11`. Finnhub/provider data remains the source of financial facts; DeepSeek is limited to labeled structured interpretation after the UI/data contracts are truthful. |
 | 2026-08-02 | UI work uses a single claim-and-advance queue | `NEXT_TASK` and `ACTIVE_CLAIM` make the next safe task explicit for every new agent. One focused queue item per PR prevents parallel agents from silently duplicating or skipping work. |
 | 2026-08-02 | `UX-01`–`UX-05` shipped as 5 commits on one branch/PR (`claude/uiux-overhaul-review-yapmlj` → `develop`), not 5 separate PRs | This session's harness restricted pushes to a single designated branch. Each task is still its own commit with its own build/lint/test-green checkpoint, matching the one-task-per-PR spirit as closely as the constraint allows — split into real separate PRs on a future session if that matters more than landing all five together. |
@@ -282,6 +287,20 @@ UI overhaul branch — this queue is additive to a merged, approved baseline, no
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-02 — claude (session 20)
+- Implemented `BE-01`–`BE-03` from the earnings intelligence backend queue, owner-approved after
+  the UX overhaul merged: added `raw`/`updatedAt` to `PortfolioEvent` (`src/types/index.ts`), read
+  in `eventFromRow()` (`src/lib/mappers.ts`), and a new `earningsFactsFromRaw()` in
+  `src/lib/earningsIntel.ts` that turns the already-stored Finnhub payload into typed
+  `consensus`/`actual`/`surprise` — no migration or Edge Function redeploy needed (see Decisions).
+  `buildEarningsCards()` now prefers real facts over the ticker's demo fixture, with fixture
+  `interpretation` suppressed whenever real facts are used.
+- 11 new unit tests covering `earningsFactsFromRaw()` (malformed/non-finite fields, division-by-
+  zero guard, no guidance/reaction fabrication) and `buildEarningsCards()`'s real-vs-fixture
+  precedence. `npm run build`/`lint`/`test` all green — 264/264 tests.
+- Not done: `BE-04`–`BE-06` (historical beat/miss backfill, fixture retirement, DeepSeek
+  interpretation) — next up per the queue above.
 
 ### 2026-08-02 — claude (session 19, continued)
 - Implemented `UX-06`–`UX-11` on the same branch, completing the master queue: Calendar overhaul

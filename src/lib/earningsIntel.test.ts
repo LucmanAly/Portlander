@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEarningsCardModel, deriveEarningsViewState } from '@/lib/earningsIntel'
+import { buildEarningsCardModel, buildEarningsCards, deriveEarningsViewState, earningsFactsFromRaw } from '@/lib/earningsIntel'
 import type { ScoredEvent } from '@/types'
 
 const TODAY = new Date(2026, 7, 2) // 2026-08-02
@@ -90,5 +90,94 @@ describe('buildEarningsCardModel', () => {
     )
     expect(model.interpretation?.summary).toBe('Beat expectations')
     expect('interpretation' in (model.facts ?? {})).toBe(false)
+  })
+})
+
+describe('earningsFactsFromRaw', () => {
+  it('returns undefined when there is no raw payload', () => {
+    expect(earningsFactsFromRaw(undefined)).toBeUndefined()
+    expect(earningsFactsFromRaw(null)).toBeUndefined()
+    expect(earningsFactsFromRaw('not an object')).toBeUndefined()
+  })
+
+  it('reads consensus/actual as real numbers from the stored Finnhub row', () => {
+    const facts = earningsFactsFromRaw({
+      epsEstimate: 1.5,
+      epsActual: 1.64,
+      revenueEstimate: 94_500_000_000,
+      revenueActual: 96_200_000_000,
+    })
+    expect(facts?.consensus).toEqual({ epsEstimate: 1.5, revenueEstimate: 94_500_000_000 })
+    expect(facts?.actual).toEqual({ epsActual: 1.64, revenueActual: 96_200_000_000 })
+  })
+
+  it('computes surprise pct/abs from consensus vs actual', () => {
+    const facts = earningsFactsFromRaw({ epsEstimate: 1.5, epsActual: 1.64 })
+    expect(facts?.surprise?.epsSurprisePct).toBeCloseTo(9.333, 2)
+    expect(facts?.surprise?.epsSurpriseAbs).toBeCloseTo(0.14, 5)
+    expect(facts?.surprise?.revenueSurprisePct).toBeUndefined()
+  })
+
+  it('omits surprise entirely when there is no consensus to diff against', () => {
+    const facts = earningsFactsFromRaw({ epsActual: 2.1 })
+    expect(facts?.actual?.epsActual).toBe(2.1)
+    expect(facts?.surprise).toBeUndefined()
+  })
+
+  it('never fabricates guidance or reaction — Finnhub has neither', () => {
+    const facts = earningsFactsFromRaw({ epsEstimate: 1, epsActual: 1.1 })
+    expect(facts?.guidance).toBeUndefined()
+    expect(facts?.reaction).toBeUndefined()
+  })
+
+  it('does not divide by zero when the consensus estimate is 0', () => {
+    const facts = earningsFactsFromRaw({ epsEstimate: 0, epsActual: 0.1 })
+    expect(facts?.surprise?.epsSurprisePct).toBeUndefined()
+  })
+
+  it('ignores non-finite/malformed provider fields rather than throwing', () => {
+    const facts = earningsFactsFromRaw({ epsEstimate: 'n/a', epsActual: NaN, revenueEstimate: 500 })
+    expect(facts?.consensus).toEqual({ epsEstimate: undefined, revenueEstimate: 500 })
+    expect(facts?.actual).toBeUndefined()
+  })
+
+  it('capitalizes the event source for display and threads fetchedAt through', () => {
+    const facts = earningsFactsFromRaw({ epsEstimate: 1 }, 'finnhub', '2026-08-01T12:00:00Z')
+    expect(facts?.provenance).toEqual({ source: 'Finnhub', fetchedAt: '2026-08-01T12:00:00Z' })
+  })
+})
+
+describe('buildEarningsCards', () => {
+  function rawEvent(overrides: Partial<ScoredEvent> = {}): ScoredEvent {
+    return scoredEvent({
+      id: 'ev-real-aapl',
+      ticker: 'AAPL',
+      eventDate: '2026-07-30',
+      source: 'finnhub',
+      raw: { epsEstimate: 2, epsActual: 2.2, revenueEstimate: 1000, revenueActual: 900 },
+      updatedAt: '2026-08-01T00:00:00Z',
+      ...overrides,
+    })
+  }
+
+  it('prefers real facts derived from raw over the AAPL demo fixture', () => {
+    const [card] = buildEarningsCards([rawEvent()], new Date(2026, 7, 2))
+    expect(card.facts?.consensus?.epsEstimate).toBe(2)
+    expect(card.facts?.actual?.epsActual).toBe(2.2)
+    expect(card.facts?.provenance?.source).toBe('Finnhub')
+  })
+
+  it('drops the fixture interpretation when real facts are used, to avoid mismatched generated prose', () => {
+    const [card] = buildEarningsCards([rawEvent()], new Date(2026, 7, 2))
+    expect(card.interpretation).toBeUndefined()
+  })
+
+  it('falls back to the fixture (facts + interpretation) when there is no raw payload', () => {
+    const [card] = buildEarningsCards(
+      [scoredEvent({ id: 'ev-fixture-aapl', ticker: 'AAPL', eventDate: '2026-07-30' })],
+      new Date(2026, 7, 2),
+    )
+    expect(card.facts?.consensus?.epsEstimate).toBe(1.5)
+    expect(card.interpretation?.summary).toContain('Beat on both lines')
   })
 })

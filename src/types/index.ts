@@ -56,6 +56,14 @@ export interface PortfolioEvent {
   source?: string
   /** Optional notes from data provider */
   description?: string
+  /**
+   * Raw provider payload as stored by sync-events (Finnhub's earnings-calendar
+   * row for `earnings` events today). Only earningsIntel.ts's
+   * earningsFactsFromRaw() interprets this shape — kept opaque here so this
+   * generic event type doesn't grow a Finnhub-specific dependency.
+   */
+  raw?: Record<string, unknown> | null
+  updatedAt?: string
 }
 
 export interface ScoredEvent extends PortfolioEvent {

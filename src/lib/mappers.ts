@@ -117,5 +117,7 @@ export function eventFromRow(row: EventRow): PortfolioEvent {
     status: asStatus(row.status),
     source: row.source ?? undefined,
     description: row.description ?? undefined,
+    raw: (row.raw as Record<string, unknown> | null) ?? undefined,
+    updatedAt: row.updated_at,
   }
 }
