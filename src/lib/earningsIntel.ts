@@ -1,6 +1,8 @@
 import { startOfDay } from 'date-fns'
 import type { ScoredEvent } from '@/types'
 import type { EarningsCardModel, EarningsFacts, EarningsViewState, GeneratedInterpretation } from '@/types/earnings'
+import { sortEventsByImpact } from '@/lib/scoring'
+import { EARNINGS_FIXTURES } from '@/data/earningsFixtures'
 
 /**
  * Future event date → `upcoming`. Today-or-past without an `actual` yet →
@@ -45,4 +47,18 @@ export function buildEarningsCardModel(
     facts,
     interpretation,
   }
+}
+
+/**
+ * Filters to ticker-bearing earnings events, sorts by impact, and looks up
+ * fixture facts by ticker. Shared by Today's deck (after its own D-1..D+1
+ * window filter) and the Earnings workspace (no window filter beyond its
+ * own query range) so both build cards the same way.
+ */
+export function buildEarningsCards(events: ScoredEvent[], today: Date = new Date()): EarningsCardModel[] {
+  const earningsOnly = events.filter((e) => e.eventType === 'earnings' && e.ticker)
+  return sortEventsByImpact(earningsOnly).map((e) => {
+    const fixture = EARNINGS_FIXTURES[e.ticker as string]
+    return buildEarningsCardModel(e, fixture, fixture?.interpretation, today)
+  })
 }

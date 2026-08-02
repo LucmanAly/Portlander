@@ -24,9 +24,31 @@ Fonts: IBM Plex Sans + IBM Plex Mono (Google Fonts in `index.html`).
 - Shell: `AppShell` — desktop sidebar, mobile bottom nav, 5 routes: `Today / Earnings /
   Calendar / Portfolio / Settings`. No "Book value" card in the sidebar (removed UX-01) —
   `RefreshQuotesButton` is the sole sidebar footer content.
-- Today: `ExposureStrip`, `EventCard`, `FilterBar`, `SortToggle`
+- Today (Morning Desk, UX-03): `MorningHeader`, `EarningsDeck` (+ `CarouselControls`,
+  `useSwipe`), `NeedsAttention`. `FilterBar`/`SortToggle` no longer used here — the full
+  schedule lives on Earnings/Calendar. `EventCard` was retired in UX-04, replaced by
+  `EarningsReportCard`.
+- Earnings workspace (UX-04): `EarningsStatusFilter`, grouped `EarningsReportCard`
+  (`compact` variant) via `groupEarningsCards`. Reuses `ForwardExposurePanel` and
+  `SortToggle` from Today.
+- Exposure: `ForwardExposurePanel` (`components/exposure/`) — replaces the old
+  `ExposureStrip`'s 3 separate cards with one hairline-divided panel. Shared by Today and
+  Earnings.
+- Earnings intelligence (UX-02): `EarningsReportCard`, `HistoricalBeatStrip`,
+  `GeneratedInsight` — see `src/types/earnings.ts` for the model. No live data source
+  populates consensus/actual/surprise/guidance/reaction yet; `src/data/earningsFixtures.ts`
+  is the interim source.
 - Calendar: `MonthCalendar`
-- Primitives: `Badge`, `Stat`, `Skeleton`, `Button`/`PillButton`, `.input`
+- Primitives: `Badge` (+ `EarningsStateBadge`), `Stat`, `Skeleton`, `Button`/`PillButton`,
+  `MetricPair`, `FreshnessLabel`, `CarouselControls`, `EmptyState`, `.input`
+
+## Earnings workspace filter semantics (UX-04)
+
+`EarningsStatusFilter`'s 4 options map onto `EarningsViewState` as: **Active** =
+`awaiting` (results due but not yet in), **Upcoming** = `upcoming`, **Recently reported** =
+`reported` within the last 7 days, **All** = no filter. The 7-day window is a product
+choice, not a data constraint — adjust `RECENT_WINDOW_DAYS` in
+`EarningsStatusFilter.tsx` if that changes.
 
 ## Micro-label convention
 

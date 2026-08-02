@@ -1,9 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import type { ScoredEvent } from '@/types'
 import type { EarningsCardModel } from '@/types/earnings'
-import { sortEventsByImpact } from '@/lib/scoring'
-import { buildEarningsCardModel } from '@/lib/earningsIntel'
-import { EARNINGS_FIXTURES } from '@/data/earningsFixtures'
+import { buildEarningsCards } from '@/lib/earningsIntel'
 
 /**
  * Cards stay active from D-1 through D+1, sorted by impact. Callers should
@@ -14,13 +12,9 @@ import { EARNINGS_FIXTURES } from '@/data/earningsFixtures'
  */
 export function selectDeckCards(events: ScoredEvent[], today: Date = new Date()): EarningsCardModel[] {
   const inWindow = events.filter((e) => {
-    if (e.eventType !== 'earnings' || !e.ticker) return false
     const days = differenceInCalendarDays(parseISO(e.eventDate), today)
     return days >= -1 && days <= 1
   })
 
-  return sortEventsByImpact(inWindow).map((e) => {
-    const fixture = EARNINGS_FIXTURES[e.ticker as string]
-    return buildEarningsCardModel(e, fixture, fixture?.interpretation, today)
-  })
+  return buildEarningsCards(inWindow, today)
 }
