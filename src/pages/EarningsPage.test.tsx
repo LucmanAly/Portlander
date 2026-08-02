@@ -9,7 +9,7 @@ import type { Holding, PortfolioEvent } from '@/types'
 const today = new Date()
 const iso = (d: Date) => format(d, 'yyyy-MM-dd')
 
-function earningsEvent(ticker: string, eventDate: Date): PortfolioEvent {
+function earningsEvent(ticker: string, eventDate: Date, raw?: Record<string, unknown>): PortfolioEvent {
   return {
     id: `ev-${ticker}`,
     ticker,
@@ -18,17 +18,19 @@ function earningsEvent(ticker: string, eventDate: Date): PortfolioEvent {
     eventDate: iso(eventDate),
     timing: 'amc',
     status: 'confirmed',
-    source: 'fixture',
+    source: 'finnhub',
+    raw,
   }
 }
 
-// Tickers chosen to match src/data/earningsFixtures.ts entries so viewState
-// derives from real facts: AAPL/META have `actual`, NVDA/RIVN don't.
+// Real per-ticker `raw` payloads (BE-01/02) drive viewState now, not the
+// retired ticker-name fixture fallback (BE-05): RIVN has no data at all,
+// NVDA has consensus only, AAPL/META have a real `epsActual`.
 const EVENTS: PortfolioEvent[] = [
-  earningsEvent('RIVN', addDays(today, 10)), // upcoming (no consensus actual)
-  earningsEvent('NVDA', today), // awaiting (no actual yet)
-  earningsEvent('AAPL', subDays(today, 3)), // reported, within 7 days
-  earningsEvent('META', subDays(today, 10)), // reported, older than 7 days but within the 14-day lookback
+  earningsEvent('RIVN', addDays(today, 10)), // upcoming (no consensus/actual at all)
+  earningsEvent('NVDA', today, { epsEstimate: 0.98 }), // awaiting (consensus only, no actual yet)
+  earningsEvent('AAPL', subDays(today, 3), { epsEstimate: 1.5, epsActual: 1.64 }), // reported, within 7 days
+  earningsEvent('META', subDays(today, 10), { epsEstimate: 5.4, epsActual: 5.1 }), // reported, older than 7 days but within the 14-day lookback
 ]
 
 const HOLDINGS: Holding[] = [

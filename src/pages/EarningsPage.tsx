@@ -31,7 +31,7 @@ export function EarningsPage() {
       today,
       filter: 'earnings',
     })
-    return buildEarningsCards(scored, today)
+    return buildEarningsCards(scored, today, events)
   }, [events, holdings, watchlist, today])
 
   const filtered = useMemo(() => filterEarningsByStatus(allCards, filter, today), [allCards, filter, today])

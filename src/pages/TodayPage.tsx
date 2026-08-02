@@ -28,7 +28,7 @@ export function TodayPage() {
       }),
     [events, holdings, watchlist, today],
   )
-  const deckCards = useMemo(() => selectDeckCards(deckEvents, today), [deckEvents, today])
+  const deckCards = useMemo(() => selectDeckCards(deckEvents, today, events), [deckEvents, today, events])
   const attentionEvents = useMemo(() => needsAttentionEvents(upcoming14), [upcoming14])
 
   const totalValue = portfolioTotalValue(holdings)

@@ -2,14 +2,22 @@ import type { PortfolioEvent } from '@/types'
 import type { EarningsFacts, GeneratedInterpretation } from '@/types/earnings'
 
 /**
- * Typed fixture data for the event-intelligence UI (UX-02 onward). No live data
- * source in this app fetches consensus/actual/surprise/guidance/reaction yet —
- * see src/lib/earningsIntel.ts's doc comment — so Today's deck and the Earnings
- * workspace look up facts here by ticker until a real provider is wired.
+ * Typed fixture data for the event-intelligence UI (UX-02 onward).
+ *
+ * As of BE-01–BE-05, this is unit-test fixture data only — Today's deck and
+ * the Earnings workspace (`buildEarningsCards` in `src/lib/earningsIntel.ts`)
+ * read real consensus/actual/surprise/history from each event's own stored
+ * Finnhub payload and never fall back to a ticker-matched entry here. That
+ * fallback was retired in BE-05: a real AAPL or META holding must not get
+ * decorated with these demo numbers just because the ticker happens to
+ * collide with one of the 8 states below. `EarningsReportCard.test.tsx`,
+ * `EarningsDetailDrawer.test.tsx`, and `EarningsDeck.test.tsx` read this file
+ * directly (via `buildEarningsCardModel`, not `buildEarningsCards`) to cover
+ * all 8 states without needing a live sync — keep it around for that, but
+ * don't wire it back into the production data path.
  *
  * Revenue/EPS are stored as raw numbers (not pre-formatted strings), matching
- * what a real provider would return, so swapping this lookup for a live one
- * later is a data-source change, not a shape change.
+ * what a real provider returns.
  */
 
 /** Fixed reference date so fixture-driven tests never depend on the wall clock. */

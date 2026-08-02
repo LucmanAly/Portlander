@@ -107,6 +107,11 @@ export interface Database {
           raw: Json | null
           created_at: string
           updated_at: string
+          eps_estimate: number | string | null
+          eps_actual: number | string | null
+          revenue_estimate: number | string | null
+          revenue_actual: number | string | null
+          ai_interpretation: Json | null
         }
         Insert: {
           id?: string
@@ -123,6 +128,11 @@ export interface Database {
           raw?: Json | null
           created_at?: string
           updated_at?: string
+          eps_estimate?: number | null
+          eps_actual?: number | null
+          revenue_estimate?: number | null
+          revenue_actual?: number | null
+          ai_interpretation?: Json | null
         }
         Update: {
           id?: string
@@ -139,6 +149,11 @@ export interface Database {
           raw?: Json | null
           created_at?: string
           updated_at?: string
+          eps_estimate?: number | null
+          eps_actual?: number | null
+          revenue_estimate?: number | null
+          revenue_actual?: number | null
+          ai_interpretation?: Json | null
         }
         Relationships: []
       }
