@@ -61,10 +61,22 @@ for this contrast level. Accent-colored eyebrow/kicker text (page headers, e.g. 
 radar") is a different, intentional pattern and keeps its existing all-caps `accent-500`
 styling — this convention only applies to neutral-toned micro-labels.
 
-As of UX-07 this has been applied to `Stat`, `PortfolioPage`'s `Field`/"Manage holdings"
-heading, the shell nav, Calendar's weekday headers/agenda heading, and `PortfolioTable`'s
-header row/column-customization panel/mobile card labels — UX-08 still owns the Settings
-sweep.
+As of UX-08 this has been applied everywhere except accent-colored eyebrow/kicker text on
+every page, which is intentionally excluded (see above).
+
+## Settings information architecture (UX-08)
+
+Six sections in a fixed order — `Account`, `Brokerage`, `Data & sync`, `Earnings
+intelligence`, `Diagnostics`, `About this build` — via the shared `SettingsSection`
+wrapper, with a sticky anchor-link nav (`#account`, `#brokerage`, etc.) at the top so a
+long page never has to be scrolled blind. Account and Brokerage always render (never
+conditionally hidden) so every nav link always resolves to real content: when Supabase
+isn't configured or the user isn't signed in, the section explains why and links to the
+section that unblocks it, instead of disappearing. `Earnings intelligence` is new —
+static disclosure of what backs the consensus/actual/guidance data (see UX-02) and the
+verified/generated separation policy. Diagnostics keeps every health check, actionable
+raw error text, and retry action unchanged. Release metadata stays wired to
+`src/lib/appMeta.ts` (`v1.0`) — never the prototype's placeholder version string.
 
 ## Portfolio workspace (UX-07)
 

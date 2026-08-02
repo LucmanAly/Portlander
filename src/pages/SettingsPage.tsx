@@ -1,9 +1,18 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatRelativeSync } from '@/lib/format'
 import { APP_LAST_UPDATED, APP_PHASE, APP_VERSION, formatAppUpdatedAt } from '@/lib/appMeta'
-import { useState, type FormEvent } from 'react'
-import { AlertCircle, CheckCircle2, CircleHelp, RefreshCw } from 'lucide-react'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { AlertCircle, CheckCircle2, CircleHelp, RefreshCw, Sparkles } from 'lucide-react'
 import clsx from 'clsx'
+
+const NAV_ITEMS = [
+  { id: 'account', label: 'Account' },
+  { id: 'brokerage', label: 'Brokerage' },
+  { id: 'data-sync', label: 'Data & sync' },
+  { id: 'earnings-intelligence', label: 'Earnings intelligence' },
+  { id: 'diagnostics', label: 'Diagnostics' },
+  { id: 'about', label: 'About' },
+]
 
 export function SettingsPage() {
   const {
@@ -97,40 +106,136 @@ export function SettingsPage() {
         </p>
       </header>
 
-      <section className="surface-elevated space-y-4 rounded-2xl p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-              About this build
-            </h2>
-            <p className="mt-1 text-sm text-ink-400">
-              Release metadata for the version currently running.
-            </p>
-          </div>
-          <span className="tabular rounded-lg bg-accent-glow px-2.5 py-1 text-sm font-semibold text-accent-300 ring-1 ring-accent-500/30">
-            v{APP_VERSION}
-          </span>
-        </div>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-ink-500">Phase</dt>
-            <dd className="font-medium text-ink-100">{APP_PHASE}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-500">Last updated</dt>
-            <dd className="font-medium text-ink-100">
-              {formatAppUpdatedAt(APP_LAST_UPDATED)}
-            </dd>
-          </div>
-        </dl>
-        <p className="text-xs leading-relaxed text-ink-500">
-          The timestamp is updated with the release metadata when a version is promoted to
-          <code className="mx-1 text-ink-300">main</code>.
-        </p>
-      </section>
+      <nav
+        aria-label="Settings sections"
+        className="surface sticky top-0 z-10 flex gap-1.5 overflow-x-auto rounded-xl p-1.5"
+      >
+        {NAV_ITEMS.map((item) => (
+          <a
+            key={item.id}
+            href={`#${item.id}`}
+            className="focus-ring shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-ink-400 transition hover:bg-ink-800 hover:text-ink-100"
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
 
-      <section className="surface-elevated space-y-4 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">Data</h2>
+      <SettingsSection id="account" title="Account">
+        {!supabaseConfigured ? (
+          <p className="text-sm text-ink-500">
+            Local / demo mode — sign-in is unavailable until Supabase is configured. See{' '}
+            <a href="#data-sync" className="text-accent-400 hover:text-accent-300">
+              Data &amp; sync
+            </a>{' '}
+            for setup steps.
+          </p>
+        ) : user ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-ink-300">
+              Signed in as <span className="text-ink-100">{user.email}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={onMagicLink} className="space-y-3">
+            <p className="text-sm text-ink-400">
+              Magic-link sign-in. After auth, holdings/watchlist write to Supabase; events load
+              from the DB (global macro + your rows).
+            </p>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-ink-450">Email</span>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="input"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={authBusy}
+              className="focus-ring rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-accent-400 disabled:opacity-50"
+            >
+              {authBusy ? 'Sending…' : 'Send magic link'}
+            </button>
+            {authMsg ? (
+              <p className={clsx('text-sm', authMsg.includes('Check') ? 'text-accent-400' : 'text-critical')}>
+                {authMsg}
+              </p>
+            ) : null}
+          </form>
+        )}
+      </SettingsSection>
+
+      <SettingsSection
+        id="brokerage"
+        title="Brokerage"
+        description="Connect a brokerage via SnapTrade to sync real positions into Portfolio. CSV/manual entries stay available for any ticker your brokerage doesn't cover."
+      >
+        {!supabaseConfigured || !user ? (
+          <p className="text-sm text-ink-500">
+            Sign in under{' '}
+            <a href="#account" className="text-accent-400 hover:text-accent-300">
+              Account
+            </a>{' '}
+            first to connect a brokerage.
+          </p>
+        ) : (
+          <>
+            {brokerageConnections.length > 0 ? (
+              <ul className="space-y-1.5">
+                {brokerageConnections.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex items-center justify-between rounded-lg bg-ink-850 px-3 py-2 text-sm ring-1 ring-border"
+                  >
+                    <span className="font-medium text-ink-100">{c.brokerageName}</span>
+                    <span className="text-xs text-ink-500">
+                      Connected {formatRelativeSync(c.connectedAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-500">No brokerage connected yet.</p>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void connectBrokerage()}
+                disabled={brokerageConnecting}
+                className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750 disabled:opacity-50"
+              >
+                {brokerageConnecting
+                  ? 'Opening…'
+                  : brokerageConnections.length > 0
+                    ? 'Connect another brokerage'
+                    : 'Connect brokerage'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void syncBrokerage()}
+                disabled={brokerageSyncing}
+                className="focus-ring rounded-xl bg-accent-500 px-3 py-2 text-sm font-semibold text-ink-950 hover:bg-accent-400 disabled:opacity-50"
+              >
+                {brokerageSyncing ? 'Syncing…' : 'Sync now'}
+              </button>
+            </div>
+          </>
+        )}
+      </SettingsSection>
+
+      <SettingsSection id="data-sync" title="Data & sync">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-ink-500">Mode</dt>
@@ -220,133 +325,67 @@ export function SettingsPage() {
             Reset demo data
           </button>
         </div>
-      </section>
 
-      {supabaseConfigured ? (
-        <section className="surface-elevated space-y-4 rounded-2xl p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">Auth</h2>
-          {user ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-sm text-ink-300">
-                Signed in as <span className="text-ink-100">{user.email}</span>
-              </p>
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border"
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={onMagicLink} className="space-y-3">
-              <p className="text-sm text-ink-400">
-                Magic-link sign-in. After auth, holdings/watchlist write to Supabase; events load
-                from the DB (global macro + your rows).
-              </p>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                  Email
-                </span>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="input"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={authBusy}
-                className="focus-ring rounded-xl bg-accent-500 px-4 py-2.5 text-sm font-semibold text-ink-950 hover:bg-accent-400 disabled:opacity-50"
-              >
-                {authBusy ? 'Sending…' : 'Send magic link'}
-              </button>
-              {authMsg ? (
-                <p
-                  className={clsx(
-                    'text-sm',
-                    authMsg.includes('Check') ? 'text-accent-400' : 'text-critical',
-                  )}
-                >
-                  {authMsg}
-                </p>
-              ) : null}
-            </form>
-          )}
-        </section>
-      ) : null}
+        <details className="rounded-xl bg-ink-950/30 px-3 py-2.5">
+          <summary className="cursor-pointer text-sm font-medium text-ink-300">
+            Cloud setup checklist
+          </summary>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-400">
+            <li>
+              Create a Supabase project; run <code className="text-ink-300">supabase/schema.sql</code>
+            </li>
+            <li>
+              Copy URL + anon key into <code className="text-ink-300">.env.local</code>
+            </li>
+            <li>Enable Email auth (magic link) in Supabase Auth settings</li>
+            <li>Restart <code className="text-ink-300">npm run dev</code> after env changes</li>
+            <li>Sign in here — write backend becomes <code className="text-ink-300">supabase</code></li>
+          </ol>
+        </details>
+      </SettingsSection>
 
-      {supabaseConfigured && user ? (
-        <section className="surface-elevated space-y-4 rounded-2xl p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-            Brokerage
-          </h2>
-          <p className="text-sm text-ink-400">
-            Connect a brokerage via SnapTrade to sync real positions into Portfolio. CSV/manual
-            entries stay available for any ticker your brokerage doesn't cover.
-          </p>
-
-          {brokerageConnections.length > 0 ? (
-            <ul className="space-y-1.5">
-              {brokerageConnections.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between rounded-lg bg-ink-850 px-3 py-2 text-sm ring-1 ring-border"
-                >
-                  <span className="font-medium text-ink-100">{c.brokerageName}</span>
-                  <span className="text-xs text-ink-500">
-                    Connected {formatRelativeSync(c.connectedAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-ink-500">No brokerage connected yet.</p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void connectBrokerage()}
-              disabled={brokerageConnecting}
-              className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750 disabled:opacity-50"
-            >
-              {brokerageConnecting
-                ? 'Opening…'
-                : brokerageConnections.length > 0
-                  ? 'Connect another brokerage'
-                  : 'Connect brokerage'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void syncBrokerage()}
-              disabled={brokerageSyncing}
-              className="focus-ring rounded-xl bg-accent-500 px-3 py-2 text-sm font-semibold text-ink-950 hover:bg-accent-400 disabled:opacity-50"
-            >
-              {brokerageSyncing ? 'Syncing…' : 'Sync now'}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      <section className="surface-elevated space-y-4 rounded-2xl p-5">
-        <div className="flex items-start justify-between gap-4">
+      <SettingsSection
+        id="earnings-intelligence"
+        title="Earnings intelligence"
+        description="What powers the consensus/actual/guidance data on Today and Earnings, and how generated content is handled."
+      >
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-              Diagnostics
-            </h2>
-            <p className="mt-1 text-sm text-ink-400">
-              Live checks for authentication, backend data, prices, events and brokerage sync.
-            </p>
+            <dt className="text-ink-500">Verified facts</dt>
+            <dd className="font-medium text-ink-100">Finnhub (once wired) — never an LLM</dd>
           </div>
-          <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-400 ring-1 ring-border">
+          <div>
+            <dt className="text-ink-500">Current status</dt>
+            <dd className="font-medium text-amber-300">Interim fixture data</dd>
+          </div>
+        </dl>
+        <p className="text-sm leading-relaxed text-ink-400">
+          No live provider populates consensus, actual results, surprise, guidance, or reaction
+          yet — Finnhub's earnings-calendar response has EPS estimate/actual, but wiring it into
+          this app's data model is future backend work. Until then, cards show a small typed
+          fixture set for a handful of tickers; any other ticker honestly renders "no estimate
+          available" rather than a fabricated number.
+        </p>
+        <div className="flex items-start gap-2 rounded-xl border border-dashed border-accent-500/30 bg-accent-glow/40 p-3">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-400" aria-hidden="true" />
+          <p className="text-xs leading-relaxed text-ink-300">
+            When a generated interpretation is present, it's always shown in a separately
+            labeled "Generated interpretation — not verified" section, never blended into the
+            verified financials above it.
+          </p>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        id="diagnostics"
+        title="Diagnostics"
+        description="Live checks for authentication, backend data, prices, events and brokerage sync."
+        badge={
+          <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold text-ink-450 ring-1 ring-border">
             Live
           </span>
-        </div>
-
+        }
+      >
         <div className="divide-y divide-border rounded-xl bg-ink-950/30 px-3">
           <DiagnosticRow
             label="Backend"
@@ -439,40 +478,77 @@ export function SettingsPage() {
             </button>
           ) : null}
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="surface-elevated space-y-3 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500">
-          Setup checklist
-        </h2>
-        <ol className="list-decimal space-y-2 pl-5 text-sm text-ink-400">
-          <li>
-            Create a Supabase project; run <code className="text-ink-300">supabase/schema.sql</code>
-          </li>
-          <li>
-            Copy URL + anon key into <code className="text-ink-300">.env.local</code>
-          </li>
-          <li>Enable Email auth (magic link) in Supabase Auth settings</li>
-          <li>Restart <code className="text-ink-300">npm run dev</code> after env changes</li>
-          <li>Sign in here — write backend becomes <code className="text-ink-300">supabase</code></li>
-        </ol>
-      </section>
+      <SettingsSection
+        id="about"
+        title="About this build"
+        description="Release metadata for the version currently running."
+        badge={
+          <span className="tabular rounded-lg bg-accent-glow px-2.5 py-1 text-sm font-semibold text-accent-300 ring-1 ring-accent-500/30">
+            v{APP_VERSION}
+          </span>
+        }
+      >
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-ink-500">Phase</dt>
+            <dd className="font-medium text-ink-100">{APP_PHASE}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Last updated</dt>
+            <dd className="font-medium text-ink-100">
+              {formatAppUpdatedAt(APP_LAST_UPDATED)}
+            </dd>
+          </div>
+        </dl>
+        <p className="text-xs leading-relaxed text-ink-500">
+          The timestamp is updated with the release metadata when a version is promoted to
+          <code className="mx-1 text-ink-300">main</code>.
+        </p>
 
-      <section className="surface rounded-2xl p-5 text-sm text-ink-400">
-        <h2 className="mb-2 text-sm font-semibold text-ink-200">Impact score v0</h2>
-        <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
+        <div className="rounded-xl bg-ink-950/30 p-3">
+          <h3 className="mb-2 text-xs font-medium text-ink-450">Impact score v0</h3>
+          <pre className="overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300">
 {`impact =
   65% × position_weight (norm to anchor)
 + 25% × event_type_weight
 + 10% × recency_boost
 
 anchor = max(5%, p90 position weight × 1.5)`}
-        </pre>
-      </section>
+          </pre>
+        </div>
+      </SettingsSection>
     </div>
   )
 }
 
+function SettingsSection({
+  id,
+  title,
+  description,
+  badge,
+  children,
+}: {
+  id: string
+  title: string
+  description?: string
+  badge?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section id={id} className="surface-elevated scroll-mt-16 space-y-4 rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-ink-450">{title}</h2>
+          {description ? <p className="mt-1 text-sm text-ink-400">{description}</p> : null}
+        </div>
+        {badge}
+      </div>
+      {children}
+    </section>
+  )
+}
 
 type DiagnosticState = 'healthy' | 'attention' | 'error' | 'checking' | 'local' | 'not-run'
 
