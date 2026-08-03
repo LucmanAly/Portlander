@@ -33,7 +33,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 1 acceptance | ✅ Owner-confirmed complete | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning all confirmed by the owner |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done, DeepSeek live | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is validated, rate-limited, and now enabled — every currently-reported event has a real interpretation |
-| Performance briefings | 🟠 Deployed on backend; data cleanup pending | PR #36 is merged to `develop`; canonical tables, `refresh-quotes` v22, `performance-interpret` v1, RLS/grants, and the 4:15 p.m. Eastern cron are live. First scheduled-path test returned HTTP 200 and stored 39/41 rows for 2026-07-31; DMYI and LGMK prevented a complete run, so whole-book totals remain withheld honestly. |
+| Performance briefings | 🟠 Complete capture verified; interval acceptance pending | PR #36 is merged to `develop`; canonical tables, `refresh-quotes` v22, `performance-interpret` v1, RLS/grants, and the 4:15 p.m. Eastern cron are live. The scheduled path returned HTTP 200 and stored an `ok` 39/39 capture for 2026-07-31. A second market-day capture is still needed to validate a true date-range review. |
 
 ---
 
@@ -241,26 +241,24 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ## Next up (ordered)
 
-**NEXT_TASK:** Resolve the two missing snapshot tickers and verify the first complete capture
+**NEXT_TASK:** Capture a second market day and verify the authenticated period-review flow
 
 **ACTIVE_CLAIM:** None
 
-1. **Owner/data:** confirm whether manual `DMYI` is a stale duplicate/old ticker and should be removed
-   or corrected. Do not silently exclude a possibly real position from whole-book performance.
-2. **Data:** investigate LGMK's stale/outlier Finnhub session timestamp without inventing a market
-   date. SPAXX is now handled explicitly as a zero-movement cash sweep.
-3. Rerun `refresh-quotes`; require `status = ok` and 41/41 (or an owner-approved corrected book),
-   then verify Morning Desk and `/performance` through an authenticated develop deployment.
-4. Promote the verified feature to `main` as a deliberate post-v2 feature release.
-5. Separately review PR #34; do not mix its UX shell changes into performance acceptance.
+1. Wait for the next weekday 4:15 p.m. Eastern capture, then confirm a second `ok` market date.
+2. Verify the authenticated develop flow: Morning Desk briefing, `/performance`, two-date analysis,
+   theme tags, and optional DeepSeek narration.
+3. Promote the verified performance feature to `main` as a deliberate post-v2 feature release.
+4. Separately review PR #34; do not mix its UX shell changes into performance acceptance.
+5. After promotion, decide whether the UX pass becomes the next release or remains deferred.
 
 ---
 
 ## Blockers
 
-The first performance capture is partial: Finnhub returned no usable evidence for manual `DMYI`
-and an outlier/stale session timestamp for `LGMK`. SPAXX cash-sweep handling is resolved.
-The system correctly withholds whole-book totals until this is resolved.
+No active performance-data blocker remains. The owner-approved removal of duplicate/stale
+`DMYI` and `LGMK` produced a complete 39/39 capture for 2026-07-31. The remaining acceptance
+item is a second market-day capture for a real interval review.
 
 ---
 
@@ -268,6 +266,7 @@ The system correctly withholds whole-book totals until this is resolved.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-03 | Removed manual `DMYI` and SnapTrade `LGMK` holdings at the owner's direction; `DMYI` duplicated the live `IONQ` share count | dMY Technology Group III completed its merger into IonQ and began trading as `IONQ`; both stale rows blocked complete evidence coverage. The action is reversible only by re-adding/importing the positions, and SnapTrade may reintroduce LGMK if it still exists at the broker. |
 | 2026-08-03 | PR #36 is the only canonical performance contract; PR #35 is closed and its empty tables/function are retained temporarily as rollback artifacts | The two implementations used incompatible schemas. Production now matches `portfolio_snapshot_runs` + per-position `portfolio_snapshots` + `performance_briefings`; preserving empty legacy objects avoids destructive cleanup during acceptance. |
 | 2026-08-03 | Scheduled performance capture may use a service-only DB row containing only a SHA-256 secret hash | The connected tooling cannot set Edge Function secrets. RLS has no client policies/grants, the plaintext secret exists only in the pg_cron command, and the function still accepts hosted env secrets when available. |
 | 2026-08-02 | Performance dollars/returns/theme attribution come from complete daily position snapshots; DeepSeek supplies cached qualitative wording only and generated prose containing digits, `$`, or `%` is rejected | SnapTrade can provide whole-connection returns and beta total-value history, but not historical position-level theme attribution. Keeping every displayed number deterministic preserves the project's verified-vs-generated boundary and makes model failure harmless. |
@@ -319,6 +318,12 @@ The system correctly withholds whole-book totals until this is resolved.
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+### 2026-08-03 — codex (session 24, performance data acceptance)
+- Confirmed DMYI was a duplicate manual row for the live IONQ position; official merger history supports IONQ.
+- Removed DMYI and owner-approved LGMK from holdings.
+- Scheduled refresh returned HTTP 200 with an ok 39/39 snapshot for 2026-07-31.
+- Remaining PERF-01 acceptance: capture a second market day and verify the authenticated period review.
+
 
 ### 2026-08-03 — codex (session 23, PERF-01 production reconciliation)
 - Closed superseded PR #35 and made merged PR #36 the sole frontend/backend contract.
