@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
 
   const { data: holdingRows, error: hErr } = await sb
     .from('holdings')
-    .select('ticker, shares, tags')
+    .select('ticker, shares, last_price, tags')
     .eq('user_id', userId)
 
   if (hErr) {
@@ -147,10 +147,17 @@ Deno.serve(async (req) => {
   const errors: string[] = []
 
   for (const ticker of tickers) {
+    const holding = holdingsByTicker.get(ticker)
     try {
       const quote = await fetchQuote(ticker, finnhubKey)
       if (quote.c == null || quote.c === 0) {
-        errors.push(`${ticker}: no price data`)
+        const cash = cashEquivalentCandidate(ticker, holding)
+        if (cash) {
+          snapshotCandidates.push(cash)
+          results.push({ ticker, lastPrice: cash.price, dayChangeValue: 0, dayChangePct: 0 })
+        } else {
+          errors.push(`${ticker}: no price data`)
+        }
       } else {
         const { data: updated, error: updErr } = await sb
           .from('holdings')
@@ -172,7 +179,6 @@ Deno.serve(async (req) => {
             dayChangeValue: quote.d ?? null,
             dayChangePct: quote.dp ?? null,
           })
-          const holding = holdingsByTicker.get(ticker)
           const shares = Number(holding?.shares)
           if (
             Number.isFinite(shares) &&
@@ -180,12 +186,11 @@ Deno.serve(async (req) => {
             quote.pc != null &&
             quote.pc > 0 &&
             quote.d != null &&
-            Number.isFinite(quote.d) &&
-            quote.t != null &&
-            Number.isFinite(quote.t)
+            Number.isFinite(quote.d)
           ) {
+            const hasTimestamp = quote.t != null && Number.isFinite(quote.t) && quote.t > 0
             snapshotCandidates.push({
-              snapshotDate: marketDateFromEpoch(quote.t),
+              snapshotDate: hasTimestamp ? marketDateFromEpoch(quote.t as number) : null,
               ticker,
               shares,
               price: quote.c,
@@ -194,14 +199,20 @@ Deno.serve(async (req) => {
               dayChangeValue: quote.d,
               dayChangePct: quote.dp ?? null,
               tags: Array.isArray(holding?.tags) ? holding.tags.map(String) : [],
-              quoteTimestamp: new Date(quote.t * 1000).toISOString(),
+              quoteTimestamp: hasTimestamp ? new Date((quote.t as number) * 1000).toISOString() : null,
             })
           }
         }
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      errors.push(`${ticker}: ${msg}`)
+      const cash = cashEquivalentCandidate(ticker, holding)
+      if (cash) {
+        snapshotCandidates.push(cash)
+        results.push({ ticker, lastPrice: cash.price, dayChangeValue: 0, dayChangePct: 0 })
+      } else {
+        const msg = e instanceof Error ? e.message : String(e)
+        errors.push(`${ticker}: ${msg}`)
+      }
     }
     await sleep(200)
   }
@@ -245,8 +256,32 @@ Deno.serve(async (req) => {
   })
 })
 
+const CASH_EQUIVALENT_TICKERS = new Set(['SPAXX', 'FDRXX', 'FCASH'])
+
+function cashEquivalentCandidate(
+  ticker: string,
+  holding: { shares?: unknown; last_price?: unknown; tags?: unknown } | undefined,
+): SnapshotCandidate | null {
+  if (!CASH_EQUIVALENT_TICKERS.has(ticker)) return null
+  const shares = Number(holding?.shares)
+  const price = Number(holding?.last_price)
+  if (!Number.isFinite(shares) || shares <= 0 || !Number.isFinite(price) || price <= 0) return null
+  return {
+    snapshotDate: null,
+    ticker,
+    shares,
+    price,
+    previousClose: price,
+    marketValue: shares * price,
+    dayChangeValue: 0,
+    dayChangePct: 0,
+    tags: Array.isArray(holding?.tags) ? holding.tags.map(String) : [],
+    quoteTimestamp: null,
+  }
+}
+
 type SnapshotCandidate = {
-  snapshotDate: string
+  snapshotDate: string | null
   ticker: string
   shares: number
   price: number
@@ -255,7 +290,7 @@ type SnapshotCandidate = {
   dayChangeValue: number
   dayChangePct: number | null
   tags: string[]
-  quoteTimestamp: string
+  quoteTimestamp: string | null
 }
 
 async function persistBestSnapshot(
@@ -273,9 +308,19 @@ async function persistBestSnapshot(
   // open it remains Friday/the prior session, so no fake Saturday snapshot is
   // created. Keep only the dominant session if a provider returns mixed dates.
   const counts = new Map<string, number>()
-  for (const row of candidates) counts.set(row.snapshotDate, (counts.get(row.snapshotDate) ?? 0) + 1)
+  for (const row of candidates) {
+    if (row.snapshotDate) counts.set(row.snapshotDate, (counts.get(row.snapshotDate) ?? 0) + 1)
+  }
+  if (counts.size === 0) {
+    return { status: 'unavailable', capturedPositions: 0, expectedPositions: tickers.length }
+  }
   const snapshotDate = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  const rows = candidates.filter((row) => row.snapshotDate === snapshotDate)
+  // Some valid Finnhub responses (notably thinly traded securities) return t=0.
+  // Only attach those rows to the dominant session established independently by
+  // timestamped quotes from the same refresh; never derive a date from wall time.
+  const rows = candidates
+    .map((row) => (row.snapshotDate ? row : { ...row, snapshotDate }))
+    .filter((row) => row.snapshotDate === snapshotDate)
   const captured = new Set(rows.map((row) => row.ticker))
   const missingTickers = tickers.filter((ticker) => !captured.has(ticker))
   const snapshotStatus = missingTickers.length === 0 ? 'ok' : rows.length ? 'partial' : 'error'
