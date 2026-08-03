@@ -15,8 +15,9 @@
  *
  * Invoke manually via the SPA, which attaches the user's session token. A
  * single-owner deployment may also invoke it from pg_cron using the anon key
- * plus x-performance-cron-secret; that path is pinned to
- * PERFORMANCE_OWNER_USER_ID and never accepts a caller-supplied user id.
+ * plus x-performance-cron-secret. Scheduled ownership is pinned either by
+ * PERFORMANCE_OWNER_USER_ID/PERFORMANCE_CRON_SECRET or by the service-only
+ * performance_cron_config row; neither path accepts a caller-supplied user id.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
@@ -64,16 +65,26 @@ Deno.serve(async (req) => {
     )
   }
 
+  // Privileged client for the actual work — every query below is explicitly
+  // scoped to userId. Unlike sync-events, this never iterates all users.
+  const sb = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
   const cronSecret = Deno.env.get('PERFORMANCE_CRON_SECRET')?.trim()
   const suppliedCronSecret = req.headers.get('x-performance-cron-secret')?.trim()
   const ownerUserId = Deno.env.get('PERFORMANCE_OWNER_USER_ID')?.trim()
-  const scheduled = Boolean(
-    cronSecret && suppliedCronSecret && ownerUserId && safeEqual(cronSecret, suppliedCronSecret),
-  )
+  const envScheduledOwner =
+    cronSecret && suppliedCronSecret && ownerUserId && safeEqual(cronSecret, suppliedCronSecret)
+      ? ownerUserId
+      : null
+  const scheduledOwner =
+    envScheduledOwner ?? (await scheduledOwnerFromDatabase(sb, suppliedCronSecret))
+  const scheduled = Boolean(scheduledOwner)
 
   let userId: string
-  if (scheduled) {
-    userId = ownerUserId as string
+  if (scheduledOwner) {
+    userId = scheduledOwner
   } else {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return json({ error: 'Missing Authorization header' }, 401)
@@ -89,12 +100,6 @@ Deno.serve(async (req) => {
     if (userErr || !userData.user) return json({ error: 'Unauthorized' }, 401)
     userId = userData.user.id
   }
-
-  // Privileged client for the actual work — every query below is explicitly
-  // scoped to userId. Unlike sync-events, this never iterates all users.
-  const sb = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   const { data: holdingRows, error: hErr } = await sb
     .from('holdings')
@@ -394,6 +399,29 @@ function marketDateFromEpoch(epochSeconds: number): string {
   }).formatToParts(new Date(epochSeconds * 1000))
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value
   return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+async function scheduledOwnerFromDatabase(
+  sb: ReturnType<typeof createClient>,
+  suppliedSecret: string | undefined,
+): Promise<string | null> {
+  if (!suppliedSecret) return null
+
+  const { data, error } = await sb
+    .from('performance_cron_config')
+    .select('owner_user_id, secret_hash')
+    .eq('singleton', true)
+    .maybeSingle()
+  if (error || !data?.owner_user_id || typeof data.secret_hash !== 'string') return null
+
+  const suppliedHash = await sha256Hex(suppliedSecret)
+  return safeEqual(data.secret_hash, suppliedHash) ? String(data.owner_user_id) : null
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 function safeEqual(expected: string, supplied: string): boolean {
