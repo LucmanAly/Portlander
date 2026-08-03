@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { scoreAndFilterEvents, sortEventsByDate } from '@/lib/scoring'
 import { buildEarningsCards } from '@/lib/earningsIntel'
@@ -19,6 +20,7 @@ const LOOKAHEAD_DAYS = 60
 
 export function EarningsPage() {
   const { events, holdings, watchlist, exposure } = usePortfolio()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [filter, setFilter] = useState<EarningsStatusFilterValue>('all')
   const [sortMode, setSortMode] = useState<SortMode>('impact')
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
@@ -33,6 +35,19 @@ export function EarningsPage() {
     })
     return buildEarningsCards(scored, today, events)
   }, [events, holdings, watchlist, today])
+
+  // Deep-link support: /earnings?ticker=AAPL opens that ticker's card straight
+  // into the detail drawer, so links from Today's "Needs attention" don't
+  // just dump the user on the workspace and make them hunt for the card.
+  useEffect(() => {
+    const ticker = searchParams.get('ticker')
+    if (!ticker) return
+    const match = allCards.find((c) => c.ticker === ticker)
+    if (match) setSelectedCardId(match.id)
+    const next = new URLSearchParams(searchParams)
+    next.delete('ticker')
+    setSearchParams(next, { replace: true })
+  }, [allCards, searchParams, setSearchParams])
 
   const filtered = useMemo(() => filterEarningsByStatus(allCards, filter, today), [allCards, filter, today])
 

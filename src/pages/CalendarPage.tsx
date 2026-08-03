@@ -4,13 +4,18 @@ import { usePortfolio } from '@/context/PortfolioContext'
 import { scoreAndFilterEvents, sortEventsByDate } from '@/lib/scoring'
 import { addDays, startOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { formatEventDay, formatPct } from '@/lib/format'
 import { TypeBadge } from '@/components/ui/Badge'
 
 export function CalendarPage() {
   const { events, holdings, watchlist, exposure } = usePortfolio()
   const today = startOfDay(new Date())
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  // Deep-link support: /calendar?date=2026-08-10 opens straight on that day,
+  // so links from Today's "Needs attention" land on the relevant date
+  // instead of a generic month view the user has to hunt through.
+  const [searchParams] = useSearchParams()
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => searchParams.get('date'))
 
   const monthEvents = useMemo(() => {
     const from = startOfMonth(today)

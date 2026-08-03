@@ -55,7 +55,7 @@ describe('EarningsStatusFilter', () => {
   it('renders all 4 options and marks the active one', () => {
     render(<EarningsStatusFilter value="upcoming" onChange={() => {}} />)
     expect(screen.getByRole('button', { name: 'Upcoming' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Active' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Awaiting results' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('calls onChange with the clicked option', async () => {

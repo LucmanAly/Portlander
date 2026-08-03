@@ -9,8 +9,8 @@ const NAV_ITEMS = [
   { id: 'account', label: 'Account' },
   { id: 'brokerage', label: 'Brokerage' },
   { id: 'data-sync', label: 'Data & sync' },
-  { id: 'earnings-intelligence', label: 'Earnings intelligence' },
-  { id: 'diagnostics', label: 'Diagnostics' },
+  { id: 'data-sources', label: 'Data sources' },
+  { id: 'troubleshooting', label: 'Troubleshooting' },
   { id: 'about', label: 'About' },
 ]
 
@@ -55,12 +55,6 @@ export function SettingsPage() {
     else setAuthMsg('Check your email for the magic link.')
   }
 
-  const modeLabel = !supabaseConfigured
-    ? 'Local / demo'
-    : user
-      ? 'Supabase (signed in)'
-      : 'Supabase configured · using local until sign-in'
-
   const backendState: DiagnosticState = remoteError
     ? 'error'
     : booting
@@ -96,13 +90,9 @@ export function SettingsPage() {
         <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-accent-500">
           Settings
         </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-100">Workspace</h1>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-100">Settings</h1>
         <p className="mt-1.5 text-sm text-ink-400">
-          Local mode always works. Add{' '}
-          <code className="text-ink-300">VITE_SUPABASE_URL</code> +{' '}
-          <code className="text-ink-300">VITE_SUPABASE_ANON_KEY</code> in{' '}
-          <code className="text-ink-300">.env.local</code>, apply{' '}
-          <code className="text-ink-300">supabase/schema.sql</code>, then sign in to sync.
+          Manage your account, brokerage connection, and sync.
         </p>
       </header>
 
@@ -146,8 +136,8 @@ export function SettingsPage() {
         ) : (
           <form onSubmit={onMagicLink} className="space-y-3">
             <p className="text-sm text-ink-400">
-              Magic-link sign-in. After auth, holdings/watchlist write to Supabase; events load
-              from the DB (global macro + your rows).
+              Sign in to sync your portfolio across devices. We'll email you a link — no password
+              needed.
             </p>
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-ink-450">Email</span>
@@ -236,50 +226,11 @@ export function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection id="data-sync" title="Data & sync">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-ink-450">Mode</dt>
-            <dd className="font-medium text-ink-100">{modeLabel}</dd>
-          </div>
-          <div>
-            <dt className="text-ink-450">Write backend</dt>
-            <dd className="font-medium text-ink-100">
-              <span
-                className={clsx(
-                  'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ring-1',
-                  backend === 'supabase'
-                    ? 'bg-accent-glow text-accent-400 ring-accent-500/40'
-                    : 'bg-ink-800 text-ink-300 ring-border',
-                )}
-              >
-                {backend}
-              </span>
-              {booting ? <span className="ml-2 text-xs text-ink-450">booting…</span> : null}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-450">Supabase</dt>
-            <dd className="font-medium text-ink-100">
-              {supabaseConfigured ? (
-                <span className="text-accent-400">{supabaseHost}</span>
-              ) : (
-                <span className="text-ink-450">Not configured</span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-450">Account</dt>
-            <dd className="truncate font-medium text-ink-100">
-              {user?.email ?? (supabaseConfigured ? 'Signed out' : '—')}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-ink-450">Holdings / events</dt>
-            <dd className="tabular font-medium text-ink-100">
-              {holdings.length} · {events.length}
-            </dd>
-          </div>
-        </dl>
+        <p className="text-sm text-ink-300">
+          {!supabaseConfigured || !user
+            ? 'Your data is stored on this device only.'
+            : `Synced to your account — ${user.email}.`}
+        </p>
 
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           <div>
@@ -302,52 +253,41 @@ export function SettingsPage() {
           </div>
         </dl>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <button
-            type="button"
-            disabled={Boolean(user)}
-            title={
-              user
-                ? 'Sign out first — demo data would overwrite your synced portfolio'
-                : undefined
-            }
-            onClick={() => {
-              if (
-                confirm(
-                  'Reset to demo portfolio and events? This replaces local holdings. Remote Supabase rows are not deleted.',
-                )
-              ) {
-                resetDemo()
+        <div className="rounded-xl border border-critical/20 bg-critical-soft/40 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-critical">
+            Danger zone
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={Boolean(user)}
+              title={
+                user
+                  ? 'Sign out first — demo data would overwrite your synced portfolio'
+                  : undefined
               }
-            }}
-            className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Reset demo data
-          </button>
+              onClick={() => {
+                if (
+                  confirm(
+                    'Reset to demo portfolio and events? This replaces local holdings. Remote Supabase rows are not deleted.',
+                  )
+                ) {
+                  resetDemo()
+                }
+              }}
+              className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Reset demo data
+            </button>
+            <p className="text-xs text-ink-450">Replaces local holdings with sample data.</p>
+          </div>
         </div>
-
-        <details className="rounded-xl bg-ink-950/30 px-3 py-2.5">
-          <summary className="cursor-pointer text-sm font-medium text-ink-300">
-            Cloud setup checklist
-          </summary>
-          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-400">
-            <li>
-              Create a Supabase project; run <code className="text-ink-300">supabase/schema.sql</code>
-            </li>
-            <li>
-              Copy URL + anon key into <code className="text-ink-300">.env.local</code>
-            </li>
-            <li>Enable Email auth (magic link) in Supabase Auth settings</li>
-            <li>Restart <code className="text-ink-300">npm run dev</code> after env changes</li>
-            <li>Sign in here — write backend becomes <code className="text-ink-300">supabase</code></li>
-          </ol>
-        </details>
       </SettingsSection>
 
       <SettingsSection
-        id="earnings-intelligence"
-        title="Earnings intelligence"
-        description="What powers the consensus/actual/guidance data on Today and Earnings, and how generated content is handled."
+        id="data-sources"
+        title="Data sources"
+        description="Where the information on Today and Earnings comes from."
       >
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
@@ -376,66 +316,24 @@ export function SettingsPage() {
       </SettingsSection>
 
       <SettingsSection
-        id="diagnostics"
-        title="Diagnostics"
-        description="Live checks for authentication, backend data, prices, events and brokerage sync."
-        badge={
-          <span className="rounded-full bg-ink-800 px-2 py-1 text-[10px] font-semibold text-ink-450 ring-1 ring-border">
-            Live
-          </span>
-        }
+        id="troubleshooting"
+        title="Troubleshooting"
+        description="Connection tests and retry actions if something looks wrong."
       >
-        <div className="divide-y divide-border rounded-xl bg-ink-950/30 px-3">
-          <DiagnosticRow
-            label="Backend"
-            state={backendState}
-            detail={
-              backend === 'supabase'
-                ? 'Supabase data path is active.'
-                : 'Local / demo data path is active.'
-            }
-          />
-          <DiagnosticRow
-            label="Authentication"
-            state={authState}
-            detail={
-              user?.email
-                ? 'Signed in as ' + user.email
-                : supabaseConfigured
-                  ? 'Supabase is configured, but no session is active.'
-                  : 'Supabase is not configured.'
-            }
-          />
-          <DiagnosticRow
-            label="Positions"
-            state={positionsState}
-            detail={
-              brokerageConnections.length > 0
-                ? brokerageConnections.length +
-                  ' brokerage connection(s) · ' +
-                  formatRelativeSync(syncTimestamps.positions)
-                : 'No brokerage connection has been tested in this session.'
-            }
-          />
-          <DiagnosticRow
-            label="Prices"
-            state={pricesState}
-            detail={
-              quotesLastSyncedAt || syncTimestamps.prices
-                ? 'Last refreshed ' +
-                  formatRelativeSync(quotesLastSyncedAt || syncTimestamps.prices)
-                : 'No live price refresh has been run.'
-            }
-          />
-          <DiagnosticRow
-            label="Events"
-            state={eventsState}
-            detail={
-              syncTimestamps.events
-                ? 'Last synced ' + formatRelativeSync(syncTimestamps.events)
-                : 'No remote event sync is recorded.'
-            }
-          />
+        <div
+          className={clsx(
+            'flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium',
+            hasIssues
+              ? 'bg-critical-soft text-critical'
+              : 'bg-accent-glow text-accent-400',
+          )}
+        >
+          {hasIssues ? (
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          {hasIssues ? 'Something needs attention — see details below.' : 'Everything is working.'}
         </div>
 
         {hasIssues ? (
@@ -443,20 +341,15 @@ export function SettingsPage() {
             className="rounded-xl border border-critical/30 bg-critical-soft px-3 py-2.5 text-sm text-critical"
             role="alert"
           >
-            <p className="font-semibold">Issues reported</p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
+            <ul className="list-disc space-y-0.5 pl-5 text-xs">
               {remoteError ? <li>Data/backend: {remoteError}</li> : null}
               {quotesError ? <li>Prices: {quotesError}</li> : null}
               {brokerageError ? <li>Brokerage: {brokerageError}</li> : null}
             </ul>
           </div>
-        ) : (
-          <p className="text-xs text-ink-450">
-            No current errors have been reported. The actions below re-run the relevant checks.
-          </p>
-        )}
+        ) : null}
 
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void refreshFromBackend()}
@@ -477,6 +370,121 @@ export function SettingsPage() {
             </button>
           ) : null}
         </div>
+
+        <details className="rounded-xl bg-ink-950/30 px-3 py-2.5">
+          <summary className="cursor-pointer text-sm font-medium text-ink-300">
+            Show technical details
+          </summary>
+          <div className="mt-3 space-y-4">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-ink-450">Write backend</dt>
+                <dd className="font-medium text-ink-100">
+                  <span
+                    className={clsx(
+                      'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ring-1',
+                      backend === 'supabase'
+                        ? 'bg-accent-glow text-accent-400 ring-accent-500/40'
+                        : 'bg-ink-800 text-ink-300 ring-border',
+                    )}
+                  >
+                    {backend}
+                  </span>
+                  {booting ? <span className="ml-2 text-xs text-ink-450">booting…</span> : null}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-450">Supabase</dt>
+                <dd className="font-medium text-ink-100">
+                  {supabaseConfigured ? (
+                    <span className="text-accent-400">{supabaseHost}</span>
+                  ) : (
+                    <span className="text-ink-450">Not configured</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-450">Holdings / events</dt>
+                <dd className="tabular font-medium text-ink-100">
+                  {holdings.length} · {events.length}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="divide-y divide-border rounded-xl bg-ink-900/40 px-3">
+              <DiagnosticRow
+                label="Backend"
+                state={backendState}
+                detail={
+                  backend === 'supabase'
+                    ? 'Supabase data path is active.'
+                    : 'Local / demo data path is active.'
+                }
+              />
+              <DiagnosticRow
+                label="Authentication"
+                state={authState}
+                detail={
+                  user?.email
+                    ? 'Signed in as ' + user.email
+                    : supabaseConfigured
+                      ? 'Supabase is configured, but no session is active.'
+                      : 'Supabase is not configured.'
+                }
+              />
+              <DiagnosticRow
+                label="Positions"
+                state={positionsState}
+                detail={
+                  brokerageConnections.length > 0
+                    ? brokerageConnections.length +
+                      ' brokerage connection(s) · ' +
+                      formatRelativeSync(syncTimestamps.positions)
+                    : 'No brokerage connection has been tested in this session.'
+                }
+              />
+              <DiagnosticRow
+                label="Prices"
+                state={pricesState}
+                detail={
+                  quotesLastSyncedAt || syncTimestamps.prices
+                    ? 'Last refreshed ' +
+                      formatRelativeSync(quotesLastSyncedAt || syncTimestamps.prices)
+                    : 'No live price refresh has been run.'
+                }
+              />
+              <DiagnosticRow
+                label="Events"
+                state={eventsState}
+                detail={
+                  syncTimestamps.events
+                    ? 'Last synced ' + formatRelativeSync(syncTimestamps.events)
+                    : 'No remote event sync is recorded.'
+                }
+              />
+            </div>
+          </div>
+        </details>
+
+        <details className="rounded-xl bg-ink-950/30 px-3 py-2.5">
+          <summary className="cursor-pointer text-sm font-medium text-ink-300">
+            Developer setup (self-hosting)
+          </summary>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-400">
+            <li>
+              Create a Supabase project; run <code className="text-ink-300">supabase/schema.sql</code>
+            </li>
+            <li>
+              Copy URL + anon key into{' '}
+              <code className="text-ink-300">VITE_SUPABASE_URL</code> /{' '}
+              <code className="text-ink-300">VITE_SUPABASE_ANON_KEY</code> in{' '}
+              <code className="text-ink-300">.env.local</code>
+            </li>
+            <li>Enable Email auth (magic link) in Supabase Auth settings</li>
+            <li>Restart <code className="text-ink-300">npm run dev</code> after env changes</li>
+            <li>Sign in here — write backend becomes <code className="text-ink-300">supabase</code></li>
+          </ol>
+        </details>
       </SettingsSection>
 
       <SettingsSection
@@ -506,12 +514,14 @@ export function SettingsPage() {
           <code className="mx-1 text-ink-300">main</code>.
         </p>
 
-        <div className="rounded-xl bg-ink-950/30 p-3">
-          <h3 className="mb-2 text-xs font-medium text-ink-450">Impact score v0</h3>
+        <details className="rounded-xl bg-ink-950/30 px-3 py-2.5">
+          <summary className="cursor-pointer text-sm font-medium text-ink-300">
+            How impact is calculated
+          </summary>
           <pre
             tabIndex={0}
             aria-label="Impact score formula, horizontally scrollable"
-            className="focus-ring overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300"
+            className="focus-ring mt-3 overflow-x-auto rounded-xl bg-ink-950/60 p-3 font-mono text-xs text-ink-300"
           >
 {`impact =
   65% × position_weight (norm to anchor)
@@ -520,7 +530,7 @@ export function SettingsPage() {
 
 anchor = max(5%, p90 position weight × 1.5)`}
           </pre>
-        </div>
+        </details>
       </SettingsSection>
     </div>
   )

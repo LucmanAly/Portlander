@@ -7,7 +7,25 @@ A running log of UX issues found and suggested fixes.
 - **Sections 1–4:** Claude, based on a review of the `develop` branch source. The live site could not be fetched directly in that session, so those findings were grounded in the deployed code.
 - **Sections 5 onward:** **ChatGPT**, based on a direct user-perspective review of `https://portlander.netlify.app/` across Today, Earnings, Calendar, Portfolio, Settings, the earnings detail drawer, and the responsive navigation rules, followed by a product-identity discussion with the owner.
 
-Status legend: `[ ]` not started · `[~]` discussed only · `[x]` implemented
+Status legend: `[ ]` not started · `[~]` discussed only / partially done · `[x]` implemented
+
+## Implementation status — P0 pass
+
+Shipped on `claude/portlander-ux-improvements-s2fwcm`: mobile bottom nav cut to 4 tabs
+with Settings moved to a top-bar icon and bigger touch targets; Settings split into a
+plain-language default view with Diagnostics/env-setup/impact-formula collapsed under
+Troubleshooting/About; Today's Needs Attention rows are now tappable and deep-link into
+Earnings/Calendar; Portfolio's search/filter/sort moved above the table, the meta-copy
+was removed, the watchlist remove button got a real tap target, and CSV headers are
+collapsed under "Import help"; the calendar's portrait ticker-truncation bug is fixed
+(ticker stacks under the dot below the `sm` breakpoint); Earnings' "Active" filter was
+renamed to "Awaiting results" rather than removed (see §9 note — the underlying state is
+real, not just ambiguous labeling). Explicitly **not** done this pass, still open:
+native `confirm()` dialogs, page transitions/toasts, Today's information hierarchy
+rewrite, Calendar's default-day-selection/Month-Agenda toggle, and everything in
+Priority 1/2 below beyond what's noted inline.
+
+Checkboxes below are updated to match; items not mentioned above are still open.
 
 ---
 
@@ -23,9 +41,9 @@ Status legend: `[ ]` not started · `[~]` discussed only · `[x]` implemented
 - The only "active" indicator is a text color change (`text-accent-400` vs `text-ink-450`) — no background pill, no elevation. Doesn't read as "pressable."
 
 **Suggested fix**
-- [ ] Increase row height to ~56–60px, icons to `h-5/h-6`.
-- [ ] Give the active tab a filled pill/background, not just a color change.
-- [ ] Consider dropping to 4 primary tabs (Today, Earnings, Calendar, Portfolio) and moving Settings behind a profile/avatar icon in the top bar, so the remaining four get more breathing room.
+- [x] Increase row height to ~56–60px, icons to `h-5/h-6`. (52px min-height row, `h-6` 24px icons.)
+- [x] Give the active tab a filled pill/background, not just a color change.
+- [x] Consider dropping to 4 primary tabs (Today, Earnings, Calendar, Portfolio) and moving Settings behind a profile/avatar icon in the top bar, so the remaining four get more breathing room.
 
 ---
 
@@ -42,11 +60,11 @@ Status legend: `[ ]` not started · `[~]` discussed only · `[x]` implemented
 - "Reset demo data" (line ~314) uses a native browser `confirm()` dialog, which visually breaks out of the app's design system.
 
 **Suggested fix**
-- [ ] Split Settings into two tiers:
+- [x] Split Settings into two tiers:
   - **Simple / consumer-facing** (default view): Account (sign in/out), Brokerage connection, Appearance/notifications if applicable, Sign out.
   - **Advanced / Developer** (collapsed accordion, or gated behind a hidden trigger like tapping the version number): Diagnostics, impact-score formula, env var setup checklist, raw backend/host strings.
-- [ ] Rewrite the copy that stays visible in plain language — e.g. "Local / demo mode" banner should say what it means for the user ("Your data is saved on this device only"), not describe the backend architecture.
-- [ ] Replace the native `confirm()` on "Reset demo data" with an in-system confirmation modal.
+- [x] Rewrite the copy that stays visible in plain language — e.g. "Local / demo mode" banner should say what it means for the user ("Your data is saved on this device only"), not describe the backend architecture.
+- [ ] Replace the native `confirm()` on "Reset demo data" with an in-system confirmation modal. (Still native `confirm()` — out of scope for this pass.)
 
 ---
 
@@ -64,10 +82,10 @@ Status legend: `[ ]` not started · `[~]` discussed only · `[x]` implemented
 - This is a known intentional trade-off in the code (see the comment on `SelectedDayDetail.tsx`: cells are meant to stay "scannable dots," with full detail deferred to the day-detail panel) — but the current spacing was tuned/tested at landscape widths, not portrait, which is the orientation most people actually use.
 
 **Suggested fix** (pick one direction, or combine — flagged for a decision):
-- [ ] **Adaptive cell content:** on narrow/portrait viewports, stack the ticker text below the dot instead of beside it, freeing up the full cell width for the ticker instead of splitting it with the dot+gap. Drop to showing just 1–2 tickers per cell (with a "+N" overflow badge, which already exists) rather than 3.
-- [ ] **Fewer columns on small screens:** switch to a 7-day **week view** as the default on mobile portrait (with swipe/paging between weeks), so each day column gets much more width for the same information — this is the most direct way to guarantee full ticker names are readable without shrinking anything else.
-- [ ] **Lead with the agenda list on mobile:** the page already has a full-width "Agenda · next 30 days" list below the grid that shows complete ticker + title text with no truncation problem (`CalendarPage.tsx:62-94`). On mobile portrait, consider making the agenda list the primary view and the month grid a secondary/collapsible view, since the list format doesn't have the space constraint at all.
-- [ ] Whichever direction is picked, re-check dot size, badge, and font-size proportions together (not just the ticker width) so the cell reads as one coherently-sized unit rather than a patchwork of independently-tuned pieces.
+- [x] **Adaptive cell content:** on narrow/portrait viewports, stack the ticker text below the dot instead of beside it, freeing up the full cell width for the ticker instead of splitting it with the dot+gap. Implemented via `sm:` breakpoint (flex-col below, flex-row at `sm`+). Still shows up to 3 events per cell rather than trimming to 1–2 — cells just grow taller instead; revisit if that reads as cramped in practice.
+- [ ] **Fewer columns on small screens:** switch to a 7-day **week view** as the default on mobile portrait (with swipe/paging between weeks), so each day column gets much more width for the same information — this is the most direct way to guarantee full ticker names are readable without shrinking anything else. (Not chosen — adaptive stacking above was lower-risk for this pass.)
+- [ ] **Lead with the agenda list on mobile:** the page already has a full-width "Agenda · next 30 days" list below the grid that shows complete ticker + title text with no truncation problem (`CalendarPage.tsx:62-94`). On mobile portrait, consider making the agenda list the primary view and the month grid a secondary/collapsible view, since the list format doesn't have the space constraint at all. (Not chosen this pass.)
+- [x] Whichever direction is picked, re-check dot size, badge, and font-size proportions together (not just the ticker width) so the cell reads as one coherently-sized unit rather than a patchwork of independently-tuned pieces.
 
 ---
 
@@ -213,8 +231,8 @@ The current Today page presents portfolio value, an empty “nothing reporting�
 - [ ] Show the date, portfolio value, daily move, and last-updated time in the compact header.
 - [ ] Make the dominant card the next important event, for example: **“MSFT earnings in 2 days · 24.3% portfolio exposure.”**
 - [ ] Make “Nothing reporting today” a small, reassuring status rather than the central empty card.
-- [ ] Make every Needs attention / next-event row visibly tappable and open the existing earnings detail drawer.
-- [ ] Add a chevron, hover/pressed state, and consistent pointer behavior to interactive cards.
+- [x] Make every Needs attention / next-event row visibly tappable and open the existing earnings detail drawer. (Deep-links to `/earnings?ticker=` for earnings rows, opening the drawer; non-earnings rows deep-link to `/calendar?date=` since there's no drawer equivalent for macro/dividend events.)
+- [x] Add a chevron, hover/pressed state, and consistent pointer behavior to interactive cards. (Needs Attention rows only — EarningsDeck cards already had this.)
 - [ ] Follow with a compact seven-day timeline or reporting cluster, then a smaller 30-day summary.
 - [ ] Replace technical metric labels with human sentences:
   - “60% of your portfolio reports this week.”
@@ -239,7 +257,7 @@ The current Today page presents portfolio value, an empty “nothing reporting�
 
 **Recommended changes**
 
-- [ ] Simplify filters to **Upcoming / Reported / All** unless Active has a distinct user-tested meaning.
+- [~] Simplify filters to **Upcoming / Reported / All** unless Active has a distinct user-tested meaning. **Claude's counter:** it does — `earningsIntel.ts`'s `deriveEarningsViewState` models "event date passed, no actual results yet" (real-world reporting lag) as its own `awaiting` state, deliberately distinct from `upcoming`. Collapsing it would hide something the code already tracks correctly. Renamed the label "Active" → "Awaiting results" instead of removing the filter.
 - [ ] Increase filter and sort controls to at least 40–44px tall.
 - [ ] Use **After market close** / **Before market open**, or the shorter **After close** / **Before open**, rather than unexplained AMC/BMO abbreviations.
 - [ ] Hide EPS/revenue blocks on summary cards when both values are unavailable.
@@ -291,14 +309,14 @@ Do not squeeze the complete table into a phone viewport. Use compact holding row
 
 **Recommended changes**
 
-- [ ] Move search, filters, and sorting immediately above the holdings table/cards. These are viewing controls, not management tools, and become essential with roughly 40 holdings.
-- [ ] Keep add/update, CSV import/export, and other mutations below the primary book view.
+- [x] Move search, filters, and sorting immediately above the holdings table/cards. These are viewing controls, not management tools, and become essential with roughly 40 holdings.
+- [x] Keep add/update, CSV import/export, and other mutations below the primary book view. (Already was; preserved.)
 - [ ] Hide **Source** by default and expose provenance through a tooltip/detail treatment.
-- [ ] Move delete/remove actions into a three-dot menu or provide at least a 44px target with an explicit confirmation.
-- [ ] Fix especially small watchlist remove controls.
-- [ ] Collapse literal CSV headers under an **Import help** disclosure.
-- [ ] Remove explanatory meta-copy such as “These controls stay below the table…”; the hierarchy should explain itself.
-- [ ] Keep truthful unavailable states for incomplete price refresh or cost-basis coverage.
+- [ ] Move delete/remove actions into a three-dot menu or provide at least a 44px target with an explicit confirmation. (Table row delete is still ~32px with native `confirm()` — not touched this pass.)
+- [x] Fix especially small watchlist remove controls. (14px icon with no padding → 32px (`h-8 w-8`) tap target.)
+- [x] Collapse literal CSV headers under an **Import help** disclosure.
+- [x] Remove explanatory meta-copy such as “These controls stay below the table…”; the hierarchy should explain itself.
+- [x] Keep truthful unavailable states for incomplete price refresh or cost-basis coverage. (Not touched; preserved.)
 
 ---
 

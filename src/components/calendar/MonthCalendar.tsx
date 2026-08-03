@@ -192,16 +192,23 @@ export function MonthCalendar({
                   </span>
                 ) : null}
               </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex min-w-0 flex-col gap-1 sm:gap-0.5">
+                {/* Below `sm` (roughly phone-portrait widths), a 7-column grid only
+                    leaves ~25-30px per cell for the ticker once the dot and its gap
+                    are accounted for — not enough room for a real ticker before
+                    `truncate` clips it to one character. Stacking the ticker under
+                    the dot instead of beside it gives it the full cell width. At
+                    `sm` and up (landscape phones, tablets, desktop) there's enough
+                    width for the original side-by-side row. */}
                 {dayEvents.slice(0, 3).map((e) => (
                   <div
                     key={e.id}
-                    className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
+                    className="flex min-w-0 flex-col gap-0.5 rounded px-1 py-0.5 text-[10px] sm:flex-row sm:items-center sm:gap-1 sm:py-0"
                     title={e.title}
                     aria-label={eventRowLabel(e)}
                   >
                     <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} aria-hidden="true" />
-                    <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
+                    <span className={clsx('min-w-0 truncate sm:flex-1', timingTextTone(e))}>
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
                   </div>

@@ -5,6 +5,9 @@ import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import { RefreshQuotesButton } from '@/components/layout/RefreshQuotesButton'
 
+// Desktop sidebar shows all five destinations — there's room. The mobile
+// bottom bar only gets the four things people reach for daily; Settings
+// moves to a top-bar icon there instead of eating a fifth column.
 const nav = [
   { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
   { to: '/earnings', label: 'Earnings', icon: TrendingUp },
@@ -12,6 +15,7 @@ const nav = [
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
+const mobileBottomNav = nav.filter((item) => item.to !== '/settings')
 
 export function AppShell() {
   const { exposure, backend, booting, remoteError } = usePortfolio()
@@ -96,6 +100,20 @@ export function AppShell() {
               </span>
             )}
             <RefreshQuotesButton variant="compact" />
+            <NavLink
+              to="/settings"
+              aria-label="Settings"
+              className={({ isActive }) =>
+                clsx(
+                  'focus-ring flex h-11 w-11 items-center justify-center rounded-lg transition',
+                  isActive
+                    ? 'bg-accent-500/15 text-accent-400'
+                    : 'text-ink-300 hover:bg-ink-800/80 hover:text-ink-100',
+                )
+              }
+            >
+              <Settings className="h-5 w-5" />
+            </NavLink>
           </div>
         </header>
 
@@ -129,21 +147,24 @@ export function AppShell() {
         </main>
 
         {/* Mobile bottom nav. pb includes the safe-area inset so the row isn't
-            obscured by the home indicator on notched phones. */}
-        <nav className="surface sticky bottom-0 z-20 grid grid-cols-5 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden">
-          {nav.map((item) => (
+            obscured by the home indicator on notched phones. Four destinations
+            only (Settings lives in the top bar) so each tap target gets real
+            room — 68px row, 24px icons, a filled pill on the active tab
+            instead of just a color change. */}
+        <nav className="surface sticky bottom-0 z-20 grid grid-cols-4 gap-1 border-t border-border px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 lg:hidden">
+          {mobileBottomNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium',
-                  isActive ? 'text-accent-400' : 'text-ink-450',
+                  'focus-ring flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition',
+                  isActive ? 'bg-accent-500/12 text-accent-400' : 'text-ink-450 active:bg-ink-800/60',
                 )
               }
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-6 w-6" />
               {item.label}
             </NavLink>
           ))}

@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { renderWithPortfolio } from '@/test/testProviders'
 
 const NAV_ORDER = ['Today', 'Earnings', 'Calendar', 'Portfolio', 'Settings']
+const MOBILE_BOTTOM_NAV_ORDER = ['Today', 'Earnings', 'Calendar', 'Portfolio']
 
 function renderShell(overrides?: Parameters<typeof renderWithPortfolio>[1]) {
   return renderWithPortfolio(
@@ -25,12 +26,18 @@ describe('AppShell navigation', () => {
     expect(links.map((l) => l.textContent)).toEqual(NAV_ORDER)
   })
 
-  it('renders all 5 routes in order on the mobile bottom nav', () => {
+  it('renders 4 primary routes in order on the mobile bottom nav, Settings excluded', () => {
     renderShell()
     const navs = screen.getAllByRole('navigation')
     const mobileNav = navs[navs.length - 1]
     const links = within(mobileNav).getAllByRole('link')
-    expect(links.map((l) => l.textContent)).toEqual(NAV_ORDER)
+    expect(links.map((l) => l.textContent)).toEqual(MOBILE_BOTTOM_NAV_ORDER)
+  })
+
+  it('still reaches Settings on mobile via the top-bar icon', () => {
+    renderShell()
+    const header = screen.getByRole('banner')
+    expect(within(header).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
   })
 
   it('never renders a Book value card', () => {
