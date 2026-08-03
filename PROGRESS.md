@@ -4,7 +4,7 @@
 **Last agent:** codex (session 23)
 **Current phase:** `v2.0` ("Portfolio Event Intelligence") is live on `main` via PR #33.
 `PERF-01` is merged to `develop`; its canonical schema and Edge Functions are deployed. The
-scheduled path is live, but the first capture is partial because three holdings lack fully usable
+scheduled path is live, but the first capture is partial because two holdings lack fully usable
 Finnhub evidence. PR #35 is closed as superseded; PR #34 remains the separate unmerged UX pass.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
@@ -33,7 +33,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 1 acceptance | ✅ Owner-confirmed complete | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning all confirmed by the owner |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done, DeepSeek live | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is validated, rate-limited, and now enabled — every currently-reported event has a real interpretation |
-| Performance briefings | 🟠 Deployed on backend; data cleanup pending | PR #36 is merged to `develop`; canonical tables, `refresh-quotes` v19, `performance-interpret` v1, RLS/grants, and the 4:15 p.m. Eastern cron are live. First scheduled-path test returned HTTP 200 and stored 38/41 rows for 2026-07-31; DMYI, LGMK, and SPAXX prevented a complete run, so whole-book totals remain withheld honestly. |
+| Performance briefings | 🟠 Deployed on backend; data cleanup pending | PR #36 is merged to `develop`; canonical tables, `refresh-quotes` v22, `performance-interpret` v1, RLS/grants, and the 4:15 p.m. Eastern cron are live. First scheduled-path test returned HTTP 200 and stored 39/41 rows for 2026-07-31; DMYI and LGMK prevented a complete run, so whole-book totals remain withheld honestly. |
 
 ---
 
@@ -241,14 +241,14 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ## Next up (ordered)
 
-**NEXT_TASK:** Resolve the three missing snapshot tickers and verify the first complete capture
+**NEXT_TASK:** Resolve the two missing snapshot tickers and verify the first complete capture
 
 **ACTIVE_CLAIM:** None
 
 1. **Owner/data:** confirm whether manual `DMYI` is a stale duplicate/old ticker and should be removed
    or corrected. Do not silently exclude a possibly real position from whole-book performance.
-2. **Code/data:** handle `SPAXX` explicitly as a zero-movement cash sweep and investigate LGMK's
-   unusable Finnhub timestamp without inventing a market date.
+2. **Data:** investigate LGMK's stale/outlier Finnhub session timestamp without inventing a market
+   date. SPAXX is now handled explicitly as a zero-movement cash sweep.
 3. Rerun `refresh-quotes`; require `status = ok` and 41/41 (or an owner-approved corrected book),
    then verify Morning Desk and `/performance` through an authenticated develop deployment.
 4. Promote the verified feature to `main` as a deliberate post-v2 feature release.
@@ -258,8 +258,8 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ## Blockers
 
-The first performance capture is partial: Finnhub returned no usable evidence for manual `DMYI`,
-no accessible quote for cash sweep `SPAXX`, and an unusable session timestamp for `LGMK`.
+The first performance capture is partial: Finnhub returned no usable evidence for manual `DMYI`
+and an outlier/stale session timestamp for `LGMK`. SPAXX cash-sweep handling is resolved.
 The system correctly withholds whole-book totals until this is resolved.
 
 ---
@@ -323,10 +323,10 @@ Keep entries short — a few bullets, key files, PR/commit pointer for detail. D
 ### 2026-08-03 — codex (session 23, PERF-01 production reconciliation)
 - Closed superseded PR #35 and made merged PR #36 the sole frontend/backend contract.
 - Reconciled the empty conflicting production schema without data loss; canonical owner-only tables,
-  `refresh-quotes` v19, and `performance-interpret` v1 are live.
+  `refresh-quotes` v22, and `performance-interpret` v1 are live.
 - Added a service-only hashed scheduler config and DST-safe 4:15 p.m. Eastern weekday cron.
-- Scheduled-path smoke test returned HTTP 200 and captured 38/41 positions for 2026-07-31; the
-  incomplete DMYI/LGMK/SPAXX coverage is now the only PERF-01 acceptance blocker.
+- Scheduled-path smoke test returned HTTP 200 and captured 39/41 positions for 2026-07-31; the
+  incomplete DMYI/LGMK coverage is now the only PERF-01 acceptance blocker.
 
 
 ### 2026-08-02 — codex (session 22, `PERF-01`)
