@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
             quote.d != null &&
             Number.isFinite(quote.d)
           ) {
-            const hasTimestamp = quote.t != null && Number.isFinite(quote.t) && quote.t > 0
+            const hasTimestamp = quote.t != null && Number.isFinite(quote.t) && quote.t >= 946684800
             snapshotCandidates.push({
               snapshotDate: hasTimestamp ? marketDateFromEpoch(quote.t as number) : null,
               ticker,
