@@ -63,6 +63,11 @@ between ending and starting account value. Intraday trades remain a disclosed li
 Theme tags can overlap; `cyber` and `core` may both include the same holding. Theme rows are useful
 attribution lenses and are not required to add up to the portfolio total.
 
+Cash-sweep tickers such as `SPAXX` are captured at their stored $1 price with zero daily movement
+when Finnhub does not support them. A quote with a missing/sentinel timestamp may join only the
+dominant market session established by the other timestamped quotes in the same refresh. A genuinely
+stale/outlier timestamp remains uncovered; Portlander does not relabel it as current.
+
 ## Product placement
 
 - **Today / Morning Desk:** weekday live daily briefing; weekend completed/current Monday–Friday
