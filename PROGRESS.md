@@ -1,7 +1,7 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-02
-**Last agent:** claude (session 20, continued)
+**Last agent:** codex (session 21)
 **Current phase:** Phase 1 and Phase 2 are both fully closed out and **`v2.0` ("Portfolio Event
 Intelligence") is being promoted to `main`** this session. `BE-01`–`BE-06` merged to `develop` via
 PR #32. Phase 1 acceptance is owner-confirmed complete. PR #28 (stale, pre-overhaul "Signal"
@@ -311,6 +311,11 @@ None outstanding. The SnapTrade connect → Fidelity → sync path is owner-conf
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-02 — codex (session 21, UX map consolidation)
+- Added `report/UX map.MD` to `develop`, preserving and attributing Claude's existing code-review notes from `claude/portlander-ux-improvements-s2fwcm`.
+- Added a separately labeled ChatGPT section covering the live-site review: mobile navigation/touch targets, consumer Settings IA, Today/Earnings/Calendar/Portfolio refinements, global polish, product identity, event-orbit P logo, persistent shell, voice, and implementation priorities.
+- Reconciled the earlier conversational version note with current repository truth: Phase 2 is complete and `v2.0` remains correct; this is documentation-only and does not change app behavior.
 
 ### 2026-08-02 — claude (session 20, v2.0 promotion)
 - Owner set the three `DEEPSEEK_*` secrets. Ran `earnings-interpret` for real, via `pg_net` (see
