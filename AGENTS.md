@@ -84,7 +84,7 @@ Calendar, table-first Portfolio, Settings diagnostics, Supabase/Finnhub sync, Sn
 truthful Local/Demo states, and release metadata. A few owner acceptance checks remain in
 `PROGRESS.md`; they are post-release verification, not permission to redesign Phase 1.
 
-### Phase 2 — Portfolio event intelligence (CURRENT)
+### Phase 2 — Portfolio event intelligence (`v2.0`, released)
 
 The old "Ritual" and "Intelligence" phase plans were canceled by the owner. Phase 2 is now
 one coherent product direction:
@@ -100,10 +100,12 @@ one coherent product direction:
 The ordered UI work is the master queue in `PROGRESS.md`. Do not improvise a parallel redesign
 or revive the canceled Phase 2/3 lists.
 
-### Phase 3 — Unplanned
+### Phase 3 — Portfolio performance intelligence (CURRENT)
 
-There is no approved Phase 3 scope. Do not invent one. It will be defined only after the owner
-uses and signs off Phase 2.
+The owner defined the first Phase 3 vertical slice on 2026-08-02: verified daily/weekly/custom-
+period portfolio value change and ticker/theme attribution, with a weekday/weekend Morning Desk
+recap and a Portfolio date-range review. DeepSeek narrates deterministic facts only; it never
+supplies a rendered number. See `docs/PERFORMANCE-INTELLIGENCE.md` and `PROGRESS.md` `PI-01`.
 
 ### Phase 2 data truth rules
 
@@ -115,6 +117,9 @@ uses and signs off Phase 2.
   content must be labeled and visually separated from verified facts.
 - Missing data renders as unavailable/pending. Never generate a plausible-looking number to fill
   a card.
+- These truth rules also apply to Phase 3 performance: snapshots and deterministic code own every
+  value/percentage; changed quantities are labeled as flow-affected value change; generated
+  narration remains visually separate.
 
 ---
 

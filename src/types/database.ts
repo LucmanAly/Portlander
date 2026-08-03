@@ -190,6 +190,120 @@ export interface Database {
         }
         Relationships: []
       }
+      portfolio_snapshots: {
+        Row: {
+          id: string
+          user_id: string
+          snapshot_date: string
+          captured_at: string
+          holdings_count: number
+          total_value: number | string
+          is_complete: boolean
+          source: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          snapshot_date: string
+          captured_at?: string
+          holdings_count: number
+          total_value: number
+          is_complete?: boolean
+          source?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          snapshot_date?: string
+          captured_at?: string
+          holdings_count?: number
+          total_value?: number
+          is_complete?: boolean
+          source?: string
+        }
+        Relationships: []
+      }
+      position_snapshots: {
+        Row: {
+          id: string
+          snapshot_id: string
+          user_id: string
+          ticker: string
+          name: string | null
+          shares: number | string
+          price: number | string
+          market_value: number | string
+          tags: string[]
+          source: string
+        }
+        Insert: {
+          id?: string
+          snapshot_id: string
+          user_id: string
+          ticker: string
+          name?: string | null
+          shares: number
+          price: number
+          market_value: number
+          tags?: string[]
+          source: string
+        }
+        Update: {
+          id?: string
+          snapshot_id?: string
+          user_id?: string
+          ticker?: string
+          name?: string | null
+          shares?: number
+          price?: number
+          market_value?: number
+          tags?: string[]
+          source?: string
+        }
+        Relationships: []
+      }
+      portfolio_recaps: {
+        Row: {
+          id: string
+          user_id: string
+          summary_key: string
+          period_start: string
+          period_end: string
+          headline: string
+          narrative: string
+          selected_ticker_ids: string[]
+          selected_theme_ids: string[]
+          model: string
+          generated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          summary_key: string
+          period_start: string
+          period_end: string
+          headline: string
+          narrative: string
+          selected_ticker_ids?: string[]
+          selected_theme_ids?: string[]
+          model: string
+          generated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          summary_key?: string
+          period_start?: string
+          period_end?: string
+          headline?: string
+          narrative?: string
+          selected_ticker_ids?: string[]
+          selected_theme_ids?: string[]
+          model?: string
+          generated_at?: string
+        }
+        Relationships: []
+      }
       snaptrade_connections: {
         Row: {
           id: string
@@ -226,3 +340,6 @@ export type HoldingRow = Database['public']['Tables']['holdings']['Row']
 export type WatchlistRow = Database['public']['Tables']['watchlist']['Row']
 export type EventRow = Database['public']['Tables']['events']['Row']
 export type SnaptradeConnectionRow = Database['public']['Tables']['snaptrade_connections']['Row']
+export type PortfolioSnapshotRow = Database['public']['Tables']['portfolio_snapshots']['Row']
+export type PositionSnapshotRow = Database['public']['Tables']['position_snapshots']['Row']
+export type PortfolioRecapRow = Database['public']['Tables']['portfolio_recaps']['Row']

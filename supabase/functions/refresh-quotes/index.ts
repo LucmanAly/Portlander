@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
   const { data: holdingRows, error: hErr } = await sb
     .from('holdings')
-    .select('ticker')
+    .select('ticker, name, shares, tags, source')
     .eq('user_id', userId)
 
   if (hErr) {
@@ -160,6 +160,15 @@ Deno.serve(async (req) => {
     await sleep(200)
   }
 
+  let snapshotId: string | null = null
+  if (errors.length === 0 && results.length === tickers.length) {
+    try {
+      snapshotId = await captureCompleteSnapshot(sb, userId)
+    } catch (error) {
+      errors.push(`Snapshot: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   const status = errors.length ? (results.length ? 'partial' : 'error') : 'ok'
   const finishedAt = new Date().toISOString()
   await finishRun(sb, runId, {
@@ -175,10 +184,84 @@ Deno.serve(async (req) => {
     tickers: tickers.length,
     results,
     errors: errors.slice(0, 20),
+    snapshotId,
     runId,
     finishedAt,
   })
 })
+
+async function captureCompleteSnapshot(
+  sb: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<string> {
+  const { data: holdings, error: loadErr } = await sb
+    .from('holdings')
+    .select('ticker, name, shares, last_price, tags, source')
+    .eq('user_id', userId)
+    .order('ticker')
+  if (loadErr) throw new Error(`failed to reload holdings: ${loadErr.message}`)
+  if (!holdings || holdings.length === 0) throw new Error('no holdings to capture')
+
+  const rows = holdings.map((holding) => {
+    const shares = Number(holding.shares)
+    const price = Number(holding.last_price)
+    if (!Number.isFinite(shares) || shares <= 0 || !Number.isFinite(price) || price <= 0) {
+      throw new Error(`${holding.ticker}: incomplete price or quantity`)
+    }
+    return {
+      ticker: String(holding.ticker).toUpperCase(),
+      name: holding.name ?? null,
+      shares,
+      price,
+      market_value: shares * price,
+      tags: Array.isArray(holding.tags) ? holding.tags : [],
+      source: String(holding.source),
+    }
+  })
+
+  const { data: header, error: headerErr } = await sb
+    .from('portfolio_snapshots')
+    .insert({
+      user_id: userId,
+      snapshot_date: newYorkDate(new Date()),
+      captured_at: new Date().toISOString(),
+      holdings_count: rows.length,
+      total_value: rows.reduce((sum, row) => sum + row.market_value, 0),
+      is_complete: false,
+      source: 'finnhub-quotes',
+    })
+    .select('id')
+    .single()
+  if (headerErr || !header) throw new Error(`failed to create header: ${headerErr?.message ?? 'no id'}`)
+
+  const { error: positionsErr } = await sb.from('position_snapshots').insert(
+    rows.map((row) => ({
+      snapshot_id: header.id,
+      user_id: userId,
+      ...row,
+    })),
+  )
+  if (positionsErr) throw new Error(`failed to write positions: ${positionsErr.message}`)
+
+  const { error: completeErr } = await sb
+    .from('portfolio_snapshots')
+    .update({ is_complete: true })
+    .eq('id', header.id)
+    .eq('user_id', userId)
+  if (completeErr) throw new Error(`failed to finalize capture: ${completeErr.message}`)
+  return String(header.id)
+}
+
+function newYorkDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const part = (type: string) => parts.find((value) => value.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
 
 async function fetchQuote(symbol: string, token: string): Promise<FinnhubQuote> {
   const url = new URL(`${FINNHUB_BASE}/quote`)

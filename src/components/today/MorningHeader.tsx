@@ -1,6 +1,7 @@
 import { formatMoney, formatRelativeSync, formatSignedPct, isStaleSync } from '@/lib/format'
 import { AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
+import type { ReactNode } from 'react'
 
 export function MorningHeader({
   totalValue,
@@ -8,12 +9,14 @@ export function MorningHeader({
   dayChangePct,
   lastSyncAt,
   holdingsCount,
+  children,
 }: {
   totalValue: number
   dayChange?: number
   dayChangePct?: number
   lastSyncAt: string | null
   holdingsCount: number
+  children?: ReactNode
 }) {
   const tone = dayChange == null ? 'text-ink-300' : dayChange >= 0 ? 'text-positive' : 'text-critical'
   const stale = isStaleSync(lastSyncAt)
@@ -44,6 +47,7 @@ export function MorningHeader({
           {stale ? ' · stale' : ''}
         </p>
       </div>
+      {children ? <div className="mt-5 border-t border-border pt-4">{children}</div> : null}
     </header>
   )
 }

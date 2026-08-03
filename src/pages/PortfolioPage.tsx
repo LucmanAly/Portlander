@@ -12,6 +12,7 @@ import {
 } from '@/lib/scoring'
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
+import { PeriodReview } from '@/components/performance/PeriodReview'
 import { Stat } from '@/components/ui/Stat'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Search, Trash2, Upload } from 'lucide-react'
@@ -231,6 +232,8 @@ export function PortfolioPage() {
             : 'No holdings match your search/filter.'
         }
       />
+
+      <PeriodReview />
 
       <section
         aria-labelledby="manage-holdings"

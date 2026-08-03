@@ -3,6 +3,7 @@ import { EarningsDeck } from '@/components/today/EarningsDeck'
 import { NeedsAttention, needsAttentionEvents } from '@/components/today/NeedsAttention'
 import { ForwardExposurePanel } from '@/components/exposure/ForwardExposurePanel'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { MorningPerformanceRecap } from '@/components/performance/MorningPerformanceRecap'
 import { usePortfolio } from '@/context/PortfolioContext'
 import {
   portfolioDayChange,
@@ -54,7 +55,9 @@ export function TodayPage() {
         dayChangePct={dayChangePct}
         lastSyncAt={lastSyncAt}
         holdingsCount={holdings.length}
-      />
+      >
+        <MorningPerformanceRecap />
+      </MorningHeader>
 
       <EarningsDeck cards={deckCards} />
 

@@ -91,6 +91,61 @@ create index if not exists events_ticker_date_idx on public.events (ticker, even
 create index if not exists events_natural_lookup_idx
   on public.events (ticker, event_type, event_date);
 
+-- Complete point-in-time portfolio captures. A refresh first creates an
+-- incomplete header, writes every position row, then marks the header
+-- complete. Readers ignore incomplete captures, so a failed partial write can
+-- never become a plausible-looking period return.
+create table if not exists public.portfolio_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  snapshot_date date not null,
+  captured_at timestamptz not null default now(),
+  holdings_count int not null check (holdings_count >= 0),
+  total_value numeric not null check (total_value >= 0),
+  is_complete boolean not null default false,
+  source text not null default 'finnhub-quotes'
+);
+
+create index if not exists portfolio_snapshots_user_date_idx
+  on public.portfolio_snapshots (user_id, snapshot_date, captured_at desc);
+
+create table if not exists public.position_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  snapshot_id uuid not null references public.portfolio_snapshots (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  ticker text not null,
+  name text,
+  shares numeric not null check (shares > 0),
+  price numeric not null check (price > 0),
+  market_value numeric not null check (market_value >= 0),
+  tags text[] not null default '{}',
+  source text not null,
+  unique (snapshot_id, ticker)
+);
+
+create index if not exists position_snapshots_snapshot_idx
+  on public.position_snapshots (snapshot_id);
+create index if not exists position_snapshots_user_ticker_idx
+  on public.position_snapshots (user_id, ticker);
+
+-- Cached qualitative DeepSeek narration. Verified numbers never come from
+-- this table: the client renders them from deterministic snapshot math and
+-- uses only these digit-free words plus selected verified fact IDs.
+create table if not exists public.portfolio_recaps (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  summary_key text not null,
+  period_start date not null,
+  period_end date not null,
+  headline text not null,
+  narrative text not null,
+  selected_ticker_ids text[] not null default '{}',
+  selected_theme_ids text[] not null default '{}',
+  model text not null,
+  generated_at timestamptz not null default now(),
+  unique (user_id, summary_key)
+);
+
 -- SnapTrade per-user secret. As sensitive as a password — RLS is enabled
 -- with zero client-facing policies, so only the service-role key (used
 -- exclusively inside Edge Functions) can ever read or write it.
@@ -132,6 +187,9 @@ alter table public.events enable row level security;
 alter table public.sync_runs enable row level security;
 alter table public.snaptrade_users enable row level security;
 alter table public.snaptrade_connections enable row level security;
+alter table public.portfolio_snapshots enable row level security;
+alter table public.position_snapshots enable row level security;
+alter table public.portfolio_recaps enable row level security;
 
 create policy "holdings_select_own" on public.holdings
   for select using (auth.uid() = user_id);
@@ -171,6 +229,17 @@ create policy "sync_runs_select_auth" on public.sync_runs
 
 create policy "snaptrade_connections_select_own" on public.snaptrade_connections
   for select using (auth.uid() = user_id);
+
+create policy "portfolio_snapshots_select_own" on public.portfolio_snapshots
+  for select to authenticated using ((select auth.uid()) = user_id);
+create policy "position_snapshots_select_own" on public.position_snapshots
+  for select to authenticated using ((select auth.uid()) = user_id);
+create policy "portfolio_recaps_select_own" on public.portfolio_recaps
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+grant select on public.portfolio_snapshots to authenticated;
+grant select on public.position_snapshots to authenticated;
+grant select on public.portfolio_recaps to authenticated;
 
 -- Phase 2 reserved (do not use in Phase 1 UI unless exit criteria met)
 -- create table journal_entries (...);
