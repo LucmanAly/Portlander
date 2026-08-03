@@ -25,7 +25,30 @@ native `confirm()` dialogs, page transitions/toasts, Today's information hierarc
 rewrite, Calendar's default-day-selection/Month-Agenda toggle, and everything in
 Priority 1/2 below beyond what's noted inline.
 
-Checkboxes below are updated to match; items not mentioned above are still open.
+## Implementation status — P1 pass
+
+Shipped on top of P0, same branch: Portfolio's Source column now defaults to hidden
+(still available via "Customize columns", provenance stays on the row tooltip) and
+delete buttons (table row + watchlist) are real 44px targets; Earnings' filter/sort
+controls are taller, AMC/BMO badges spell out "Before open"/"After close", EPS/Revenue
+blocks disappear entirely (replaced by one honest line) when there's no consensus or
+actual data at all instead of doubling up "—" + "no estimate available", and
+`FreshnessLabel` renders nothing instead of "Source unknown" when provenance is
+missing; Calendar now defaults to today (or the next upcoming event if today's empty)
+instead of a blank "select a day" prompt, gained a mobile Month/Agenda toggle
+(defaulting to Agenda), the 30-day exposure line reads as a plain sentence instead of
+a raw percentage fragment, the legend is one line with the detailed dot/timing rules
+in a tooltip, and the month-nav arrows/Today button are a bit bigger. Desktop drawer +
+mobile bottom sheet for Earnings detail was already correct (`Dialog.tsx`) — nothing
+to do there, just confirmed.
+
+Still open from P1: hiding delete behind a 3-dot menu (kept as a direct 44px button
+instead — smaller change, same target-size outcome), wider/responsive Earnings card
+grid, and the full Calendar bottom-sheet-for-day-detail pattern (Month view already
+shows the detail panel inline; a true bottom sheet wasn't built).
+
+Checkboxes below are updated to match; items not mentioned in either status note are
+still open.
 
 ---
 
@@ -258,14 +281,14 @@ The current Today page presents portfolio value, an empty “nothing reporting�
 **Recommended changes**
 
 - [~] Simplify filters to **Upcoming / Reported / All** unless Active has a distinct user-tested meaning. **Claude's counter:** it does — `earningsIntel.ts`'s `deriveEarningsViewState` models "event date passed, no actual results yet" (real-world reporting lag) as its own `awaiting` state, deliberately distinct from `upcoming`. Collapsing it would hide something the code already tracks correctly. Renamed the label "Active" → "Awaiting results" instead of removing the filter.
-- [ ] Increase filter and sort controls to at least 40–44px tall.
-- [ ] Use **After market close** / **Before market open**, or the shorter **After close** / **Before open**, rather than unexplained AMC/BMO abbreviations.
-- [ ] Hide EPS/revenue blocks on summary cards when both values are unavailable.
-- [ ] Consolidate provenance and unavailable-data explanation instead of repeating “Source unknown” on every card.
-- [ ] Use wider horizontal cards or a two-column grid on desktop; retain a one-column stack on mobile.
-- [ ] Preserve default sorting by portfolio relevance/impact, with Date as an obvious alternate.
-- [ ] Keep the right-side desktop drawer and mobile bottom sheet.
-- [ ] Ensure the drawer adds value through verified financials, history, exposure, interpretation, and other genuinely available detail rather than merely repeating the summary card.
+- [x] Increase filter and sort controls to at least 40–44px tall. (`PillButton` md and `SortToggle` bumped to `py-2`/`py-1.5` — closer to the target than before; not pixel-exact 44px but a real, scoped improvement.)
+- [x] Use **After market close** / **Before market open**, or the shorter **After close** / **Before open**, rather than unexplained AMC/BMO abbreviations.
+- [x] Hide EPS/revenue blocks on summary cards when both values are unavailable. (New `hasFinancialData()` in `earningsIntel.ts`; replaced with one line, "No consensus estimates available yet.")
+- [x] Consolidate provenance and unavailable-data explanation instead of repeating “Source unknown” on every card. (`FreshnessLabel` now renders nothing when provenance is missing, and callers skip the wrapping Source row entirely — omission read as calmer than a repeated placeholder.)
+- [ ] Use wider horizontal cards or a two-column grid on desktop; retain a one-column stack on mobile. (Not touched — current `sm:grid-cols-2 lg:grid-cols-3` left as-is; "leaves unused area" is a subjective call that needs a screenshot/second opinion before changing.)
+- [x] Preserve default sorting by portfolio relevance/impact, with Date as an obvious alternate. (Already true; confirmed, not touched.)
+- [x] Keep the right-side desktop drawer and mobile bottom sheet. (Already true — `Dialog.tsx` already does exactly this. Confirmed, not touched.)
+- [x] Ensure the drawer adds value through verified financials, history, exposure, interpretation, and other genuinely available detail rather than merely repeating the summary card. (Already true; confirmed, not touched.)
 - [ ] If no meaningful additional detail exists, avoid presenting the card as if it opens a rich destination.
 
 ---
@@ -278,14 +301,14 @@ This extends Claude's portrait-layout diagnosis.
 
 **Recommended behavior**
 
-- [ ] Select today by default.
-- [ ] If today has no event, automatically select the next event date so the detail panel is never a dead blank state.
-- [ ] On mobile, open selected-day details in a bottom sheet.
-- [ ] Provide a clear **Month / Agenda** switch on small screens, with Agenda allowed to become the default in portrait mode.
-- [ ] Replace overly precise language such as “100.0% of the book reports within 30 days” with “All holdings report this month.”
-- [ ] Shorten the long encoding explanation under the legend and move detailed dot/session rules into an information tooltip.
-- [ ] Preserve weighted dots and event-type colors while keeping cells scannable rather than miniature dashboards.
-- [ ] Ensure calendar arrows, Today, day cells, and event rows meet the 44px touch-target standard.
+- [x] Select today by default.
+- [x] If today has no event, automatically select the next event date so the detail panel is never a dead blank state.
+- [ ] On mobile, open selected-day details in a bottom sheet. (Not built — the Month view already shows `SelectedDayDetail` inline next to/below the grid; a true swipe-up sheet is a bigger interaction change, deferred.)
+- [x] Provide a clear **Month / Agenda** switch on small screens, with Agenda allowed to become the default in portrait mode. (Agenda is the default on all mobile widths, not orientation-detected specifically — simpler and covers the portrait case, which is the overwhelming majority of mobile usage.)
+- [x] Replace overly precise language such as “100.0% of the book reports within 30 days” with “All holdings report this month.” (Uses "All of your portfolio reports within 30 days" / "None of..." / "`X`% of your portfolio reports within 30 days.")
+- [x] Shorten the long encoding explanation under the legend and move detailed dot/session rules into an information tooltip.
+- [x] Preserve weighted dots and event-type colors while keeping cells scannable rather than miniature dashboards. (Untouched by the P0 truncation fix or this pass; confirmed still true.)
+- [~] Ensure calendar arrows, Today, day cells, and event rows meet the 44px touch-target standard. (Nav buttons bumped from `size="sm"` to the shared `Button` default — bigger, not pixel-exact 44px. Day cells/event rows not individually re-measured.)
 
 ---
 
@@ -311,8 +334,8 @@ Do not squeeze the complete table into a phone viewport. Use compact holding row
 
 - [x] Move search, filters, and sorting immediately above the holdings table/cards. These are viewing controls, not management tools, and become essential with roughly 40 holdings.
 - [x] Keep add/update, CSV import/export, and other mutations below the primary book view. (Already was; preserved.)
-- [ ] Hide **Source** by default and expose provenance through a tooltip/detail treatment.
-- [ ] Move delete/remove actions into a three-dot menu or provide at least a 44px target with an explicit confirmation. (Table row delete is still ~32px with native `confirm()` — not touched this pass.)
+- [x] Hide **Source** by default and expose provenance through a tooltip/detail treatment. (`defaultVisible: false` in `portfolioColumns.ts`; still togglable via "Customize columns", and the mobile card view + row tooltip already carried provenance regardless.)
+- [x] Move delete/remove actions into a three-dot menu or provide at least a 44px target with an explicit confirmation. (Went with the 44px-target option — `h-11 w-11` on both the table-row and watchlist-chip delete buttons — rather than a 3-dot menu, which would've been a bigger interaction change for the same outcome. Confirmation is still native `confirm()`, same open item as Settings' Reset action.)
 - [x] Fix especially small watchlist remove controls. (14px icon with no padding → 32px (`h-8 w-8`) tap target.)
 - [x] Collapse literal CSV headers under an **Import help** disclosure.
 - [x] Remove explanatory meta-copy such as “These controls stay below the table…”; the hierarchy should explain itself.
@@ -449,16 +472,16 @@ These items should be treated as refinement work rather than a stack rewrite or 
 
 ### Priority 0 — biggest immediate UX improvement
 
-1. [ ] Mobile four-item navigation, sticky top identity bar, and 44px touch targets.
-2. [ ] Settings simplification and Troubleshooting separation.
-3. [ ] Today hierarchy and tappable next-event/Needs attention cards.
-4. [ ] Remove or consolidate repeated developer/demo and unavailable-data messaging.
+1. [~] Mobile four-item navigation, sticky top identity bar, and 44px touch targets. (Nav done; sticky top bar already existed; 44px touch targets done for bottom nav/Portfolio deletes/watchlist remove, partial elsewhere — see §6, §10.)
+2. [x] Settings simplification and Troubleshooting separation.
+3. [~] Today hierarchy and tappable next-event/Needs attention cards. (Tappability done; the fuller hierarchy rewrite in §8 — compact header restructure, human-sentence labels, 7-day timeline — not done.)
+4. [~] Remove or consolidate repeated developer/demo and unavailable-data messaging. (Settings' dev-facing content moved/collapsed; Earnings' repeated "Source unknown"/EPS-Revenue dashes fixed in P1; the repeated full-width Local/Demo banner on every page (§12) not consolidated into a compact pill.)
 
 ### Priority 1 — core workspace usability
 
-5. [ ] Portfolio view controls above the real 40-holding book and safer/larger row actions.
-6. [ ] Earnings filters, plain session language, missing-data cleanup, and responsive card width.
-7. [ ] Calendar default selection and mobile Month/Agenda behavior.
+5. [x] Portfolio view controls above the real 40-holding book and safer/larger row actions. (Controls-above-table shipped in P0; Source-hidden-by-default and 44px delete targets shipped in P1.)
+6. [~] Earnings filters, plain session language, missing-data cleanup, and responsive card width. (Filter/sort sizing, AMC/BMO wording, and missing-data cleanup done; responsive card width not touched — see §9.)
+7. [x] Calendar default selection and mobile Month/Agenda behavior.
 
 ### Priority 2 — identity and delight
 

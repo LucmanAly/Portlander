@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react'
 import { FreshnessLabel } from '@/components/ui/FreshnessLabel'
 
 describe('FreshnessLabel', () => {
-  it('renders "Source unknown" when provenance is undefined', () => {
-    render(<FreshnessLabel />)
-    expect(screen.getByText('Source unknown')).toBeInTheDocument()
+  it('renders nothing when provenance is undefined, rather than an alarming placeholder', () => {
+    const { container } = render(<FreshnessLabel />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders the source and freshness when provenance is present', () => {

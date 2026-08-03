@@ -2,20 +2,35 @@ import { MonthCalendar } from '@/components/calendar/MonthCalendar'
 import { SelectedDayDetail } from '@/components/calendar/SelectedDayDetail'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { scoreAndFilterEvents, sortEventsByDate } from '@/lib/scoring'
-import { addDays, startOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns'
-import { useMemo, useState } from 'react'
+import { addDays, format, startOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { formatEventDay, formatPct } from '@/lib/format'
 import { TypeBadge } from '@/components/ui/Badge'
+import { PillButton } from '@/components/ui/Button'
+
+type MobileView = 'agenda' | 'month'
+
+function exposureSentence(pct: number): string {
+  if (pct >= 99.95) return 'All of your portfolio reports within 30 days.'
+  if (pct <= 0.05) return 'None of your portfolio reports within 30 days.'
+  return `${formatPct(pct)} of your portfolio reports within 30 days.`
+}
 
 export function CalendarPage() {
   const { events, holdings, watchlist, exposure } = usePortfolio()
   const today = startOfDay(new Date())
+  const todayKey = format(today, 'yyyy-MM-dd')
   // Deep-link support: /calendar?date=2026-08-10 opens straight on that day,
   // so links from Today's "Needs attention" land on the relevant date
   // instead of a generic month view the user has to hunt through.
   const [searchParams] = useSearchParams()
   const [selectedDate, setSelectedDate] = useState<string | null>(() => searchParams.get('date'))
+  // Grid + agenda list used to both render, stacked, on every screen size —
+  // fine on desktop, a lot of redundant scrolling on a phone. Below `lg`,
+  // show one or the other; agenda first since it's the format that already
+  // shows full ticker names with no width constraint.
+  const [mobileView, setMobileView] = useState<MobileView>('agenda')
 
   const monthEvents = useMemo(() => {
     const from = startOfMonth(today)
@@ -44,6 +59,19 @@ export function CalendarPage() {
     return sortEventsByDate(scored)
   }, [events, holdings, watchlist, today])
 
+  // Default selection: today if it has something reporting, otherwise the
+  // next upcoming event — so the detail panel is never a dead "select a day"
+  // prompt when there's an obvious answer. Only runs while nothing is
+  // selected yet, so it won't fight a deep-link or a manual click.
+  useEffect(() => {
+    if (selectedDate) return
+    if (monthEvents.some((e) => e.eventDate === todayKey)) {
+      setSelectedDate(todayKey)
+    } else if (agenda.length > 0) {
+      setSelectedDate(agenda[0].eventDate)
+    }
+  }, [selectedDate, monthEvents, agenda, todayKey])
+
   return (
     <div className="space-y-6">
       <header>
@@ -53,18 +81,27 @@ export function CalendarPage() {
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-100">Month view</h1>
         <p className="mt-1.5 text-sm text-ink-400">
           Color-coded by type. For ranked priority, use{' '}
-          <span className="text-ink-200">Today</span>.{' '}
-          <span className="tabular text-ink-300">{formatPct(exposure.earnings30dPct)}</span> of the
-          book reports within 30 days.
+          <span className="text-ink-200">Today</span>. {exposureSentence(exposure.earnings30dPct)}
         </p>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-start">
-        <MonthCalendar events={monthEvents} selectedDate={selectedDate} onSelectDay={setSelectedDate} />
-        <SelectedDayDetail dateKey={selectedDate} events={selectedDayEvents} />
+      <div className="flex gap-1.5 lg:hidden">
+        <PillButton size="sm" active={mobileView === 'agenda'} onClick={() => setMobileView('agenda')}>
+          Agenda
+        </PillButton>
+        <PillButton size="sm" active={mobileView === 'month'} onClick={() => setMobileView('month')}>
+          Month
+        </PillButton>
       </div>
 
-      <section>
+      <div className={mobileView === 'month' ? 'block lg:block' : 'hidden lg:block'}>
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-start">
+          <MonthCalendar events={monthEvents} selectedDate={selectedDate} onSelectDay={setSelectedDate} />
+          <SelectedDayDetail dateKey={selectedDate} events={selectedDayEvents} />
+        </div>
+      </div>
+
+      <section className={mobileView === 'agenda' ? 'block lg:block' : 'hidden lg:block'}>
         <h2 className="mb-3 text-sm font-semibold text-ink-450">Agenda · next 30 days</h2>
         <div className="surface divide-y divide-border overflow-hidden rounded-2xl">
           {agenda.length === 0 ? (

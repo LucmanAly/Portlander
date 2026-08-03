@@ -2,10 +2,13 @@ import { AlertTriangle } from 'lucide-react'
 import type { ProvenanceInfo } from '@/types/earnings'
 import { formatRelativeShort } from '@/lib/format'
 
+/**
+ * Renders nothing when provenance is missing — an unlabeled card reads as
+ * calmer/more honest than repeating a "Source unknown" placeholder across
+ * every card that doesn't happen to have one yet.
+ */
 export function FreshnessLabel({ provenance }: { provenance?: ProvenanceInfo }) {
-  if (!provenance) {
-    return <span className="text-xs text-ink-450">Source unknown</span>
-  }
+  if (!provenance) return null
 
   return (
     <span className="inline-flex items-center gap-1 text-xs text-ink-450">

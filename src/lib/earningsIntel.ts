@@ -182,6 +182,20 @@ export function deriveEarningsViewState(
   return hasActual ? 'reported' : 'awaiting'
 }
 
+/**
+ * True when there's at least one real EPS/revenue number (estimate or, once
+ * reported, actual) to show. Cards/drawers use this to hide the whole
+ * financials block rather than rendering two rows of "—" + "no estimate
+ * available" — repeated across every sparse card, that reads as broken
+ * rather than honest.
+ */
+export function hasFinancialData(facts: EarningsFacts | undefined, isReported: boolean): boolean {
+  if (!facts) return false
+  if (facts.consensus?.epsEstimate != null || facts.consensus?.revenueEstimate != null) return true
+  if (isReported && (facts.actual?.epsActual != null || facts.actual?.revenueActual != null)) return true
+  return false
+}
+
 /** Builds an EarningsCardModel from a real ScoredEvent plus optional fixture facts. Never throws on missing facts. */
 export function buildEarningsCardModel(
   event: ScoredEvent,

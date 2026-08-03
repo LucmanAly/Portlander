@@ -252,7 +252,7 @@ function HoldingRow({
           onClick={() => {
             if (confirm(`Remove ${h.ticker} from your holdings?`)) onRemove()
           }}
-          className="focus-ring rounded-lg p-2 text-ink-450 hover:bg-ink-800 hover:text-critical"
+          className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg text-ink-450 hover:bg-ink-800 hover:text-critical"
           aria-label={`Remove ${h.ticker}`}
         >
           <Trash2 className="h-4 w-4" />
@@ -388,7 +388,7 @@ function HoldingCard({
           onClick={() => {
             if (confirm(`Remove ${h.ticker} from your holdings?`)) onRemove()
           }}
-          className="focus-ring shrink-0 rounded-lg p-2 text-ink-450 hover:bg-ink-800 hover:text-critical"
+          className="focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-450 hover:bg-ink-800 hover:text-critical"
           aria-label={`Remove ${h.ticker}`}
         >
           <Trash2 className="h-4 w-4" />

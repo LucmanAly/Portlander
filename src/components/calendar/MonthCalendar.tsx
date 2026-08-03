@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import type { ScoredEvent } from '@/types'
 import { eventTypeLabel, isDividendType, isMacroType, scoreTier } from '@/lib/scoring'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 /** Background tint only — kept separate from the ring so selection/today can't visually conflict with it (see dayRing). */
@@ -120,18 +120,16 @@ export function MonthCalendar({
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => setCursor((c) => subMonths(c, 1))}
             aria-label="Previous month"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setCursor(startOfMonth(new Date()))}>
+          <Button variant="ghost" onClick={() => setCursor(startOfMonth(new Date()))}>
             Today
           </Button>
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => setCursor((c) => addMonths(c, 1))}
             aria-label="Next month"
           >
@@ -243,17 +241,18 @@ export function MonthCalendar({
         })}
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-4 text-xs text-ink-450">
+      <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-ink-450">
         <Legend color="bg-earnings" label="Earnings" />
         <Legend color="bg-dividend" label="Dividends" />
         <Legend color="bg-macro" label="Macro" />
+        <span
+          className="inline-flex items-center gap-1 text-[11px] text-ink-600"
+          title="Earnings ticker: bright reports before the open, dim reports after the close. Number badge = multiple reports that day."
+        >
+          <Info className="h-3 w-3" aria-hidden="true" />
+          Dot size = position weight
+        </span>
       </div>
-      <p className="mt-2 text-[11px] text-ink-600">
-        Dot size tracks position weight · Earnings ticker:{' '}
-        <span className="text-ink-100">bright</span> reports before the open ·{' '}
-        <span className="text-ink-400">dim</span> reports after the close · number badge = multiple
-        reports that day
-      </p>
     </div>
   )
 }
