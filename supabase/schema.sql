@@ -175,6 +175,91 @@ create table if not exists public.performance_briefings (
   unique (user_id, evidence_hash)
 );
 
+-- Optional single-owner scheduler configuration. The secret is stored only as
+-- SHA-256; RLS has no client policies and only the service-role Edge Function
+-- may read it. Hosted deployments may instead use Edge Function env secrets.
+create table if not exists public.performance_cron_config (
+  singleton boolean primary key default true check (singleton),
+  owner_user_id uuid not null references auth.users (id) on delete cascade,
+  secret_hash text not null check (secret_hash ~ '^[0-9a-f]{64}
+-- RLS
+alter table public.holdings enable row level security;
+alter table public.watchlist enable row level security;
+alter table public.events enable row level security;
+alter table public.sync_runs enable row level security;
+alter table public.snaptrade_users enable row level security;
+alter table public.snaptrade_connections enable row level security;
+alter table public.portfolio_snapshot_runs enable row level security;
+alter table public.portfolio_snapshots enable row level security;
+alter table public.performance_briefings enable row level security;
+alter table public.performance_cron_config enable row level security;
+
+create policy "holdings_select_own" on public.holdings
+  for select using (auth.uid() = user_id);
+create policy "holdings_insert_own" on public.holdings
+  for insert with check (auth.uid() = user_id);
+create policy "holdings_update_own" on public.holdings
+  for update using (auth.uid() = user_id);
+create policy "holdings_delete_own" on public.holdings
+  for delete using (auth.uid() = user_id);
+
+create policy "watchlist_select_own" on public.watchlist
+  for select using (auth.uid() = user_id);
+create policy "watchlist_insert_own" on public.watchlist
+  for insert with check (auth.uid() = user_id);
+create policy "watchlist_update_own" on public.watchlist
+  for update using (auth.uid() = user_id);
+create policy "watchlist_delete_own" on public.watchlist
+  for delete using (auth.uid() = user_id);
+
+-- Events: own rows OR global macro (user_id is null)
+create policy "events_select_visible" on public.events
+  for select using (user_id is null or auth.uid() = user_id);
+create policy "events_insert_own" on public.events
+  for insert with check (auth.uid() = user_id);
+create policy "events_update_own" on public.events
+  for update using (auth.uid() = user_id);
+create policy "events_delete_own" on public.events
+  for delete using (auth.uid() = user_id);
+
+-- sync_runs: service role only in production; allow read for authenticated for now
+create policy "sync_runs_select_auth" on public.sync_runs
+  for select to authenticated using (true);
+
+-- snaptrade_users: intentionally NO policies for `authenticated`/`anon` — RLS
+-- with zero permissive policies means only the service role (bypasses RLS)
+-- can touch this table. The client must never read the secret directly.
+
+create policy "snaptrade_connections_select_own" on public.snaptrade_connections
+  for select using (auth.uid() = user_id);
+
+create policy "portfolio_snapshot_runs_select_own" on public.portfolio_snapshot_runs
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "portfolio_snapshots_select_own" on public.portfolio_snapshots
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "performance_briefings_select_own" on public.performance_briefings
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+-- Supabase projects created after the 2026 Data API exposure change may not
+-- expose SQL-created public tables automatically. Grant read access explicitly;
+-- RLS above still restricts every row to its owner. Writes stay service-role only.
+grant select on public.portfolio_snapshot_runs to authenticated;
+grant select on public.portfolio_snapshots to authenticated;
+grant select on public.performance_briefings to authenticated;
+
+-- No client grants or policies: this table stores scheduled-run authentication
+-- metadata and is intentionally service-role-only.
+revoke all on public.performance_cron_config from anon, authenticated;
+
+-- Phase 2 reserved (do not use in Phase 1 UI unless exit criteria met)
+-- create table journal_entries (...);
+-- create table event_notes (...);
+),
+  configured_at timestamptz not null default now()
+);
+
 -- RLS
 alter table public.holdings enable row level security;
 alter table public.watchlist enable row level security;
