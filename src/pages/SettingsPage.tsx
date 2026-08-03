@@ -1,6 +1,7 @@
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatRelativeSync } from '@/lib/format'
 import { APP_LAST_UPDATED, APP_RELEASE_NAME, APP_VERSION, formatAppUpdatedAt } from '@/lib/appMeta'
+import { useToast } from '@/components/ui/Toast'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { AlertCircle, CheckCircle2, CircleHelp, RefreshCw, Sparkles } from 'lucide-react'
 import clsx from 'clsx'
@@ -40,6 +41,7 @@ export function SettingsPage() {
     quotesSyncing,
     refreshQuotes,
   } = usePortfolio()
+  const toast = useToast()
 
   const [email, setEmail] = useState('')
   const [authMsg, setAuthMsg] = useState<string | null>(null)
@@ -127,7 +129,9 @@ export function SettingsPage() {
             </p>
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={() => {
+                void signOut().then(() => toast.info('Signed out.'))
+              }}
               className="focus-ring rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border"
             >
               Sign out
@@ -273,6 +277,7 @@ export function SettingsPage() {
                   )
                 ) {
                   resetDemo()
+                  toast.success('Reset to demo portfolio and events.')
                 }
               }}
               className="focus-ring rounded-xl bg-critical-soft px-3 py-2 text-sm font-medium text-critical ring-1 ring-critical/30 hover:bg-critical/20 disabled:cursor-not-allowed disabled:opacity-40"
@@ -352,7 +357,9 @@ export function SettingsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => void refreshFromBackend()}
+            onClick={() => {
+              void refreshFromBackend().then(() => toast.success('Data reloaded.'))
+            }}
             className="focus-ring inline-flex items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -497,6 +504,10 @@ export function SettingsPage() {
           </span>
         }
       >
+        <p className="text-sm text-ink-300">
+          <span className="font-semibold text-ink-100">Portlander</span> — portfolio event
+          intelligence. Know what matters next.
+        </p>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-ink-450">Release</dt>

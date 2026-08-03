@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { PortfolioProvider } from '@/context/PortfolioContext'
+import { ToastProvider } from '@/components/ui/Toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { TodayPage } from '@/pages/TodayPage'
 import { EarningsPage } from '@/pages/EarningsPage'
@@ -15,18 +16,20 @@ import { SettingsPage } from '@/pages/SettingsPage'
 function renderAt(path: string) {
   return render(
     <PortfolioProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<TodayPage />} />
-            <Route path="earnings" element={<EarningsPage />} />
-            <Route path="calendar" element={<CalendarPage />} />
-            <Route path="portfolio" element={<PortfolioPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="*" element={<div>redirected</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<TodayPage />} />
+              <Route path="earnings" element={<EarningsPage />} />
+              <Route path="calendar" element={<CalendarPage />} />
+              <Route path="portfolio" element={<PortfolioPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="*" element={<div>redirected</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
     </PortfolioProvider>,
   )
 }

@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PortfolioContext, type PortfolioContextValue } from '@/context/PortfolioContext'
+import { ToastProvider } from '@/components/ui/Toast'
 
 /** Baseline context value: empty/local/booted-false state, every action a no-op. */
 export function makePortfolioContextValue(
@@ -76,7 +77,9 @@ export function renderWithPortfolio(
 ) {
   return render(
     <MemoryRouter initialEntries={options?.initialEntries ?? ['/']}>
-      <PortfolioTestProvider overrides={options?.overrides}>{ui}</PortfolioTestProvider>
+      <ToastProvider>
+        <PortfolioTestProvider overrides={options?.overrides}>{ui}</PortfolioTestProvider>
+      </ToastProvider>
     </MemoryRouter>,
   )
 }

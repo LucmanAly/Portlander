@@ -13,6 +13,7 @@ import {
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { Stat } from '@/components/ui/Stat'
+import { useToast } from '@/components/ui/Toast'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Search, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
@@ -44,6 +45,7 @@ export function PortfolioPage() {
     addWatchlist,
     removeWatchlist,
   } = usePortfolio()
+  const toast = useToast()
 
   // Two different totals: `total` is the raw dollar sum for the header display;
   // `weightBasis` is what weight percentages should actually divide by, so a
@@ -115,6 +117,7 @@ export function PortfolioPage() {
     const t = ticker.trim().toUpperCase()
     const s = Number(shares)
     if (!t || !Number.isFinite(s) || s <= 0) return
+    const alreadyExists = holdings.some((h) => h.ticker === t)
     addHolding({
       ticker: t,
       name: name.trim() || undefined,
@@ -122,10 +125,17 @@ export function PortfolioPage() {
       lastPrice: price ? Number(price) : undefined,
       source: 'manual',
     })
+    toast.success(alreadyExists ? `Updated ${t}.` : `Added ${t} to holdings.`)
     setTicker('')
     setShares('')
     setPrice('')
     setName('')
+  }
+
+  function onRemoveHolding(id: string) {
+    const removed = holdings.find((h) => h.id === id)
+    removeHolding(id)
+    if (removed) toast.info(`Removed ${removed.ticker} from holdings.`)
   }
 
   function onCsv(file: File) {
@@ -265,7 +275,7 @@ export function PortfolioPage() {
       <PortfolioTable
         holdings={sorted}
         weightBasis={weightBasis}
-        onRemove={removeHolding}
+        onRemove={onRemoveHolding}
         emptyMessage={
           holdings.length === 0
             ? 'No holdings yet.'
@@ -450,8 +460,10 @@ export function PortfolioPage() {
           className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault()
-            if (watchTicker.trim()) {
-              addWatchlist(watchTicker.trim())
+            const t = watchTicker.trim()
+            if (t) {
+              addWatchlist(t)
+              toast.success(`Added ${t.toUpperCase()} to watchlist.`)
               setWatchTicker('')
             }
           }}
@@ -483,7 +495,10 @@ export function PortfolioPage() {
                 <button
                   type="button"
                   className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-450 transition hover:bg-ink-800 hover:text-critical"
-                  onClick={() => removeWatchlist(w.id)}
+                  onClick={() => {
+                    removeWatchlist(w.id)
+                    toast.info(`Removed ${w.ticker} from watchlist.`)
+                  }}
                   aria-label={`Remove ${w.ticker}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

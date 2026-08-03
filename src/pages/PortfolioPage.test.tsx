@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { PortfolioPage } from '@/pages/PortfolioPage'
 import { renderWithPortfolio } from '@/test/testProviders'
 import type { Holding } from '@/types'
@@ -35,5 +36,27 @@ describe('PortfolioPage total gain/loss', () => {
       },
     })
     expect(screen.getByText('Add cost basis to every position to calculate')).toBeInTheDocument()
+  })
+})
+
+describe('PortfolioPage action feedback', () => {
+  it('toasts after adding a holding', async () => {
+    const user = userEvent.setup()
+    renderWithPortfolio(<PortfolioPage />, { overrides: { holdings: [] } })
+    await user.type(screen.getByLabelText('Ticker'), 'nvda')
+    await user.type(screen.getByLabelText('Shares'), '5')
+    await user.click(screen.getByRole('button', { name: /add \/ update/i }))
+    expect(await screen.findByText('Added NVDA to holdings.')).toBeInTheDocument()
+  })
+
+  it('toasts after removing a watchlist ticker', async () => {
+    const user = userEvent.setup()
+    renderWithPortfolio(<PortfolioPage />, {
+      overrides: {
+        watchlist: [{ id: 'w1', ticker: 'TSLA', createdAt: '2026-01-01T00:00:00.000Z' }],
+      },
+    })
+    await user.click(screen.getByRole('button', { name: 'Remove TSLA' }))
+    expect(await screen.findByText('Removed TSLA from watchlist.')).toBeInTheDocument()
   })
 })

@@ -1,9 +1,11 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
-import { CalendarDays, CloudOff, LayoutDashboard, TrendingUp, Briefcase, Settings } from 'lucide-react'
+import { CalendarDays, CloudOff, LayoutDashboard, TrendingUp, Briefcase, Settings, X } from 'lucide-react'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import { RefreshQuotesButton } from '@/components/layout/RefreshQuotesButton'
+import { Logo } from '@/components/ui/Logo'
 
 // Desktop sidebar shows all five destinations — there's room. The mobile
 // bottom bar only gets the four things people reach for daily; Settings
@@ -19,6 +21,13 @@ const mobileBottomNav = nav.filter((item) => item.to !== '/settings')
 
 export function AppShell() {
   const { exposure, backend, booting, remoteError } = usePortfolio()
+  const location = useLocation()
+  // "Local / demo" status is shown as a compact pill everywhere (mobile
+  // header badge, sidebar caption) — the full explanation used to also be a
+  // permanent full-width banner repeated on every page. Now it only opens on
+  // request, so implementation state doesn't dominate every screen.
+  const [showLocalNote, setShowLocalNote] = useState(false)
+  const isLocal = !booting && backend === 'local'
 
   return (
     <div className="flex min-h-dvh">
@@ -26,19 +35,22 @@ export function AppShell() {
       <aside className="surface sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border p-4 lg:flex">
         <div className="mb-8 px-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-500/15 ring-1 ring-accent-500/40">
-              <span className="text-sm font-bold text-accent-400">P</span>
-            </div>
+            <Logo className="h-8 w-8 shrink-0" />
             <div>
               <div className="text-sm font-semibold tracking-tight text-ink-100">Portlander</div>
-              <div
-                className={clsx(
-                  'text-[11px]',
-                  !booting && backend === 'local' ? 'text-amber-300' : 'text-ink-450',
-                )}
-              >
-                {booting ? 'Loading…' : backend === 'supabase' ? 'Cloud sync' : 'Local / demo'}
-              </div>
+              {isLocal ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLocalNote((v) => !v)}
+                  className="focus-ring rounded text-[11px] text-amber-300 underline decoration-dotted underline-offset-2"
+                >
+                  Local / demo
+                </button>
+              ) : (
+                <div className="text-[11px] text-ink-450">
+                  {booting ? 'Loading…' : 'Cloud sync'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -78,14 +90,17 @@ export function AppShell() {
         {/* Mobile top bar */}
         <header className="surface sticky top-0 z-20 flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-500/15 text-xs font-bold text-accent-400">
-              P
-            </div>
+            <Logo className="h-7 w-7 shrink-0" />
             <span className="text-sm font-semibold">Portlander</span>
-            {!booting && backend === 'local' ? (
-              <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+            {isLocal ? (
+              <button
+                type="button"
+                onClick={() => setShowLocalNote((v) => !v)}
+                aria-expanded={showLocalNote}
+                className="focus-ring rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300"
+              >
                 Local
-              </span>
+              </button>
             ) : null}
           </div>
           <div className="flex items-center gap-1">
@@ -118,7 +133,7 @@ export function AppShell() {
         </header>
 
         <main className="scrollbar-thin flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {!booting && backend === 'local' ? (
+          {isLocal && showLocalNote ? (
             <div className="mx-auto mb-4 flex max-w-6xl flex-col gap-3 rounded-xl border border-amber-400/25 bg-amber-400/8 px-4 py-3 text-amber-100 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <CloudOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
@@ -132,17 +147,33 @@ export function AppShell() {
                   </p>
                 </div>
               </div>
-              <NavLink
-                to="/settings"
-                className="focus-ring shrink-0 self-start rounded-lg border border-amber-400/25 px-2.5 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/10 sm:self-auto"
-              >
-                Open Settings
-              </NavLink>
+              <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+                <NavLink
+                  to="/settings"
+                  className="focus-ring rounded-lg border border-amber-400/25 px-2.5 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/10"
+                >
+                  Open Settings
+                </NavLink>
+                <button
+                  type="button"
+                  onClick={() => setShowLocalNote(false)}
+                  aria-label="Dismiss"
+                  className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-amber-300 hover:bg-amber-400/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ) : null}
 
           <div className="mx-auto max-w-6xl">
-            {booting ? <AppSkeleton /> : <Outlet />}
+            {booting ? (
+              <AppSkeleton />
+            ) : (
+              <div key={location.pathname} className="animate-page-in">
+                <Outlet />
+              </div>
+            )}
           </div>
         </main>
 

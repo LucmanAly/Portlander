@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { renderWithPortfolio } from '@/test/testProviders'
@@ -50,10 +51,17 @@ describe('AppShell navigation', () => {
     expect(screen.getByText(/refresh prices/i)).toBeInTheDocument()
   })
 
-  it('shows the Local/Demo banner and mobile badge when backend is local', () => {
+  it('shows the compact Local/Demo pill by default, full banner only on request', async () => {
+    const user = userEvent.setup()
     renderShell({ overrides: { backend: 'local', booting: false } })
-    expect(screen.getByText(/local \/ demo portfolio/i)).toBeInTheDocument()
     expect(screen.getByText('Local')).toBeInTheDocument()
+    expect(screen.queryByText(/local \/ demo portfolio/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('Local'))
+    expect(screen.getByText(/local \/ demo portfolio/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByText(/local \/ demo portfolio/i)).not.toBeInTheDocument()
   })
 
   it('does not show the Local/Demo banner when backend is supabase', () => {

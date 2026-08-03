@@ -47,7 +47,52 @@ instead — smaller change, same target-size outcome), wider/responsive Earnings
 grid, and the full Calendar bottom-sheet-for-day-detail pattern (Month view already
 shows the detail panel inline; a true bottom sheet wasn't built).
 
-Checkboxes below are updated to match; items not mentioned in either status note are
+## Implementation status — P2 pass
+
+Shipped on top of P0+P1, same branch:
+
+- **Logo system** (§14): the old "P" text badge is replaced everywhere (desktop sidebar,
+  mobile top bar, favicon) with an actual event-orbit mark — `src/components/ui/Logo.tsx`,
+  an outlined "P" glyph (stem + bowl) with a bright amber dot sitting on the bowl's curve
+  as the "next event" marker, matching the spec's brief almost exactly. Verified visually
+  at 24/28/32px via a real headless-browser screenshot, not just eyeballed in code — the
+  first version (a stem + dashed-circle arc) read as an abstract squiggle at small sizes,
+  not a "P," and was redrawn as a proper glyph outline before shipping.
+- **Brand descriptor/tagline** (§13): "Portlander — portfolio event intelligence. Know
+  what matters next." added to Settings → About, which is this app's only real
+  first-contact/identity surface (there's no separate sign-in or onboarding screen — sign-in
+  lives inline in Settings → Account). Not repeated anywhere else.
+- **Local/Demo banner → compact pill** (§12): the full-width amber banner that used to
+  render on every single page is gone. The existing small "Local" pill (mobile header) and
+  a new clickable "Local / demo" caption (desktop sidebar) are the persistent, compact
+  signal; tapping either expands the full explanation (with a close button), instead of it
+  being permanently on-screen everywhere.
+- **Toast feedback** (§12): new `src/components/ui/Toast.tsx` (`ToastProvider` + `useToast`),
+  wired to the actions that previously had **zero** feedback: adding/updating a holding,
+  removing a holding, adding/removing a watchlist ticker, resetting demo data, signing out,
+  and "Reload data" in Troubleshooting. Deliberately **not** wired into refresh-quotes/
+  brokerage-connect/CSV-import — those already show their own inline status (captions,
+  Diagnostics rows, import-preview panel) and a duplicate toast would just be noise.
+- **Subtle transitions** (§12): a 180ms fade+slide on route change (`animate-page-in`,
+  keyed on the route so it retriggers per navigation) and on toast entry. Both ride the
+  app's existing global `prefers-reduced-motion` clamp in `index.css` (forces
+  `animation-duration: 0.01ms` for anyone with reduced-motion on) rather than needing a
+  separate `motion-safe:` variant — one mechanism, not two.
+
+**Explicitly not done, deferred:**
+- PWA icons (192/512/maskable) and a `manifest.json` (§14) — there's no manifest or PWA
+  install flow in this app at all today, so this would be new infrastructure, not a
+  refinement of something that exists. Flagging it rather than quietly skipping it.
+- A first-run onboarding wizard (§11) — the banner/pill consolidation and descriptor
+  addition cover part of the underlying goal ("help a new user understand Demo mode
+  without exposing setup internals") without the cost of building a guided flow.
+- A broad hover/focus/pressed-state sweep across every interactive surface (§12) — most
+  already had `focus-ring`; only the changed surfaces (bottom nav, toast, banner pill)
+  got explicit new pressed states this pass, not a full audit.
+- Native `confirm()` dialogs (Settings reset, Portfolio row/watchlist delete, CSV replace)
+  — same open item carried from P0/P1.
+
+Checkboxes below are updated to match; items not mentioned in any status note are
 still open.
 
 ---
@@ -347,16 +392,16 @@ Do not squeeze the complete table into a phone viewport. Use compact holding row
 
 **Source:** ChatGPT
 
-- [ ] Replace the full yellow Local/Demo warning repeated on every page with a compact persistent **Demo data** status pill and a full explanation only when first shown or opened.
-- [ ] Avoid placing “Local/demo” directly beneath the brand; implementation state should not become the app's identity.
+- [x] Replace the full yellow Local/Demo warning repeated on every page with a compact persistent **Demo data** status pill and a full explanation only when first shown or opened. (Compact pill in the mobile header + a clickable sidebar caption; tapping either opens the full explanation with a close button, instead of it being permanent on every page.)
+- [ ] Avoid placing “Local/demo” directly beneath the brand; implementation state should not become the app's identity. **Not done** — kept it in the same spot under "Portlander" in the sidebar, just made it compact/interactive instead of relocating it entirely. Moving it elsewhere (e.g. into a status area) is a bigger layout change than this pass covered.
 - [ ] Slightly increase normal body-text size and contrast; reduce excessive all-caps micro-labels.
-- [ ] Keep the existing layout-matched loading skeletons.
-- [ ] Add concise success/error toasts after refresh, sync, import, reset, and connection actions.
-- [ ] Use subtle 150–200ms drawer/card/page transitions and respect reduced-motion preferences.
-- [ ] Add clear hover, focus, and pressed states to every interactive surface.
-- [ ] Do not add animation for decoration alone. Portlander should feel calm and fast, not playful.
-- [ ] Use honest, quiet unavailable states instead of filling screens with repeated dashes and technical explanations.
-- [ ] Consider a lightweight first-run path that helps a new user sign in, connect a brokerage, or understand Demo mode without exposing setup internals.
+- [x] Keep the existing layout-matched loading skeletons. (Not touched; confirmed still true.)
+- [~] Add concise success/error toasts after refresh, sync, import, reset, and connection actions. (New `Toast.tsx` wired to add/update/remove holding, add/remove watchlist, reset demo, sign out, reload data — actions that had zero feedback before. Deliberately *not* wired into refresh-quotes/brokerage-connect/CSV-import, which already have their own inline status and didn't need a second, redundant channel.)
+- [x] Use subtle 150–200ms drawer/card/page transitions and respect reduced-motion preferences. (180ms fade+slide on route change and toast entry, riding the app's existing global `prefers-reduced-motion` clamp rather than a separate motion-safe variant.)
+- [~] Add clear hover, focus, and pressed states to every interactive surface. (Most already had `focus-ring`; only the surfaces touched this pass — bottom nav, toast, banner pill — got new explicit pressed states. Not a full audit.)
+- [x] Do not add animation for decoration alone. Portlander should feel calm and fast, not playful. (Followed by omission — the two animations added are both functional feedback, not decoration.)
+- [x] Use honest, quiet unavailable states instead of filling screens with repeated dashes and technical explanations. (Delivered in P1 — EPS/Revenue honest line, `FreshnessLabel` omission.)
+- [ ] Consider a lightweight first-run path that helps a new user sign in, connect a brokerage, or understand Demo mode without exposing setup internals. **Not built** — the banner/pill consolidation and About descriptor address part of the underlying goal without the cost of a guided flow.
 
 ---
 
@@ -374,11 +419,11 @@ Portlander should have a recognizable identity, but not a large decorative logo 
 
 **Usage rules**
 
-- [ ] Keep **Portlander** visible in the persistent desktop sidebar and mobile top bar.
-- [ ] Use **Portfolio event intelligence** on sign-in, onboarding, About, landing/metadata, and other first-contact surfaces where the name needs explanation.
-- [ ] Use **Know what matters next** on sign-in/onboarding or marketing surfaces only; do not repeat it on every application page.
-- [ ] Do not rename the product.
-- [ ] Avoid generic fintech identity cues such as candlesticks, dollar signs, bulls/bears, pie charts, and upward arrows.
+- [x] Keep **Portlander** visible in the persistent desktop sidebar and mobile top bar. (Already true; confirmed, not touched.)
+- [~] Use **Portfolio event intelligence** on sign-in, onboarding, About, landing/metadata, and other first-contact surfaces where the name needs explanation. (Added to Settings → About — this app's only real first-contact surface, since sign-in lives inline in Settings → Account rather than a dedicated screen.)
+- [x] Use **Know what matters next** on sign-in/onboarding or marketing surfaces only; do not repeat it on every application page. (Same single placement as above, About only.)
+- [x] Do not rename the product. (Trivially true; not touched.)
+- [x] Avoid generic fintech identity cues such as candlesticks, dollar signs, bulls/bears, pie charts, and upward arrows. (Already true; confirmed, not touched.)
 
 ---
 
@@ -404,12 +449,12 @@ The mark should communicate:
 
 **Production requirements**
 
-- [ ] Remain recognizable at 24–32px.
-- [ ] Create a standalone mark and a mark-plus-wordmark lockup.
-- [ ] Provide favicon sizes and PWA icons (`192`, `512`, and maskable variants as required by the manifest).
-- [ ] Verify the mark against the existing dark background and at small mobile-header size.
-- [ ] Keep the wordmark in the existing typography family unless a later brand exercise proves a change is necessary.
-- [ ] A cold-load/splash state may use one subtle event-dot motion; the logo should remain static during ordinary use.
+- [x] Remain recognizable at 24–32px. (Verified with real headless-browser screenshots at 24/28/32px, not just eyeballed in code — the first attempt didn't hold up at small size and was redrawn.)
+- [x] Create a standalone mark and a mark-plus-wordmark lockup. (`Logo.tsx` is the standalone mark; the sidebar/mobile-header layout — mark + "Portlander" text — is the lockup.)
+- [ ] Provide favicon sizes and PWA icons (`192`, `512`, and maskable variants as required by the manifest). **Not done** — there's no `manifest.json` or PWA install flow in this app today, so this would be new infrastructure rather than refining an existing asset. `favicon.svg` was updated to the new mark; the 192/512/maskable raster set was not built.
+- [x] Verify the mark against the existing dark background and at small mobile-header size. (Screenshotted at 28px in the actual mobile header.)
+- [x] Keep the wordmark in the existing typography family unless a later brand exercise proves a change is necessary. (Not changed.)
+- [ ] A cold-load/splash state may use one subtle event-dot motion; the logo should remain static during ordinary use. (No splash screen exists to add this to; not built.)
 
 ---
 
@@ -431,9 +476,9 @@ The mark should communicate:
 
 **Explicit decision**
 
-- [ ] Do not add a second persistent desktop top bar; the sidebar already owns desktop identity.
-- [ ] Do add a compact sticky mobile top bar, approximately 56px tall.
-- [ ] Do not place a large logo or tagline inside every route.
+- [x] Do not add a second persistent desktop top bar; the sidebar already owns desktop identity. (Not added.)
+- [x] Do add a compact sticky mobile top bar, approximately 56px tall. (Already existed pre-P2; confirmed, not touched.)
+- [x] Do not place a large logo or tagline inside every route. (Tagline only appears in Settings → About.)
 
 ---
 
@@ -452,15 +497,15 @@ The mark should communicate:
 
 **Recurring motif**
 
-- [ ] Reuse the orbit/dot/time motif lightly in calendar selection, event indicators, loading, and impact explanations.
-- [ ] Do not turn the motif into decorative background noise.
+- [ ] Reuse the orbit/dot/time motif lightly in calendar selection, event indicators, loading, and impact explanations. (The motif lives in the logo only so far — extending it into the calendar/loading states is a deeper design-system pass, not done.)
+- [x] Do not turn the motif into decorative background noise. (Trivially satisfied — it isn't used anywhere but the logo.)
 
 **Voice rules**
 
-- [ ] Prefer “portfolio” over internal jargon such as “book” when addressing ordinary users.
-- [ ] Prefer direct sentences such as “60% of your portfolio reports this week.”
-- [ ] Avoid “workspace,” “write backend,” environment-variable language, and raw implementation terminology in normal flows.
-- [ ] Be transparent about unavailable or generated information without sounding broken or defensive.
+- [~] Prefer “portfolio” over internal jargon such as “book” when addressing ordinary users. (Calendar's exposure sentence fixed in P1; not audited elsewhere in the app.)
+- [~] Prefer direct sentences such as “60% of your portfolio reports this week.” (Done for Calendar in P1; Today's `ForwardExposurePanel` phrasing not rewritten to match — that's §8's fuller Today hierarchy rewrite, still open.)
+- [x] Avoid “workspace,” “write backend,” environment-variable language, and raw implementation terminology in normal flows. (Done in P0 — "Workspace" → "Settings," that language moved behind Troubleshooting's collapsed technical details.)
+- [x] Be transparent about unavailable or generated information without sounding broken or defensive. (Done in P1 — EPS/Revenue honest line, `FreshnessLabel` omission — plus the pre-existing generated-interpretation separation.)
 
 ---
 
@@ -485,10 +530,10 @@ These items should be treated as refinement work rather than a stack rewrite or 
 
 ### Priority 2 — identity and delight
 
-8. [ ] Event-orbit P logo system, favicon, and PWA assets.
-9. [ ] Consistent brand descriptor/tagline placement.
-10. [ ] Subtle transitions, pressed states, and action feedback.
-11. [ ] Lightweight onboarding/sign-in guidance.
+8. [~] Event-orbit P logo system, favicon, and PWA assets. (Logo + favicon done; PWA manifest/icon set deferred — no existing manifest to extend.)
+9. [x] Consistent brand descriptor/tagline placement.
+10. [~] Subtle transitions, pressed states, and action feedback. (Transitions + toast feedback done; pressed-state coverage is scoped to what changed this pass, not a full sweep.)
+11. [ ] Lightweight onboarding/sign-in guidance. (Not built; partially addressed indirectly via the banner/pill and descriptor work.)
 
 **Do not introduce as part of this refinement**
 
