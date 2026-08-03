@@ -2,8 +2,9 @@
 
 **Last updated:** 2026-08-02
 **Last agent:** codex (session 21)
-**Current phase:** Phase 1 and Phase 2 are both fully closed out and **`v2.0` ("Portfolio Event
-Intelligence") is being promoted to `main`** this session. `BE-01`–`BE-06` merged to `develop` via
+**Current phase:** Phase 1 and Phase 2 are fully closed out. The owner has now defined the first
+Phase 3 slice: **portfolio performance intelligence** — verified daily/weekly/date-range attribution
+with DeepSeek limited to narration of deterministic facts. `BE-01`–`BE-06` merged to `develop` via
 PR #32. Phase 1 acceptance is owner-confirmed complete. PR #28 (stale, pre-overhaul "Signal"
 branch) is closed as superseded. **DeepSeek interpretation is live**: the owner set
 `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`(`https://api.deepseek.com`)/`DEEPSEEK_MODEL`(`deepseek-chat`)
@@ -41,6 +42,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 1 acceptance | ✅ Owner-confirmed complete | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning all confirmed by the owner |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done, DeepSeek live | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is validated, rate-limited, and now enabled — every currently-reported event has a real interpretation |
+| Phase 3 performance intelligence | 🚧 In progress (`PI-01`) | Daily per-position snapshots, deterministic daily/weekly/date-range attribution, Morning Desk recap, Portfolio period review, and strictly grounded DeepSeek narration |
 
 ---
 
@@ -247,6 +249,21 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
    from production pushes.
 3. **No open Phase 3 scope.** Per `AGENTS.md`, Phase 3 is undefined until the owner uses Phase 2 in
    production and decides what's next — don't invent one.
+
+---
+
+## Phase 3 — portfolio performance intelligence
+
+**NEXT_TASK:** `PI-01`
+
+**ACTIVE_CLAIM:** `codex`, 2026-08-02, `PI-01`, branch `codex/portfolio-period-recaps`
+
+- [ ] **PI-01 — Verified performance recaps, end to end.** Add a user-scoped daily per-position
+  snapshot ledger; deterministic daily/weekly/custom-period and tag/theme attribution; a weekday
+  vs weekend Morning Desk recap; a Portfolio date-range review; and optional DeepSeek narration
+  that receives only the verified aggregate payload and can never supply rendered numbers.
+  SnapTrade's beta historical total-value endpoint may reconcile totals but cannot be the source
+  of per-position/theme attribution. Missing snapshots or incomplete prices must render honestly.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
 
