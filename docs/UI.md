@@ -35,9 +35,14 @@ Fonts: IBM Plex Sans + IBM Plex Mono (Google Fonts in `index.html`).
   `ExposureStrip`'s 3 separate cards with one hairline-divided panel. Shared by Today and
   Earnings.
 - Earnings intelligence (UX-02): `EarningsReportCard`, `HistoricalBeatStrip`,
-  `GeneratedInsight` — see `src/types/earnings.ts` for the model. No live data source
-  populates consensus/actual/surprise/guidance/reaction yet; `src/data/earningsFixtures.ts`
-  is the interim source.
+  `GeneratedInsight` — see `src/types/earnings.ts` for the model. **Live Finnhub data**
+  populates consensus/actual/surprise/history via `events` typed columns + `raw`
+  (`BE-01`–`BE-05`). Guidance and post-report reaction are intentionally undefined until a
+  real second source exists. `src/data/earningsFixtures.ts` is **unit-test-only** — never
+  used as a production fallback.
+- Performance (`/performance`, PERF-01 on `develop`): period review from complete daily
+  position snapshots; Morning Desk shows weekday/weekend briefings when captures exist.
+  Verified dollars/returns stay deterministic; DeepSeek prose is optional and labeled.
 - Calendar (UX-06): `MonthCalendar` (day cells are buttons when `onSelectDay` is passed, plain
   divs otherwise — no dead tab stops; a small count badge marks 2+ report days) +
   `SelectedDayDetail` (full per-event detail lives outside the grid, not crammed into cells).
@@ -74,11 +79,11 @@ wrapper, with a sticky anchor-link nav (`#account`, `#brokerage`, etc.) at the t
 long page never has to be scrolled blind. Account and Brokerage always render (never
 conditionally hidden) so every nav link always resolves to real content: when Supabase
 isn't configured or the user isn't signed in, the section explains why and links to the
-section that unblocks it, instead of disappearing. `Earnings intelligence` is new —
-static disclosure of what backs the consensus/actual/guidance data (see UX-02) and the
+section that unblocks it, instead of disappearing. `Earnings intelligence` discloses live
+Finnhub consensus/actual/history, the honest guidance/reaction gap, and the
 verified/generated separation policy. Diagnostics keeps every health check, actionable
 raw error text, and retry action unchanged. Release metadata stays wired to
-`src/lib/appMeta.ts` (`v1.0`) — never the prototype's placeholder version string.
+`src/lib/appMeta.ts` (currently `v2.0` on `main`) — never a prototype placeholder string.
 
 ## Portfolio workspace (UX-07)
 
@@ -112,12 +117,12 @@ Two things audited and found already correct, not just asserted:
   underlying `$0` still feeds totals/weights math (a real, if incomplete, number), but the
   per-row *display* no longer presents it as an observed value.
 
-**DeepSeek resilience**: not applicable yet — no live DeepSeek integration exists in this
-codebase (per AGENTS.md's phase ordering, that's backend work after UX-11). `GeneratedInsight`
-already degrades correctly for the one state that *is* reachable today (`interpretation`
-absent → renders `null`, verified sections unaffected, see UX-05's `EarningsDetailDrawer`
-tests). Delayed/rate-limited/malformed-response handling has to be re-verified against the
-real integration once it exists — this note exists so that task doesn't skip it.
+**DeepSeek resilience**: `earnings-interpret` is live and enabled (manual, rate-limited;
+`BE-06`). `GeneratedInsight` still degrades correctly when `interpretation` is absent
+(`null`, verified sections unaffected — see UX-05's `EarningsDetailDrawer` tests). On
+failure, delay, rate-limit, or malformed model output, verified financials must remain
+usable; generated prose never invents digits, `$`, or `%` (same boundary for
+`performance-interpret`).
 
 **Demo/fixture privacy**: `src/data/demo.ts` and `src/data/earningsFixtures.ts` audited —
 synthetic tickers/share counts/prices only, no real email, account identifier, or portfolio

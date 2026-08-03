@@ -1,11 +1,11 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-03
-**Last agent:** codex (session 23)
+**Last agent:** grok-build (session 25)
 **Current phase:** `v2.0` ("Portfolio Event Intelligence") is live on `main` via PR #33.
-`PERF-01` is merged to `develop`; its canonical schema and Edge Functions are deployed. The
-scheduled path is live, but the first capture is partial because two holdings lack fully usable
-Finnhub evidence. PR #35 is closed as superseded; PR #34 remains the separate unmerged UX pass.
+`PERF-01` is on `develop` with deployed schema/functions and a complete first capture (39/39);
+**NEXT_TASK** is second market-day acceptance + period review before promote. PR #34 remains the
+separate unmerged consumer UX pass. Docs/roadmap/README/AGENTS brought in line with this truth.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -34,6 +34,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done, DeepSeek live | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is validated, rate-limited, and now enabled — every currently-reported event has a real interpretation |
 | Performance briefings | 🟠 Complete capture verified; interval acceptance pending | PR #36 is merged to `develop`; canonical tables, `refresh-quotes` v22, `performance-interpret` v1, RLS/grants, and the 4:15 p.m. Eastern cron are live. The scheduled path returned HTTP 200 and stored an `ok` 39/39 capture for 2026-07-31. A second market-day capture is still needed to validate a true date-range review. |
+| Docs (README / ROADMAP / UI / AGENTS) | ✅ Aligned with v2.0 + PERF | Session 25 rewrote stale Phase maps and fixture-era copy so agents stop reading pre-v2 status. |
 
 ---
 
@@ -64,9 +65,10 @@ demo values, account details, or invented financials into production code.
 
 Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](https://project-portlander-portfolio-event-intelligence-323.magicpatterns.app/). It is a direction and interaction reference, not a source of production data or code.
 
-**NEXT_TASK:** None — `UX-01`-`UX-11` complete; see the backend queue below for what's next
+**Status:** Complete. Do not start new UX queue items from this list.
 
-**ACTIVE_CLAIM:** None
+**For active work, use [Next up](#next-up-ordered) only** — currently PERF-01 acceptance, then
+optional review of PR #34 / `report/UX map.MD` (consumer polish; not part of this checklist).
 
 - [x] **UX-01 — Visual foundation and application shell**
   - First reconcile the release-only `main` commits back into `develop`; `main` currently contains
@@ -175,14 +177,12 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 
 ---
 
-## Next: earnings intelligence backend queue
+## Earnings intelligence backend queue (complete)
 
-`UX-01`–`UX-11` built the full UI contract (`src/types/earnings.ts`, `EarningsCardModel`) against
-typed fixtures (`src/data/earningsFixtures.ts`) because no live source populates consensus,
-actual results, surprise, guidance, or reaction — see UX-02's and UX-09's notes in this file and
-in `docs/UI.md`. This was the ordered work to make that data real. All six items are done as of
-session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for what "done" means for
-`BE-06` specifically (built and deployed, deliberately not enabled).
+Historical queue. All six items shipped; DeepSeek is **live and enabled** (owner secrets +
+session 20 validation). Fixtures are unit-test-only (`BE-05`). Guidance/reaction remain honestly
+undefined (`BE-03`). Do not reopen this queue unless adding a real second provider for guidance
+or reaction.
 
 - [x] **BE-01 — Read the Finnhub payload the app already fetches.** `sync-events`'s `toEventRow()`
   was already storing the full `FinnhubEarning` object (`epsEstimate`/`epsActual`/
@@ -248,9 +248,12 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 1. Wait for the next weekday 4:15 p.m. Eastern capture, then confirm a second `ok` market date.
 2. Verify the authenticated develop flow: Morning Desk briefing, `/performance`, two-date analysis,
    theme tags, and optional DeepSeek narration.
-3. Promote the verified performance feature to `main` as a deliberate post-v2 feature release.
-4. Separately review PR #34; do not mix its UX shell changes into performance acceptance.
+3. Promote the verified performance feature to `main` as a deliberate post-v2 feature release
+   (bump `APP_VERSION` / name / timestamp in `src/lib/appMeta.ts`, e.g. candidate `2.1`).
+4. Separately review **PR #34** (draft; may need rebase onto current `develop`); do not mix its
+   UX shell changes into performance acceptance.
 5. After promotion, decide whether the UX pass becomes the next release or remains deferred.
+6. Keep open-PR hygiene: superseded drafts should stay closed (session 25 closed #15, #27, #29, #30).
 
 ---
 
@@ -266,6 +269,8 @@ item is a second market-day capture for a real interval review.
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-03 | Docs/roadmap/README/AGENTS must describe shipped v2.0 + PERF acceptance, not pre-Phase-2 Ritual/Intelligence maps or fixture-era earnings copy | Status review found agents reading three eras of the project at once. Canonical program: Phase 1 done → Phase 2 event intelligence shipped → CURRENT is PERF-01 acceptance → Phase 3 unplanned. Consumer UX is PR #34 / UX map only. |
+| 2026-08-03 | Closed draft PRs #15, #27, #29, #30 as superseded/out of active queue; keep only #34 for the UX pass | #15 DeepSeek plan landed via BE-06; #27 docs redefine already in AGENTS/PROGRESS; #30 calendar truncation and most of #29's spirit are covered or superseded by #34's broader UX pass. One open product PR at a time after PERF. |
 | 2026-08-03 | Removed manual `DMYI` and SnapTrade `LGMK` holdings at the owner's direction; `DMYI` duplicated the live `IONQ` share count | dMY Technology Group III completed its merger into IonQ and began trading as `IONQ`; both stale rows blocked complete evidence coverage. The action is reversible only by re-adding/importing the positions, and SnapTrade may reintroduce LGMK if it still exists at the broker. |
 | 2026-08-03 | PR #36 is the only canonical performance contract; PR #35 is closed and its empty tables/function are retained temporarily as rollback artifacts | The two implementations used incompatible schemas. Production now matches `portfolio_snapshot_runs` + per-position `portfolio_snapshots` + `performance_briefings`; preserving empty legacy objects avoids destructive cleanup during acceptance. |
 | 2026-08-03 | Scheduled performance capture may use a service-only DB row containing only a SHA-256 secret hash | The connected tooling cannot set Edge Function secrets. RLS has no client policies/grants, the plaintext secret exists only in the pg_cron command, and the function still accepts hosted env secrets when available. |
@@ -318,6 +323,15 @@ item is a second market-day capture for a real interval review.
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-03 — grok-build (session 25, status hygiene)
+- Full status review: Phase 1/2 + BE queues complete; only PERF-01 acceptance remains active.
+- Rewrote stale docs: `docs/ROADMAP.md`, `README.md`, `docs/UI.md`, `AGENTS.md` (Phase 2 shipped;
+  CURRENT = PERF acceptance; handoff points at Next up).
+- Harmonized this file's UX/BE queue headers so agents don't treat completed lists as NEXT_TASK.
+- Merged `main` into `develop` for branch hygiene; closed superseded draft PRs #15, #27, #29, #30
+  (comments on each). Left #34 open as the sole consumer UX pass.
+
 ### 2026-08-03 — codex (session 24, performance data acceptance)
 - Confirmed DMYI was a duplicate manual row for the live IONQ position; official merger history supports IONQ.
 - Removed DMYI and owner-approved LGMK from holdings.

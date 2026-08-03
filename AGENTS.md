@@ -79,31 +79,38 @@ If you cannot finish a task, still update PROGRESS with partial state and blocke
 
 ### Phase 1 — Foundation (`v1.0`, released)
 
-The foundation is on `main`: real holdings, portfolio-relative impact ranking, Today,
-Calendar, table-first Portfolio, Settings diagnostics, Supabase/Finnhub sync, SnapTrade,
-truthful Local/Demo states, and release metadata. A few owner acceptance checks remain in
-`PROGRESS.md`; they are post-release verification, not permission to redesign Phase 1.
+Shipped on `main`: real holdings, portfolio-relative impact ranking, Today, Calendar,
+table-first Portfolio, Settings diagnostics, Supabase/Finnhub sync, SnapTrade, truthful
+Local/Demo states, and release metadata. Owner-accepted. Do not redesign Phase 1.
 
-### Phase 2 — Portfolio event intelligence (CURRENT)
+### Phase 2 — Portfolio event intelligence (`v2.0`, released)
 
-The old "Ritual" and "Intelligence" phase plans were canceled by the owner. Phase 2 is now
-one coherent product direction:
+Shipped on `main` as **Portfolio Event Intelligence**. The old "Ritual" / "Intelligence"
+roadmaps were canceled. Phase 2 delivered:
 
-1. Rebuild the UI/UX around the approved Magic Patterns event-intelligence concept.
-2. Add an Earnings workspace and a D-1 through D+1 quantitative report-card deck.
-3. Show consensus before a report and actual-vs-consensus after it, always tied to portfolio
-   weight and timing.
-4. Add a detail drawer that clearly separates verified financial facts from generated
-   interpretation.
-5. Integrate DeepSeek only after the underlying provider data and UI contracts are truthful.
+1. UI/UX around the Magic Patterns event-intelligence concept (`UX-01`–`UX-11`).
+2. Earnings workspace and D-1 through D+1 quantitative report-card deck.
+3. Consensus before a report and actual-vs-consensus after it, tied to portfolio weight.
+4. Detail drawer separating verified financial facts from generated interpretation.
+5. DeepSeek structured interpretation only after truthful Finnhub/UI contracts (`BE-01`–`BE-06`).
 
-The ordered UI work is the master queue in `PROGRESS.md`. Do not improvise a parallel redesign
-or revive the canceled Phase 2/3 lists.
+Do not reinvent Phase 2 or revive the canceled lists. Consumer polish lives in
+`report/UX map.MD` / PR #34 as a **separate** post-v2 track — never mix it into PERF work.
+
+### CURRENT — Performance briefings (post-v2, candidate `v2.1`)
+
+Authoritative queue: `PROGRESS.md` → **Post-v2 feature queue** and **Next up**.
+
+- PERF-01 code, schema, Edge Functions, and weekday 4:15 p.m. Eastern capture are on
+  `develop` and deployed.
+- Remaining work is **data acceptance** (second market-day `ok` capture + authenticated
+  period review), then a deliberate promote to `main` with an `appMeta.ts` version bump.
+- Do not invent Phase 3 while this acceptance is open.
 
 ### Phase 3 — Unplanned
 
-There is no approved Phase 3 scope. Do not invent one. It will be defined only after the owner
-uses and signs off Phase 2.
+There is no approved Phase 3 scope. Do not invent one. It will be defined only after the
+owner lives with v2.x and explicitly signs off next scope.
 
 ### Phase 2 data truth rules
 
@@ -204,7 +211,8 @@ Product name: **Portlander**. Do not rename unless owner requests.
 ---
 ## How to choose and hand off work
 
-`PROGRESS.md → Phase 2 UI/UX overhaul master queue` is the authoritative task sequence.
+`PROGRESS.md → Next up` (and its `NEXT_TASK` / `ACTIVE_CLAIM` lines) is the authoritative
+task sequence. Historical queues (Phase 1, UX-01–11, BE-01–06) stay checked for audit only.
 
 1. Read `NEXT_TASK` and `ACTIVE_CLAIM`. Take `NEXT_TASK` unless it is explicitly blocked.
 2. Before changing code, set `ACTIVE_CLAIM` to your agent name, date, task ID, and working
