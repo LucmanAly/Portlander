@@ -180,11 +180,17 @@ Deno.serve(async (req) => {
             dayChangePct: quote.dp ?? null,
           })
           const shares = Number(holding?.shares)
+          const previousClose =
+            quote.pc != null && quote.pc > 0
+              ? quote.pc
+              : quote.d != null && Number.isFinite(quote.d)
+                ? quote.c - quote.d
+                : null
           if (
             Number.isFinite(shares) &&
             shares > 0 &&
-            quote.pc != null &&
-            quote.pc > 0 &&
+            previousClose != null &&
+            previousClose > 0 &&
             quote.d != null &&
             Number.isFinite(quote.d)
           ) {
@@ -194,7 +200,7 @@ Deno.serve(async (req) => {
               ticker,
               shares,
               price: quote.c,
-              previousClose: quote.pc,
+              previousClose,
               marketValue: shares * quote.c,
               dayChangeValue: quote.d,
               dayChangePct: quote.dp ?? null,
