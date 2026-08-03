@@ -1,7 +1,8 @@
 /**
  * Portlander — refresh-quotes Edge Function
  *
- * Manual, user-triggered live price refresh. Unlike sync-events (global,
+ * User-triggered live price refresh plus one position-level performance
+ * snapshot per market date. Unlike sync-events (global,
  * unscoped — writes shared events rows safe for any authenticated caller),
  * this function does privileged per-user writes to holdings.last_price, so
  * every read/write is explicitly scoped to the calling user, resolved from
@@ -12,8 +13,10 @@
  *   SUPABASE_URL               (auto-injected on hosted Edge)
  *   SUPABASE_SERVICE_ROLE_KEY  (auto-injected on hosted Edge)
  *
- * Invoke: only via the SPA (supabase.functions.invoke('refresh-quotes')),
- * which attaches the signed-in user's session token automatically.
+ * Invoke manually via the SPA, which attaches the user's session token. A
+ * single-owner deployment may also invoke it from pg_cron using the anon key
+ * plus x-performance-cron-secret; that path is pinned to
+ * PERFORMANCE_OWNER_USER_ID and never accepts a caller-supplied user id.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1'
@@ -36,7 +39,8 @@ Deno.serve(async (req) => {
     return new Response(null, {
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Headers':
+          'authorization, x-client-info, apikey, content-type, x-performance-cron-secret',
       },
     })
   }
@@ -60,23 +64,31 @@ Deno.serve(async (req) => {
     )
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return json({ error: 'Missing Authorization header' }, 401)
-  }
+  const cronSecret = Deno.env.get('PERFORMANCE_CRON_SECRET')?.trim()
+  const suppliedCronSecret = req.headers.get('x-performance-cron-secret')?.trim()
+  const ownerUserId = Deno.env.get('PERFORMANCE_OWNER_USER_ID')?.trim()
+  const scheduled = Boolean(
+    cronSecret && suppliedCronSecret && ownerUserId && safeEqual(cronSecret, suppliedCronSecret),
+  )
 
-  // Resolve the CALLING user's identity from their own JWT. verify_jwt:true
-  // already validated the token at the gateway; this recovers the identity
-  // in a supported way rather than hand-decoding it.
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const { data: userData, error: userErr } = await userClient.auth.getUser()
-  if (userErr || !userData.user) {
-    return json({ error: 'Unauthorized' }, 401)
+  let userId: string
+  if (scheduled) {
+    userId = ownerUserId as string
+  } else {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return json({ error: 'Missing Authorization header' }, 401)
+
+    // Resolve the CALLING user's identity from their own JWT. verify_jwt:true
+    // already validated the token at the gateway; this recovers the identity
+    // in a supported way rather than hand-decoding it.
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    const { data: userData, error: userErr } = await userClient.auth.getUser()
+    if (userErr || !userData.user) return json({ error: 'Unauthorized' }, 401)
+    userId = userData.user.id
   }
-  const userId = userData.user.id
 
   // Privileged client for the actual work — every query below is explicitly
   // scoped to userId. Unlike sync-events, this never iterates all users.
@@ -86,7 +98,7 @@ Deno.serve(async (req) => {
 
   const { data: holdingRows, error: hErr } = await sb
     .from('holdings')
-    .select('ticker')
+    .select('ticker, shares, tags')
     .eq('user_id', userId)
 
   if (hErr) {
@@ -94,6 +106,9 @@ Deno.serve(async (req) => {
   }
 
   const tickers = [...new Set((holdingRows ?? []).map((r) => String(r.ticker).toUpperCase()))].sort()
+  const holdingsByTicker = new Map(
+    (holdingRows ?? []).map((row) => [String(row.ticker).toUpperCase(), row]),
+  )
 
   const startedAt = new Date().toISOString()
   const { data: runRow, error: runInsertErr } = await sb
@@ -123,6 +138,7 @@ Deno.serve(async (req) => {
   }
 
   const results: { ticker: string; lastPrice: number; dayChangeValue: number | null; dayChangePct: number | null }[] = []
+  const snapshotCandidates: SnapshotCandidate[] = []
   const errors: string[] = []
 
   for (const ticker of tickers) {
@@ -151,6 +167,31 @@ Deno.serve(async (req) => {
             dayChangeValue: quote.d ?? null,
             dayChangePct: quote.dp ?? null,
           })
+          const holding = holdingsByTicker.get(ticker)
+          const shares = Number(holding?.shares)
+          if (
+            Number.isFinite(shares) &&
+            shares > 0 &&
+            quote.pc != null &&
+            quote.pc > 0 &&
+            quote.d != null &&
+            Number.isFinite(quote.d) &&
+            quote.t != null &&
+            Number.isFinite(quote.t)
+          ) {
+            snapshotCandidates.push({
+              snapshotDate: marketDateFromEpoch(quote.t),
+              ticker,
+              shares,
+              price: quote.c,
+              previousClose: quote.pc,
+              marketValue: shares * quote.c,
+              dayChangeValue: quote.d,
+              dayChangePct: quote.dp ?? null,
+              tags: Array.isArray(holding?.tags) ? holding.tags.map(String) : [],
+              quoteTimestamp: new Date(quote.t * 1000).toISOString(),
+            })
+          }
         }
       }
     } catch (e) {
@@ -162,6 +203,23 @@ Deno.serve(async (req) => {
 
   const status = errors.length ? (results.length ? 'partial' : 'error') : 'ok'
   const finishedAt = new Date().toISOString()
+  let snapshot: Record<string, unknown>
+  try {
+    snapshot = await persistBestSnapshot(
+      sb,
+      userId,
+      tickers,
+      snapshotCandidates,
+      finishedAt,
+    )
+  } catch (error) {
+    // Price refresh remains useful if snapshot storage is temporarily
+    // unavailable (for example during a rolling schema/function deploy).
+    snapshot = {
+      status: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
   await finishRun(sb, runId, {
     status,
     tickers_count: tickers.length,
@@ -177,8 +235,119 @@ Deno.serve(async (req) => {
     errors: errors.slice(0, 20),
     runId,
     finishedAt,
+    snapshot,
+    scheduled,
   })
 })
+
+type SnapshotCandidate = {
+  snapshotDate: string
+  ticker: string
+  shares: number
+  price: number
+  previousClose: number
+  marketValue: number
+  dayChangeValue: number
+  dayChangePct: number | null
+  tags: string[]
+  quoteTimestamp: string
+}
+
+async function persistBestSnapshot(
+  sb: ReturnType<typeof createClient>,
+  userId: string,
+  tickers: string[],
+  candidates: SnapshotCandidate[],
+  capturedAt: string,
+) {
+  if (tickers.length === 0 || candidates.length === 0) {
+    return { status: 'unavailable', capturedPositions: 0, expectedPositions: tickers.length }
+  }
+
+  // Finnhub's quote timestamp names the market session. On weekends or before
+  // open it remains Friday/the prior session, so no fake Saturday snapshot is
+  // created. Keep only the dominant session if a provider returns mixed dates.
+  const counts = new Map<string, number>()
+  for (const row of candidates) counts.set(row.snapshotDate, (counts.get(row.snapshotDate) ?? 0) + 1)
+  const snapshotDate = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  const rows = candidates.filter((row) => row.snapshotDate === snapshotDate)
+  const captured = new Set(rows.map((row) => row.ticker))
+  const missingTickers = tickers.filter((ticker) => !captured.has(ticker))
+  const snapshotStatus = missingTickers.length === 0 ? 'ok' : rows.length ? 'partial' : 'error'
+
+  const { data: existing } = await sb
+    .from('portfolio_snapshot_runs')
+    .select('id, status, captured_positions')
+    .eq('user_id', userId)
+    .eq('snapshot_date', snapshotDate)
+    .maybeSingle()
+
+  // A later partial refresh must not destroy a complete snapshot already
+  // captured for that market session.
+  if (existing?.status === 'ok' && snapshotStatus !== 'ok') {
+    return {
+      snapshotDate,
+      status: 'ok',
+      capturedPositions: existing.captured_positions,
+      expectedPositions: tickers.length,
+      preservedEarlierCompleteSnapshot: true,
+    }
+  }
+
+  const { data: run, error: runError } = await sb
+    .from('portfolio_snapshot_runs')
+    .upsert(
+      {
+        user_id: userId,
+        snapshot_date: snapshotDate,
+        status: snapshotStatus,
+        expected_positions: tickers.length,
+        captured_positions: rows.length,
+        missing_tickers: missingTickers,
+        captured_at: capturedAt,
+      },
+      { onConflict: 'user_id,snapshot_date' },
+    )
+    .select('id')
+    .single()
+  if (runError || !run) throw new Error(`Snapshot run write failed: ${runError?.message ?? 'no row'}`)
+
+  const { error: deleteError } = await sb
+    .from('portfolio_snapshots')
+    .delete()
+    .eq('user_id', userId)
+    .eq('snapshot_date', snapshotDate)
+  if (deleteError) throw new Error(`Snapshot replacement failed: ${deleteError.message}`)
+
+  if (rows.length > 0) {
+    const { error: insertError } = await sb.from('portfolio_snapshots').insert(
+      rows.map((row) => ({
+        snapshot_run_id: run.id,
+        user_id: userId,
+        snapshot_date: snapshotDate,
+        ticker: row.ticker,
+        shares: row.shares,
+        price: row.price,
+        previous_close: row.previousClose,
+        market_value: row.marketValue,
+        day_change_value: row.dayChangeValue,
+        day_change_pct: row.dayChangePct,
+        tags: row.tags,
+        quote_timestamp: row.quoteTimestamp,
+        captured_at: capturedAt,
+      })),
+    )
+    if (insertError) throw new Error(`Snapshot rows write failed: ${insertError.message}`)
+  }
+
+  return {
+    snapshotDate,
+    status: snapshotStatus,
+    capturedPositions: rows.length,
+    expectedPositions: tickers.length,
+    missingTickers,
+  }
+}
 
 async function fetchQuote(symbol: string, token: string): Promise<FinnhubQuote> {
   const url = new URL(`${FINNHUB_BASE}/quote`)
@@ -214,6 +383,26 @@ async function finishRun(
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+function marketDateFromEpoch(epochSeconds: number): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(epochSeconds * 1000))
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
+function safeEqual(expected: string, supplied: string): boolean {
+  if (expected.length !== supplied.length) return false
+  let mismatch = 0
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ supplied.charCodeAt(index)
+  }
+  return mismatch === 0
 }
 
 function json(body: unknown, status = 200) {
