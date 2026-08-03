@@ -1,19 +1,12 @@
 # PROGRESS.md — Portlander live status
 
 **Last updated:** 2026-08-02
-**Last agent:** codex (session 21)
-**Current phase:** Phase 1 and Phase 2 are both fully closed out and **`v2.0` ("Portfolio Event
-Intelligence") is being promoted to `main`** this session. `BE-01`–`BE-06` merged to `develop` via
-PR #32. Phase 1 acceptance is owner-confirmed complete. PR #28 (stale, pre-overhaul "Signal"
-branch) is closed as superseded. **DeepSeek interpretation is live**: the owner set
-`DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`(`https://api.deepseek.com`)/`DEEPSEEK_MODEL`(`deepseek-chat`)
-and every currently-reported earnings event in the real book has a generated interpretation,
-verified accurate against the underlying numbers. `src/lib/appMeta.ts` was bumped to `2.0` /
-`APP_RELEASE_NAME = 'Portfolio Event Intelligence'` — the owner explicitly asked for release
-naming to drop "Phase N" language in the app UI (that numbering stays internal, in this file and
-`AGENTS.md`, not shown to the owner). Fixed stale Settings copy in the same pass — the "Earnings
-intelligence" section still said "Interim fixture data" / "No live provider populates consensus…",
-which stopped being true after `BE-01`/`BE-05` and was never updated until now.
+**Last agent:** codex (session 22)
+**Current phase:** `v2.0` ("Portfolio Event Intelligence") is live on `main` via PR #33. The owner
+requested a post-v2 performance-briefing feature: truthful weekday daily / weekend weekly summaries
+plus arbitrary date-range review. `PERF-01` is claimed on `codex/performance-briefings`; it must
+store deterministic position-level snapshots before DeepSeek narrates any result. PR #34 is a
+separate UX pass against `develop`; this branch avoids its shell/navigation work.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -41,6 +34,7 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 1 acceptance | ✅ Owner-confirmed complete | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning all confirmed by the owner |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done, DeepSeek live | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is validated, rate-limited, and now enabled — every currently-reported event has a real interpretation |
+| Performance briefings | 🟡 `PERF-01` in progress | Add daily holding snapshots, deterministic tag/theme attribution, weekday daily / weekend week-to-date briefings, and date-range review. Whole-book broker returns may augment headlines, but cannot replace position snapshots for theme attribution. |
 
 ---
 
@@ -239,13 +233,23 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ## Next up (ordered)
 
-1. **Owner, optional:** decide whether to automate `earnings-interpret` (e.g. chained after the
+**NEXT_TASK:** `PERF-01`
+
+**ACTIVE_CLAIM:** `codex` · 2026-08-02 · `PERF-01` · `codex/performance-briefings`
+
+1. **PERF-01 — Performance history and generated briefings.** Capture one truthful per-holding
+   snapshot per market day; calculate totals and tag/theme attribution in code; show daily on
+   weekdays and the completed/current trading week on weekends; add an arbitrary date-range review
+   in Portfolio; send only the already-calculated evidence to DeepSeek for optional narrative.
+   Missing coverage, trades/cash-flow limitations, and model failure must stay visible rather than
+   becoming plausible-looking numbers.
+2. **Owner, optional:** decide whether to automate `earnings-interpret` (e.g. chained after the
    daily `sync-events` cron) now that it's live and verified, or keep it manual/on-demand.
    Automating it means recurring spend without an explicit trigger each time — a deliberate
    decision, not a default.
-2. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
+3. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
    from production pushes.
-3. **No open Phase 3 scope.** Per `AGENTS.md`, Phase 3 is undefined until the owner uses Phase 2 in
+4. **No open Phase 3 scope.** Per `AGENTS.md`, Phase 3 is undefined until the owner uses Phase 2 in
    production and decides what's next — don't invent one.
 
 **Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
