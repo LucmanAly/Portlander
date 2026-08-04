@@ -10,9 +10,9 @@
  * "Phase" numbering is internal project-planning language (AGENTS.md/
  * PROGRESS.md), not something that belongs in front of a user.
  */
-export const APP_VERSION = '2.0'
-export const APP_RELEASE_NAME = 'Portfolio Event Intelligence'
-export const APP_LAST_UPDATED = '2026-08-02T23:41:35Z'
+export const APP_VERSION = '2.1'
+export const APP_RELEASE_NAME = 'Everyday Usability'
+export const APP_LAST_UPDATED = '2026-08-04T10:50:26Z'
 
 export function formatAppUpdatedAt(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {

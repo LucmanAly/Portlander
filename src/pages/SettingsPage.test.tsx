@@ -69,7 +69,7 @@ describe('SettingsPage information architecture', () => {
 
   it('About this build keeps the real release metadata, not a placeholder', () => {
     renderWithPortfolio(<SettingsPage />)
-    expect(screen.getByText('v2.0')).toBeInTheDocument()
+    expect(screen.getByText('v2.1')).toBeInTheDocument()
     expect(screen.queryByText(/v1\.4/)).not.toBeInTheDocument()
   })
 })
