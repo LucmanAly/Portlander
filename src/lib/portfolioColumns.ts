@@ -25,7 +25,10 @@ export const PORTFOLIO_COLUMNS: PortfolioColumnDef[] = [
   { key: 'value', label: 'Value', defaultVisible: true },
   { key: 'totalGainLoss', label: 'Total gain/loss', defaultVisible: true },
   { key: 'weight', label: '% of portfolio', defaultVisible: true },
-  { key: 'source', label: 'Source', defaultVisible: true },
+  // Provenance still shows via each row's tooltip (see `provenanceTitle` in
+  // PortfolioTable) — hidden by default so a 40-holding book isn't spending a
+  // whole column on "Manual/CSV/Synced" tags nobody reads column-by-column.
+  { key: 'source', label: 'Source', defaultVisible: false },
   { key: 'tags', label: 'Tags', defaultVisible: false },
 ]
 

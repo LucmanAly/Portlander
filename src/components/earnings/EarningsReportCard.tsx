@@ -5,6 +5,7 @@ import { EarningsStateBadge, TimingBadge } from '@/components/ui/Badge'
 import { MetricPair } from '@/components/ui/MetricPair'
 import { FreshnessLabel } from '@/components/ui/FreshnessLabel'
 import { HistoricalBeatStrip } from '@/components/earnings/HistoricalBeatStrip'
+import { hasFinancialData } from '@/lib/earningsIntel'
 import { formatEps, formatCompactMoney, formatEventDay, formatPct, formatSignedPct } from '@/lib/format'
 
 /**
@@ -29,6 +30,7 @@ export function EarningsReportCard({
   const facts = card.facts
   const isHero = variant === 'hero'
   const isReported = card.viewState === 'reported'
+  const showFinancials = hasFinancialData(facts, isReported)
 
   const content = (
     <>
@@ -60,20 +62,26 @@ export function EarningsReportCard({
         ) : null}
       </div>
 
-      <div className="mt-3 divide-y divide-border/60 border-t border-border/60">
-        <MetricPair
-          label="EPS"
-          estimate={facts?.consensus?.epsEstimate}
-          actual={isReported ? facts?.actual?.epsActual : undefined}
-          format={formatEps}
-        />
-        <MetricPair
-          label="Revenue"
-          estimate={facts?.consensus?.revenueEstimate}
-          actual={isReported ? facts?.actual?.revenueActual : undefined}
-          format={formatCompactMoney}
-        />
-      </div>
+      {showFinancials ? (
+        <div className="mt-3 divide-y divide-border/60 border-t border-border/60">
+          <MetricPair
+            label="EPS"
+            estimate={facts?.consensus?.epsEstimate}
+            actual={isReported ? facts?.actual?.epsActual : undefined}
+            format={formatEps}
+          />
+          <MetricPair
+            label="Revenue"
+            estimate={facts?.consensus?.revenueEstimate}
+            actual={isReported ? facts?.actual?.revenueActual : undefined}
+            format={formatCompactMoney}
+          />
+        </div>
+      ) : (
+        <p className="mt-3 border-t border-border/60 pt-3 text-xs text-ink-450">
+          No consensus estimates available yet.
+        </p>
+      )}
 
       {isReported && facts?.surprise ? (
         <div className="mt-2 flex flex-wrap gap-3 text-xs">
@@ -130,9 +138,11 @@ export function EarningsReportCard({
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-center justify-between">
-        <FreshnessLabel provenance={facts?.provenance} />
-      </div>
+      {facts?.provenance ? (
+        <div className="mt-3 flex items-center justify-between">
+          <FreshnessLabel provenance={facts.provenance} />
+        </div>
+      ) : null}
 
       {children}
     </>

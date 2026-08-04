@@ -13,6 +13,7 @@ import {
 import { holdingsToCsv, parseHoldingsCsv, planCsvImport, type CsvImportMode } from '@/lib/csv'
 import { PortfolioTable } from '@/components/portfolio/PortfolioTable'
 import { Stat } from '@/components/ui/Stat'
+import { useToast } from '@/components/ui/Toast'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Download, Search, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
@@ -44,6 +45,7 @@ export function PortfolioPage() {
     addWatchlist,
     removeWatchlist,
   } = usePortfolio()
+  const toast = useToast()
 
   // Two different totals: `total` is the raw dollar sum for the header display;
   // `weightBasis` is what weight percentages should actually divide by, so a
@@ -115,6 +117,7 @@ export function PortfolioPage() {
     const t = ticker.trim().toUpperCase()
     const s = Number(shares)
     if (!t || !Number.isFinite(s) || s <= 0) return
+    const alreadyExists = holdings.some((h) => h.ticker === t)
     addHolding({
       ticker: t,
       name: name.trim() || undefined,
@@ -122,10 +125,17 @@ export function PortfolioPage() {
       lastPrice: price ? Number(price) : undefined,
       source: 'manual',
     })
+    toast.success(alreadyExists ? `Updated ${t}.` : `Added ${t} to holdings.`)
     setTicker('')
     setShares('')
     setPrice('')
     setName('')
+  }
+
+  function onRemoveHolding(id: string) {
+    const removed = holdings.find((h) => h.id === id)
+    removeHolding(id)
+    if (removed) toast.info(`Removed ${removed.ticker} from holdings.`)
   }
 
   function onCsv(file: File) {
@@ -192,9 +202,7 @@ export function PortfolioPage() {
             Portfolio
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink-100">Holdings</h1>
-          <p className="mt-1.5 text-sm text-ink-400">
-            Your holdings and today’s move at a glance. Management tools live below the table.
-          </p>
+          <p className="mt-1.5 text-sm text-ink-400">Your holdings and today’s move at a glance.</p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:min-w-[540px] sm:grid-cols-3">
           <Stat label="Total value" value={formatMoney(total)} />
@@ -221,10 +229,53 @@ export function PortfolioPage() {
         </div>
       </header>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
+          <Search className="h-4 w-4 shrink-0 text-ink-450" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ticker or name"
+            className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-450 focus:outline-none"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {SOURCE_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setSourceFilter(f.id)}
+              className={clsx(
+                'focus-ring rounded-lg px-3 py-1.5 text-sm font-medium transition duration-150',
+                sourceFilter === f.id
+                  ? 'bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/40'
+                  : 'bg-ink-850 text-ink-400 ring-1 ring-border hover:text-ink-200',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-400">
+          Sort
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="input w-auto"
+          >
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((key) => (
+              <option key={key} value={key}>
+                {SORT_LABEL[key]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       <PortfolioTable
         holdings={sorted}
         weightBasis={weightBasis}
-        onRemove={removeHolding}
+        onRemove={onRemoveHolding}
         emptyMessage={
           holdings.length === 0
             ? 'No holdings yet.'
@@ -236,15 +287,9 @@ export function PortfolioPage() {
         aria-labelledby="manage-holdings"
         className="surface-elevated space-y-5 rounded-2xl p-5"
       >
-        <div>
-          <h2 id="manage-holdings" className="text-sm font-semibold text-ink-450">
-            Manage holdings
-          </h2>
-          <p className="mt-1 text-sm text-ink-400">
-            Import, add, search, filter, and sort your book here. These controls stay below the
-            table so the portfolio opens on the information that matters most.
-          </p>
-        </div>
+        <h2 id="manage-holdings" className="text-sm font-semibold text-ink-450">
+          Manage holdings
+        </h2>
 
         <div className="flex flex-wrap gap-2">
           <label className="focus-ring inline-flex cursor-pointer items-center gap-2 rounded-xl bg-ink-800 px-3 py-2 text-sm font-medium text-ink-200 ring-1 ring-border hover:bg-ink-750">
@@ -274,9 +319,13 @@ export function PortfolioPage() {
 
         {csvInfo ? <p className="text-sm text-accent-400">{csvInfo}</p> : null}
         {csvError ? <p className="text-sm text-critical">{csvError}</p> : null}
-        <p className="text-xs text-ink-450">
-          CSV headers: <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
-        </p>
+        <details className="text-xs text-ink-450">
+          <summary className="cursor-pointer font-medium text-ink-400">Import help</summary>
+          <p className="mt-1.5">
+            Expected CSV columns:{' '}
+            <code className="text-ink-400">ticker, shares, last_price, cost_basis, weight_pct, name</code>
+          </p>
+        </details>
 
         {pendingCsv && csvPlan ? (
           <div className="surface space-y-4 rounded-2xl p-4">
@@ -402,49 +451,6 @@ export function PortfolioPage() {
             </button>
           </div>
         </form>
-
-        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
-          <label className="focus-ring flex min-w-[200px] flex-1 items-center gap-2 rounded-xl bg-ink-850 px-3 py-2 ring-1 ring-border">
-            <Search className="h-4 w-4 shrink-0 text-ink-450" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search ticker or name"
-              className="w-full bg-transparent text-sm text-ink-100 placeholder:text-ink-450 focus:outline-none"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {SOURCE_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setSourceFilter(f.id)}
-                className={clsx(
-                  'focus-ring rounded-lg px-3 py-1.5 text-sm font-medium transition duration-150',
-                  sourceFilter === f.id
-                    ? 'bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/40'
-                    : 'bg-ink-850 text-ink-400 ring-1 ring-border hover:text-ink-200',
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <label className="flex items-center gap-2 text-sm text-ink-400">
-            Sort
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="input w-auto"
-            >
-              {(Object.keys(SORT_LABEL) as SortKey[]).map((key) => (
-                <option key={key} value={key}>
-                  {SORT_LABEL[key]}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
       </section>
 
       {/* Watchlist */}
@@ -454,8 +460,10 @@ export function PortfolioPage() {
           className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault()
-            if (watchTicker.trim()) {
-              addWatchlist(watchTicker.trim())
+            const t = watchTicker.trim()
+            if (t) {
+              addWatchlist(t)
+              toast.success(`Added ${t.toUpperCase()} to watchlist.`)
               setWatchTicker('')
             }
           }}
@@ -480,14 +488,17 @@ export function PortfolioPage() {
             watchlist.map((w) => (
               <span
                 key={w.id}
-                className="inline-flex items-center gap-2 rounded-lg bg-ink-850 px-3 py-1.5 text-sm ring-1 ring-border"
+                className="inline-flex items-center gap-1 rounded-lg bg-ink-850 py-1 pl-3 pr-1 text-sm ring-1 ring-border"
               >
                 <span className="font-medium text-accent-400">{w.ticker}</span>
                 {w.name ? <span className="text-ink-450">{w.name}</span> : null}
                 <button
                   type="button"
-                  className="text-ink-450 hover:text-critical"
-                  onClick={() => removeWatchlist(w.id)}
+                  className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-450 transition hover:bg-ink-800 hover:text-critical"
+                  onClick={() => {
+                    removeWatchlist(w.id)
+                    toast.info(`Removed ${w.ticker} from watchlist.`)
+                  }}
                   aria-label={`Remove ${w.ticker}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

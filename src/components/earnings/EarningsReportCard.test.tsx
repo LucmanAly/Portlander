@@ -111,4 +111,14 @@ describe('EarningsReportCard', () => {
     render(<EarningsReportCard card={modelFor('AAPL')} />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('hides the EPS/Revenue block and shows one honest line when there is no consensus or actual data at all', () => {
+    const card = modelFor('AAPL')
+    const bareCard = { ...card, facts: card.facts ? { ...card.facts, consensus: undefined, actual: undefined } : card.facts }
+    render(<EarningsReportCard card={bareCard} />)
+    expect(screen.queryByText('EPS')).not.toBeInTheDocument()
+    expect(screen.queryByText('Revenue')).not.toBeInTheDocument()
+    expect(screen.queryByText(/no estimate available/i)).not.toBeInTheDocument()
+    expect(screen.getByText('No consensus estimates available yet.')).toBeInTheDocument()
+  })
 })

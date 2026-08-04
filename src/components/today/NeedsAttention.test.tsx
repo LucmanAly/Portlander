@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { NeedsAttention, needsAttentionEvents } from '@/components/today/NeedsAttention'
 import type { ScoredEvent } from '@/types'
+
+function renderNeedsAttention(events: ScoredEvent[]) {
+  return render(
+    <MemoryRouter>
+      <NeedsAttention events={events} />
+    </MemoryRouter>,
+  )
+}
 
 function scoredEvent(overrides: Partial<ScoredEvent> = {}): ScoredEvent {
   return {
@@ -44,13 +53,25 @@ describe('needsAttentionEvents', () => {
 
 describe('NeedsAttention', () => {
   it('renders nothing when there are no events', () => {
-    const { container } = render(<NeedsAttention events={[]} />)
+    const { container } = renderNeedsAttention([])
     expect(container).toBeEmptyDOMElement()
   })
 
   it('renders each event with ticker, title, and weight', () => {
-    render(<NeedsAttention events={[scoredEvent({ ticker: 'MSFT', title: 'Microsoft earnings' })]} />)
+    renderNeedsAttention([scoredEvent({ ticker: 'MSFT', title: 'Microsoft earnings' })])
     expect(screen.getByText(/MSFT · Microsoft earnings/)).toBeInTheDocument()
     expect(screen.getByText('10.0%')).toBeInTheDocument()
+  })
+
+  it('links earnings rows to the earnings workspace, deep-linked by ticker', () => {
+    renderNeedsAttention([scoredEvent({ ticker: 'MSFT', eventType: 'earnings' })])
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/earnings?ticker=MSFT')
+  })
+
+  it('links non-earnings rows to the calendar day', () => {
+    renderNeedsAttention([
+      scoredEvent({ ticker: null, title: 'Fed rate decision', eventType: 'fomc', eventDate: '2026-08-10' }),
+    ])
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/calendar?date=2026-08-10')
   })
 })

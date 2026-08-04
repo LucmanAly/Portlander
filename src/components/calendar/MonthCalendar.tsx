@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import type { ScoredEvent } from '@/types'
 import { eventTypeLabel, isDividendType, isMacroType, scoreTier } from '@/lib/scoring'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 /** Background tint only — kept separate from the ring so selection/today can't visually conflict with it (see dayRing). */
@@ -120,18 +120,16 @@ export function MonthCalendar({
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => setCursor((c) => subMonths(c, 1))}
             aria-label="Previous month"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setCursor(startOfMonth(new Date()))}>
+          <Button variant="ghost" onClick={() => setCursor(startOfMonth(new Date()))}>
             Today
           </Button>
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => setCursor((c) => addMonths(c, 1))}
             aria-label="Next month"
           >
@@ -192,16 +190,23 @@ export function MonthCalendar({
                   </span>
                 ) : null}
               </div>
-              <div className="flex min-w-0 flex-col gap-0.5">
+              <div className="flex min-w-0 flex-col gap-1 sm:gap-0.5">
+                {/* Below `sm` (roughly phone-portrait widths), a 7-column grid only
+                    leaves ~25-30px per cell for the ticker once the dot and its gap
+                    are accounted for — not enough room for a real ticker before
+                    `truncate` clips it to one character. Stacking the ticker under
+                    the dot instead of beside it gives it the full cell width. At
+                    `sm` and up (landscape phones, tablets, desktop) there's enough
+                    width for the original side-by-side row. */}
                 {dayEvents.slice(0, 3).map((e) => (
                   <div
                     key={e.id}
-                    className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-[10px]"
+                    className="flex min-w-0 flex-col gap-0.5 rounded px-1 py-0.5 text-[10px] sm:flex-row sm:items-center sm:gap-1 sm:py-0"
                     title={e.title}
                     aria-label={eventRowLabel(e)}
                   >
                     <span className={clsx('shrink-0 rounded-full', dotSize(e), dotColor(e))} aria-hidden="true" />
-                    <span className={clsx('min-w-0 flex-1 truncate', timingTextTone(e))}>
+                    <span className={clsx('min-w-0 truncate sm:flex-1', timingTextTone(e))}>
                       {e.ticker ?? e.title.replace(' release', '').replace(' decision', '')}
                     </span>
                   </div>
@@ -236,17 +241,18 @@ export function MonthCalendar({
         })}
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-4 text-xs text-ink-450">
+      <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-ink-450">
         <Legend color="bg-earnings" label="Earnings" />
         <Legend color="bg-dividend" label="Dividends" />
         <Legend color="bg-macro" label="Macro" />
+        <span
+          className="inline-flex items-center gap-1 text-[11px] text-ink-600"
+          title="Earnings ticker: bright reports before the open, dim reports after the close. Number badge = multiple reports that day."
+        >
+          <Info className="h-3 w-3" aria-hidden="true" />
+          Dot size = position weight
+        </span>
       </div>
-      <p className="mt-2 text-[11px] text-ink-600">
-        Dot size tracks position weight · Earnings ticker:{' '}
-        <span className="text-ink-100">bright</span> reports before the open ·{' '}
-        <span className="text-ink-400">dim</span> reports after the close · number badge = multiple
-        reports that day
-      </p>
     </div>
   )
 }

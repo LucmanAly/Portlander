@@ -5,7 +5,7 @@ import { PillButton } from '@/components/ui/Button'
 export type EarningsStatusFilterValue = 'active' | 'upcoming' | 'recent' | 'all'
 
 const OPTIONS: { id: EarningsStatusFilterValue; label: string }[] = [
-  { id: 'active', label: 'Active' },
+  { id: 'active', label: 'Awaiting results' },
   { id: 'upcoming', label: 'Upcoming' },
   { id: 'recent', label: 'Recently reported' },
   { id: 'all', label: 'All' },

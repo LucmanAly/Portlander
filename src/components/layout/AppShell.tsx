@@ -1,10 +1,15 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
-import { CalendarDays, CloudOff, LayoutDashboard, TrendingUp, Briefcase, Settings } from 'lucide-react'
+import { CalendarDays, CloudOff, LayoutDashboard, TrendingUp, Briefcase, Settings, X } from 'lucide-react'
 import { usePortfolio } from '@/context/PortfolioContext'
 import { formatMoney } from '@/lib/format'
 import { RefreshQuotesButton } from '@/components/layout/RefreshQuotesButton'
+import { Logo } from '@/components/ui/Logo'
 
+// Desktop sidebar shows all five destinations — there's room. The mobile
+// bottom bar only gets the four things people reach for daily; Settings
+// moves to a top-bar icon there instead of eating a fifth column.
 const nav = [
   { to: '/', label: 'Today', icon: LayoutDashboard, end: true },
   { to: '/earnings', label: 'Earnings', icon: TrendingUp },
@@ -12,9 +17,17 @@ const nav = [
   { to: '/portfolio', label: 'Portfolio', icon: Briefcase },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
+const mobileBottomNav = nav.filter((item) => item.to !== '/settings')
 
 export function AppShell() {
   const { exposure, backend, booting, remoteError } = usePortfolio()
+  const location = useLocation()
+  // "Local / demo" status is shown as a compact pill everywhere (mobile
+  // header badge, sidebar caption) — the full explanation used to also be a
+  // permanent full-width banner repeated on every page. Now it only opens on
+  // request, so implementation state doesn't dominate every screen.
+  const [showLocalNote, setShowLocalNote] = useState(false)
+  const isLocal = !booting && backend === 'local'
 
   return (
     <div className="flex min-h-dvh">
@@ -22,19 +35,22 @@ export function AppShell() {
       <aside className="surface sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border p-4 lg:flex">
         <div className="mb-8 px-2">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-500/15 ring-1 ring-accent-500/40">
-              <span className="text-sm font-bold text-accent-400">P</span>
-            </div>
+            <Logo className="h-8 w-8 shrink-0" />
             <div>
               <div className="text-sm font-semibold tracking-tight text-ink-100">Portlander</div>
-              <div
-                className={clsx(
-                  'text-[11px]',
-                  !booting && backend === 'local' ? 'text-amber-300' : 'text-ink-450',
-                )}
-              >
-                {booting ? 'Loading…' : backend === 'supabase' ? 'Cloud sync' : 'Local / demo'}
-              </div>
+              {isLocal ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLocalNote((v) => !v)}
+                  className="focus-ring rounded text-[11px] text-amber-300 underline decoration-dotted underline-offset-2"
+                >
+                  Local / demo
+                </button>
+              ) : (
+                <div className="text-[11px] text-ink-450">
+                  {booting ? 'Loading…' : 'Cloud sync'}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -74,14 +90,17 @@ export function AppShell() {
         {/* Mobile top bar */}
         <header className="surface sticky top-0 z-20 flex items-center justify-between border-b border-border px-4 py-3 lg:hidden">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent-500/15 text-xs font-bold text-accent-400">
-              P
-            </div>
+            <Logo className="h-7 w-7 shrink-0" />
             <span className="text-sm font-semibold">Portlander</span>
-            {!booting && backend === 'local' ? (
-              <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+            {isLocal ? (
+              <button
+                type="button"
+                onClick={() => setShowLocalNote((v) => !v)}
+                aria-expanded={showLocalNote}
+                className="focus-ring rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300"
+              >
                 Local
-              </span>
+              </button>
             ) : null}
           </div>
           <div className="flex items-center gap-1">
@@ -96,11 +115,25 @@ export function AppShell() {
               </span>
             )}
             <RefreshQuotesButton variant="compact" />
+            <NavLink
+              to="/settings"
+              aria-label="Settings"
+              className={({ isActive }) =>
+                clsx(
+                  'focus-ring flex h-11 w-11 items-center justify-center rounded-lg transition',
+                  isActive
+                    ? 'bg-accent-500/15 text-accent-400'
+                    : 'text-ink-300 hover:bg-ink-800/80 hover:text-ink-100',
+                )
+              }
+            >
+              <Settings className="h-5 w-5" />
+            </NavLink>
           </div>
         </header>
 
         <main className="scrollbar-thin flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {!booting && backend === 'local' ? (
+          {isLocal && showLocalNote ? (
             <div className="mx-auto mb-4 flex max-w-6xl flex-col gap-3 rounded-xl border border-amber-400/25 bg-amber-400/8 px-4 py-3 text-amber-100 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <CloudOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
@@ -114,36 +147,55 @@ export function AppShell() {
                   </p>
                 </div>
               </div>
-              <NavLink
-                to="/settings"
-                className="focus-ring shrink-0 self-start rounded-lg border border-amber-400/25 px-2.5 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/10 sm:self-auto"
-              >
-                Open Settings
-              </NavLink>
+              <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+                <NavLink
+                  to="/settings"
+                  className="focus-ring rounded-lg border border-amber-400/25 px-2.5 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/10"
+                >
+                  Open Settings
+                </NavLink>
+                <button
+                  type="button"
+                  onClick={() => setShowLocalNote(false)}
+                  aria-label="Dismiss"
+                  className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-amber-300 hover:bg-amber-400/10"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ) : null}
 
           <div className="mx-auto max-w-6xl">
-            {booting ? <AppSkeleton /> : <Outlet />}
+            {booting ? (
+              <AppSkeleton />
+            ) : (
+              <div key={location.pathname} className="animate-page-in">
+                <Outlet />
+              </div>
+            )}
           </div>
         </main>
 
         {/* Mobile bottom nav. pb includes the safe-area inset so the row isn't
-            obscured by the home indicator on notched phones. */}
-        <nav className="surface sticky bottom-0 z-20 grid grid-cols-5 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden">
-          {nav.map((item) => (
+            obscured by the home indicator on notched phones. Four destinations
+            only (Settings lives in the top bar) so each tap target gets real
+            room — 68px row, 24px icons, a filled pill on the active tab
+            instead of just a color change. */}
+        <nav className="surface sticky bottom-0 z-20 grid grid-cols-4 gap-1 border-t border-border px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 lg:hidden">
+          {mobileBottomNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium',
-                  isActive ? 'text-accent-400' : 'text-ink-450',
+                  'focus-ring flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition',
+                  isActive ? 'bg-accent-500/12 text-accent-400' : 'text-ink-450 active:bg-ink-800/60',
                 )
               }
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-6 w-6" />
               {item.label}
             </NavLink>
           ))}

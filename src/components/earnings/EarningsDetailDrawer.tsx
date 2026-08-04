@@ -5,6 +5,7 @@ import { EarningsStateBadge, TimingBadge } from '@/components/ui/Badge'
 import { HistoricalBeatStrip } from '@/components/earnings/HistoricalBeatStrip'
 import { GeneratedInsight } from '@/components/earnings/GeneratedInsight'
 import type { EarningsCardModel } from '@/types/earnings'
+import { hasFinancialData } from '@/lib/earningsIntel'
 import { formatEps, formatCompactMoney, formatEventDay, formatPct, formatSignedPct } from '@/lib/format'
 
 /**
@@ -32,6 +33,7 @@ export function EarningsDetailDrawer({
 function DrawerBody({ card }: { card: EarningsCardModel }) {
   const facts = card.facts
   const isReported = card.viewState === 'reported'
+  const showFinancials = hasFinancialData(facts, isReported)
 
   return (
     <div className="space-y-4">
@@ -47,20 +49,26 @@ function DrawerBody({ card }: { card: EarningsCardModel }) {
 
       <section>
         <h3 className="mb-1 text-xs font-medium text-ink-450">Financials</h3>
-        <div className="divide-y divide-border/60 border-t border-border/60">
-          <MetricPair
-            label="EPS"
-            estimate={facts?.consensus?.epsEstimate}
-            actual={isReported ? facts?.actual?.epsActual : undefined}
-            format={formatEps}
-          />
-          <MetricPair
-            label="Revenue"
-            estimate={facts?.consensus?.revenueEstimate}
-            actual={isReported ? facts?.actual?.revenueActual : undefined}
-            format={formatCompactMoney}
-          />
-        </div>
+        {showFinancials ? (
+          <div className="divide-y divide-border/60 border-t border-border/60">
+            <MetricPair
+              label="EPS"
+              estimate={facts?.consensus?.epsEstimate}
+              actual={isReported ? facts?.actual?.epsActual : undefined}
+              format={formatEps}
+            />
+            <MetricPair
+              label="Revenue"
+              estimate={facts?.consensus?.revenueEstimate}
+              actual={isReported ? facts?.actual?.revenueActual : undefined}
+              format={formatCompactMoney}
+            />
+          </div>
+        ) : (
+          <p className="border-t border-border/60 pt-2 text-sm text-ink-450">
+            No consensus estimates available yet.
+          </p>
+        )}
         {isReported && facts?.surprise ? (
           <div className="mt-2 flex flex-wrap gap-3 text-xs">
             {facts.surprise.epsSurprisePct != null ? (
@@ -105,10 +113,12 @@ function DrawerBody({ card }: { card: EarningsCardModel }) {
         </section>
       ) : null}
 
-      <section>
-        <h3 className="mb-1 text-xs font-medium text-ink-450">Source</h3>
-        <FreshnessLabel provenance={facts?.provenance} />
-      </section>
+      {facts?.provenance ? (
+        <section>
+          <h3 className="mb-1 text-xs font-medium text-ink-450">Source</h3>
+          <FreshnessLabel provenance={facts.provenance} />
+        </section>
+      ) : null}
 
       <section>
         <h3 className="mb-1 text-xs font-medium text-ink-450">History</h3>

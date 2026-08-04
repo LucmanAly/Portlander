@@ -71,10 +71,10 @@ describe('EarningsPage', () => {
     expect(screen.getAllByRole('heading', { level: 2, name: /After Close/ }).length).toBeGreaterThan(0)
   })
 
-  it('filters to Active (awaiting) only', async () => {
+  it('filters to Awaiting results only', async () => {
     const user = userEvent.setup()
     renderPage()
-    await user.click(screen.getByRole('button', { name: 'Active' }))
+    await user.click(screen.getByRole('button', { name: 'Awaiting results' }))
     expect(screen.getByText('NVDA')).toBeInTheDocument()
     expect(screen.queryByText('RIVN')).not.toBeInTheDocument()
     expect(screen.queryByText('AAPL')).not.toBeInTheDocument()
@@ -101,7 +101,7 @@ describe('EarningsPage', () => {
     renderWithPortfolio(<EarningsPage />, {
       overrides: { events: [earningsEvent('RIVN', addDays(today, 10))], holdings: HOLDINGS, watchlist: [] },
     })
-    await user.click(screen.getByRole('button', { name: 'Active' }))
+    await user.click(screen.getByRole('button', { name: 'Awaiting results' }))
     expect(screen.getByText(/no reports match this filter/i)).toBeInTheDocument()
   })
 
