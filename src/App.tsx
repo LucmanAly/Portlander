@@ -7,6 +7,7 @@ import { EarningsPage } from '@/pages/EarningsPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { PortfolioPage } from '@/pages/PortfolioPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { PerformancePage } from '@/pages/PerformancePage'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
               <Route path="earnings" element={<EarningsPage />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="portfolio" element={<PortfolioPage />} />
+              <Route path="performance" element={<PerformancePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

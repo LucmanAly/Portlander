@@ -190,6 +190,111 @@ export interface Database {
         }
         Relationships: []
       }
+      portfolio_snapshot_runs: {
+        Row: {
+          id: string
+          user_id: string
+          snapshot_date: string
+          status: string
+          expected_positions: number
+          captured_positions: number
+          missing_tickers: string[]
+          captured_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          snapshot_date: string
+          status: string
+          expected_positions: number
+          captured_positions: number
+          missing_tickers?: string[]
+          captured_at?: string
+        }
+        Update: {
+          status?: string
+          expected_positions?: number
+          captured_positions?: number
+          missing_tickers?: string[]
+          captured_at?: string
+        }
+        Relationships: []
+      }
+      portfolio_snapshots: {
+        Row: {
+          id: string
+          snapshot_run_id: string
+          user_id: string
+          snapshot_date: string
+          ticker: string
+          shares: number | string
+          price: number | string
+          previous_close: number | string
+          market_value: number | string
+          day_change_value: number | string
+          day_change_pct: number | string | null
+          tags: string[]
+          quote_timestamp: string | null
+          captured_at: string
+        }
+        Insert: {
+          id?: string
+          snapshot_run_id: string
+          user_id: string
+          snapshot_date: string
+          ticker: string
+          shares: number
+          price: number
+          previous_close: number
+          market_value: number
+          day_change_value: number
+          day_change_pct?: number | null
+          tags?: string[]
+          quote_timestamp?: string | null
+          captured_at?: string
+        }
+        Update: {
+          snapshot_run_id?: string
+          shares?: number
+          price?: number
+          previous_close?: number
+          market_value?: number
+          day_change_value?: number
+          day_change_pct?: number | null
+          tags?: string[]
+          quote_timestamp?: string | null
+          captured_at?: string
+        }
+        Relationships: []
+      }
+      performance_briefings: {
+        Row: {
+          id: string
+          user_id: string
+          period_start: string
+          period_end: string
+          evidence_hash: string
+          generated_summary: Json
+          model: string
+          generated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          period_start: string
+          period_end: string
+          evidence_hash: string
+          generated_summary: Json
+          model: string
+          generated_at?: string
+        }
+        Update: {
+          generated_summary?: Json
+          model?: string
+          generated_at?: string
+        }
+        Relationships: []
+      }
       snaptrade_connections: {
         Row: {
           id: string

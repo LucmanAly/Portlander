@@ -125,6 +125,63 @@ create table if not exists public.sync_runs (
   error text
 );
 
+-- Daily position-level evidence for performance briefings. One completed
+-- refresh replaces that user's snapshot for the same New York market date.
+-- The client only reads these rows; refresh-quotes/service-role owns writes.
+create table if not exists public.portfolio_snapshot_runs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  snapshot_date date not null,
+  status text not null check (status in ('ok', 'partial', 'error')),
+  expected_positions int not null check (expected_positions >= 0),
+  captured_positions int not null check (captured_positions >= 0),
+  missing_tickers text[] not null default '{}',
+  captured_at timestamptz not null default now(),
+  unique (user_id, snapshot_date)
+);
+
+create table if not exists public.portfolio_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  snapshot_run_id uuid not null references public.portfolio_snapshot_runs (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  snapshot_date date not null,
+  ticker text not null,
+  shares numeric not null check (shares > 0),
+  price numeric not null check (price >= 0),
+  previous_close numeric not null check (previous_close >= 0),
+  market_value numeric not null,
+  day_change_value numeric not null,
+  day_change_pct numeric,
+  tags text[] not null default '{}',
+  quote_timestamp timestamptz,
+  captured_at timestamptz not null default now(),
+  unique (user_id, snapshot_date, ticker)
+);
+
+create index if not exists portfolio_snapshots_user_date_idx
+  on public.portfolio_snapshots (user_id, snapshot_date);
+
+-- Cached DeepSeek narration. The evidence hash is calculated from the exact
+-- deterministic figures shown in the UI; the model never owns those figures.
+create table if not exists public.performance_briefings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  period_start date not null,
+  period_end date not null,
+  evidence_hash text not null,
+  generated_summary jsonb not null,
+  model text not null,
+  generated_at timestamptz not null default now(),
+  unique (user_id, evidence_hash)
+);
+
+-- Optional single-owner scheduler configuration. The secret is stored only as
+-- SHA-256; RLS has no client policies and only the service-role Edge Function
+-- may read it. Hosted deployments may instead use Edge Function env secrets.
+create table if not exists public.performance_cron_config (
+  singleton boolean primary key default true check (singleton),
+  owner_user_id uuid not null references auth.users (id) on delete cascade,
+  secret_hash text not null check (secret_hash ~ '^[0-9a-f]{64}
 -- RLS
 alter table public.holdings enable row level security;
 alter table public.watchlist enable row level security;
@@ -132,6 +189,10 @@ alter table public.events enable row level security;
 alter table public.sync_runs enable row level security;
 alter table public.snaptrade_users enable row level security;
 alter table public.snaptrade_connections enable row level security;
+alter table public.portfolio_snapshot_runs enable row level security;
+alter table public.portfolio_snapshots enable row level security;
+alter table public.performance_briefings enable row level security;
+alter table public.performance_cron_config enable row level security;
 
 create policy "holdings_select_own" on public.holdings
   for select using (auth.uid() = user_id);
@@ -171,6 +232,99 @@ create policy "sync_runs_select_auth" on public.sync_runs
 
 create policy "snaptrade_connections_select_own" on public.snaptrade_connections
   for select using (auth.uid() = user_id);
+
+create policy "portfolio_snapshot_runs_select_own" on public.portfolio_snapshot_runs
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "portfolio_snapshots_select_own" on public.portfolio_snapshots
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "performance_briefings_select_own" on public.performance_briefings
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+-- Supabase projects created after the 2026 Data API exposure change may not
+-- expose SQL-created public tables automatically. Grant read access explicitly;
+-- RLS above still restricts every row to its owner. Writes stay service-role only.
+grant select on public.portfolio_snapshot_runs to authenticated;
+grant select on public.portfolio_snapshots to authenticated;
+grant select on public.performance_briefings to authenticated;
+
+-- No client grants or policies: this table stores scheduled-run authentication
+-- metadata and is intentionally service-role-only.
+revoke all on public.performance_cron_config from anon, authenticated;
+
+-- Phase 2 reserved (do not use in Phase 1 UI unless exit criteria met)
+-- create table journal_entries (...);
+-- create table event_notes (...);
+),
+  configured_at timestamptz not null default now()
+);
+
+-- RLS
+alter table public.holdings enable row level security;
+alter table public.watchlist enable row level security;
+alter table public.events enable row level security;
+alter table public.sync_runs enable row level security;
+alter table public.snaptrade_users enable row level security;
+alter table public.snaptrade_connections enable row level security;
+alter table public.portfolio_snapshot_runs enable row level security;
+alter table public.portfolio_snapshots enable row level security;
+alter table public.performance_briefings enable row level security;
+
+create policy "holdings_select_own" on public.holdings
+  for select using (auth.uid() = user_id);
+create policy "holdings_insert_own" on public.holdings
+  for insert with check (auth.uid() = user_id);
+create policy "holdings_update_own" on public.holdings
+  for update using (auth.uid() = user_id);
+create policy "holdings_delete_own" on public.holdings
+  for delete using (auth.uid() = user_id);
+
+create policy "watchlist_select_own" on public.watchlist
+  for select using (auth.uid() = user_id);
+create policy "watchlist_insert_own" on public.watchlist
+  for insert with check (auth.uid() = user_id);
+create policy "watchlist_update_own" on public.watchlist
+  for update using (auth.uid() = user_id);
+create policy "watchlist_delete_own" on public.watchlist
+  for delete using (auth.uid() = user_id);
+
+-- Events: own rows OR global macro (user_id is null)
+create policy "events_select_visible" on public.events
+  for select using (user_id is null or auth.uid() = user_id);
+create policy "events_insert_own" on public.events
+  for insert with check (auth.uid() = user_id);
+create policy "events_update_own" on public.events
+  for update using (auth.uid() = user_id);
+create policy "events_delete_own" on public.events
+  for delete using (auth.uid() = user_id);
+
+-- sync_runs: service role only in production; allow read for authenticated for now
+create policy "sync_runs_select_auth" on public.sync_runs
+  for select to authenticated using (true);
+
+-- snaptrade_users: intentionally NO policies for `authenticated`/`anon` — RLS
+-- with zero permissive policies means only the service role (bypasses RLS)
+-- can touch this table. The client must never read the secret directly.
+
+create policy "snaptrade_connections_select_own" on public.snaptrade_connections
+  for select using (auth.uid() = user_id);
+
+create policy "portfolio_snapshot_runs_select_own" on public.portfolio_snapshot_runs
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "portfolio_snapshots_select_own" on public.portfolio_snapshots
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+create policy "performance_briefings_select_own" on public.performance_briefings
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+-- Supabase projects created after the 2026 Data API exposure change may not
+-- expose SQL-created public tables automatically. Grant read access explicitly;
+-- RLS above still restricts every row to its owner. Writes stay service-role only.
+grant select on public.portfolio_snapshot_runs to authenticated;
+grant select on public.portfolio_snapshots to authenticated;
+grant select on public.performance_briefings to authenticated;
 
 -- Phase 2 reserved (do not use in Phase 1 UI unless exit criteria met)
 -- create table journal_entries (...);

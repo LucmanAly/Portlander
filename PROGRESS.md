@@ -1,19 +1,11 @@
 # PROGRESS.md — Portlander live status
 
-**Last updated:** 2026-08-02
-**Last agent:** codex (session 21)
-**Current phase:** Phase 1 and Phase 2 are both fully closed out and **`v2.0` ("Portfolio Event
-Intelligence") is being promoted to `main`** this session. `BE-01`–`BE-06` merged to `develop` via
-PR #32. Phase 1 acceptance is owner-confirmed complete. PR #28 (stale, pre-overhaul "Signal"
-branch) is closed as superseded. **DeepSeek interpretation is live**: the owner set
-`DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`(`https://api.deepseek.com`)/`DEEPSEEK_MODEL`(`deepseek-chat`)
-and every currently-reported earnings event in the real book has a generated interpretation,
-verified accurate against the underlying numbers. `src/lib/appMeta.ts` was bumped to `2.0` /
-`APP_RELEASE_NAME = 'Portfolio Event Intelligence'` — the owner explicitly asked for release
-naming to drop "Phase N" language in the app UI (that numbering stays internal, in this file and
-`AGENTS.md`, not shown to the owner). Fixed stale Settings copy in the same pass — the "Earnings
-intelligence" section still said "Interim fixture data" / "No live provider populates consensus…",
-which stopped being true after `BE-01`/`BE-05` and was never updated until now.
+**Last updated:** 2026-08-03
+**Last agent:** grok-build (session 25)
+**Current phase:** `v2.0` ("Portfolio Event Intelligence") is live on `main` via PR #33.
+`PERF-01` is on `develop` with deployed schema/functions and a complete first capture (39/39);
+**NEXT_TASK** is second market-day acceptance + period review before promote. PR #34 remains the
+separate unmerged consumer UX pass. Docs/roadmap/README/AGENTS brought in line with this truth.
 
 > **Protocol:** Read `AGENTS.md` + this file before work; update this file after work without being asked. Trimmed 2026-08-01 (225 → 112 lines) after session-log bloat crept back in — old debugging narrative for *resolved* issues was cut in favor of the Decisions table (the "why," kept) over the session-by-session "what we tried" (cut). Keep new entries short.
 
@@ -26,13 +18,13 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Area | Status | Notes |
 |------|--------|-------|
 | Local app (UI shell, scoring, CSV, demo) | ✅ Done | Premium dark app, Today/Calendar/Portfolio/Settings; boot skeletons prevent demo-data flash and Local/Demo state is explicit on desktop + mobile |
-| Settings diagnostics + release metadata | ✅ Promoting to `main` as `v2.0` this session | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, release name (not "Phase N" — owner's naming call), and last-updated metadata |
+| Settings diagnostics + release metadata | ✅ Live on `main` as `v2.0` | Central Diagnostics card surfaces backend/auth/positions/prices/events issues; About this build shows version, release name (not "Phase N" — owner's naming call), and last-updated metadata |
 | Supabase project `vvstmdnnpjnfvueoecwl` | ✅ Live | Schema (`holdings`/`watchlist`/`events`/`sync_runs`/`snaptrade_users`/`snaptrade_connections`) applied. Only advisories are pre-existing/expected (see Decisions) |
 | Netlify | ✅ Live | `https://portlander.netlify.app`, git-linked to `main` |
 | `sync-events` Edge Function | ✅ Live (v16) | Global/unscoped, `verify_jwt: true`. Writes `eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual` typed columns (not just `raw` jsonb) and now looks back 380 days (was 7) to backfill real historical quarters for `BE-04`. Macro rows (FOMC/CPI/NFP) come from the static, hand-verified `supabase/functions/_shared/macro-calendar.ts` — no more heuristic generation |
 | `earnings-interpret` Edge Function | ✅ Live (v2) and **enabled** | `BE-06`. Owner set `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`(`https://api.deepseek.com`)/`DEEPSEEK_MODEL`(`deepseek-chat`) 2026-08-02. Invoked (via `pg_net`, from inside Supabase — this session's sandbox can't reach `*.supabase.co` directly, see Decisions) against every already-reported event with no interpretation yet (5 events: FTNT, MSFT, MSTR, CHKP, TENB) — all generated successfully, spot-checked against the underlying numbers by hand, all correct. Still manual/rate-limited only — no cron |
-| Daily cron | ✅ Live | `daily-sync-events` targets **9:31 a.m. America/New_York year-round**: `31 13,14 * * *` UTC plus an Eastern-time guard, so exactly one EDT/EST slot executes |
-| `refresh-quotes` Edge Function | ✅ Live (v2) | User-scoped, manual "Refresh prices" control. Persists `day_change_value`/`day_change_pct` |
+| Daily cron | ✅ Live | `daily-sync-events` targets 9:31 a.m. Eastern. `weekday-performance-snapshot` targets 4:15 p.m. Eastern via `15 20,21 * * 1-5` plus an Eastern-time guard. |
+| `refresh-quotes` Edge Function | ✅ Live (v19) | PR #36 canonical user/manual + scheduled capture implementation. Persists quote movement and per-position snapshot evidence; scheduled auth accepts Edge env secrets or the service-only hashed DB configuration. |
 | `snaptrade-sync` / `snaptrade-connect` | ✅ Live (v18 / v17) | Personal-auth mode by default (`SNAPTRADE_AUTH_MODE`). Reconciles sold positions (`seenTickers` diff+delete). Owner-confirmed working end to end |
 | Portfolio table + CSV | ✅ Rebuilt | Table-first opening view with total value + whole-book daily gain/loss, management controls below the table, drag-and-drop desktop column ordering, per-row writes (PR 5), CSV Merge/Replace picker, `~` estimated-value marker, search/sort/source filter + mobile compact cards |
 | Impact score | ✅ Recalibrated (PR 6) | Portfolio-relative anchor (`max(5, p90weight × 1.5)`) replaced the fixed `/20` clamp; High/Med/Low tiers; `EventCard` leads with weight, not the score |
@@ -41,6 +33,8 @@ Single source of truth for current state. If it's here, don't re-explain it else
 | Phase 1 acceptance | ✅ Owner-confirmed complete | SnapTrade connect/sync, Refresh prices, real-book math, sign-out, mobile, and one real morning all confirmed by the owner |
 | Phase 2 UI/UX overhaul | ✅ Done, merged to `develop` | Full frontend baseline: 5-route shell, event-intelligence primitives + fixtures, Today Morning Desk, Earnings workspace, detail drawer, Calendar overhaul, Portfolio refinement, Settings IA, truthful-states audit, a11y/mobile polish, full regression pass (`UX-01`–`UX-11`) |
 | Phase 2 earnings intelligence (backend) | ✅ `BE-01`–`BE-06` done, DeepSeek live | Real consensus/actual/surprise/history reach the client from `events`' typed columns (real facts always take priority over `earningsFixtures.ts`, which is unit-test-only now — `BE-05`). Guidance/reaction left honestly undefined — Finnhub has neither. DeepSeek interpretation (`BE-06`) is validated, rate-limited, and now enabled — every currently-reported event has a real interpretation |
+| Performance briefings | 🟠 Complete capture verified; interval acceptance pending | PR #36 is merged to `develop`; canonical tables, `refresh-quotes` v22, `performance-interpret` v1, RLS/grants, and the 4:15 p.m. Eastern cron are live. The scheduled path returned HTTP 200 and stored an `ok` 39/39 capture for 2026-07-31. A second market-day capture is still needed to validate a true date-range review. |
+| Docs (README / ROADMAP / UI / AGENTS) | ✅ Aligned with v2.0 + PERF | Session 25 rewrote stale Phase maps and fixture-era copy so agents stop reading pre-v2 status. |
 
 ---
 
@@ -71,9 +65,10 @@ demo values, account details, or invented financials into production code.
 
 Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](https://project-portlander-portfolio-event-intelligence-323.magicpatterns.app/). It is a direction and interaction reference, not a source of production data or code.
 
-**NEXT_TASK:** None — `UX-01`-`UX-11` complete; see the backend queue below for what's next
+**Status:** Complete. Do not start new UX queue items from this list.
 
-**ACTIVE_CLAIM:** None
+**For active work, use [Next up](#next-up-ordered) only** — currently PERF-01 acceptance, then
+optional review of PR #34 / `report/UX map.MD` (consumer polish; not part of this checklist).
 
 - [x] **UX-01 — Visual foundation and application shell**
   - First reconcile the release-only `main` commits back into `develop`; `main` currently contains
@@ -182,14 +177,12 @@ Visual reference: [Portlander Portfolio Event Intelligence — Magic Patterns](h
 
 ---
 
-## Next: earnings intelligence backend queue
+## Earnings intelligence backend queue (complete)
 
-`UX-01`–`UX-11` built the full UI contract (`src/types/earnings.ts`, `EarningsCardModel`) against
-typed fixtures (`src/data/earningsFixtures.ts`) because no live source populates consensus,
-actual results, surprise, guidance, or reaction — see UX-02's and UX-09's notes in this file and
-in `docs/UI.md`. This was the ordered work to make that data real. All six items are done as of
-session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for what "done" means for
-`BE-06` specifically (built and deployed, deliberately not enabled).
+Historical queue. All six items shipped; DeepSeek is **live and enabled** (owner secrets +
+session 20 validation). Fixtures are unit-test-only (`BE-05`). Guidance/reaction remain honestly
+undefined (`BE-03`). Do not reopen this queue unless adding a real second provider for guidance
+or reaction.
 
 - [x] **BE-01 — Read the Finnhub payload the app already fetches.** `sync-events`'s `toEventRow()`
   was already storing the full `FinnhubEarning` object (`epsEstimate`/`epsActual`/
@@ -237,26 +230,38 @@ session 20 — see the "DeepSeek / `earnings-interpret`" Decisions entry for wha
 
 ---
 
+## Post-v2 feature queue
+
+- [x] **PERF-01 — Performance history and generated briefings.** Merged to `develop`; schema,
+  functions, owner-only RLS, service-only scheduler config, and DST-safe cron deployed.
+- [ ] **PERF-01 data acceptance.** Resolve unsupported/stale quote coverage, then verify the first
+  `ok` snapshot and a two-date period review before promotion to `main`.
+
+---
+
 ## Next up (ordered)
 
-1. **Owner, optional:** decide whether to automate `earnings-interpret` (e.g. chained after the
-   daily `sync-events` cron) now that it's live and verified, or keep it manual/on-demand.
-   Automating it means recurring spend without an explicit trigger each time — a deliberate
-   decision, not a default.
-2. **Owner:** check Netlify Deploy contexts once; PR previews may consume build minutes separately
-   from production pushes.
-3. **No open Phase 3 scope.** Per `AGENTS.md`, Phase 3 is undefined until the owner uses Phase 2 in
-   production and decides what's next — don't invent one.
+**NEXT_TASK:** Capture a second market day and verify the authenticated period-review flow
 
-**Open discussion, not a task yet:** Finnhub rate-limit strategy for PE ratio/market cap later. Verified: 60 calls/min free tier, no daily cap, bulk earnings-calendar mode exists (omit `symbol`). Owner hasn't decided whether to build this.
+**ACTIVE_CLAIM:** None
+
+1. Wait for the next weekday 4:15 p.m. Eastern capture, then confirm a second `ok` market date.
+2. Verify the authenticated develop flow: Morning Desk briefing, `/performance`, two-date analysis,
+   theme tags, and optional DeepSeek narration.
+3. Promote the verified performance feature to `main` as a deliberate post-v2 feature release
+   (bump `APP_VERSION` / name / timestamp in `src/lib/appMeta.ts`, e.g. candidate `2.1`).
+4. Separately review **PR #34** (draft; may need rebase onto current `develop`); do not mix its
+   UX shell changes into performance acceptance.
+5. After promotion, decide whether the UX pass becomes the next release or remains deferred.
+6. Keep open-PR hygiene: superseded drafts should stay closed (session 25 closed #15, #27, #29, #30).
 
 ---
 
 ## Blockers
 
-None outstanding. The SnapTrade connect → Fidelity → sync path is owner-confirmed working end to end (Phase 1 acceptance, 2026-08-02) — the previous entry here is resolved and deleted per this file's own protocol below.
-
-(Resolved blockers are deleted, not kept. Ambient MCP-connector disconnects/reconnects are not a project blocker.)
+No active performance-data blocker remains. The owner-approved removal of duplicate/stale
+`DMYI` and `LGMK` produced a complete 39/39 capture for 2026-07-31. The remaining acceptance
+item is a second market-day capture for a real interval review.
 
 ---
 
@@ -264,6 +269,13 @@ None outstanding. The SnapTrade connect → Fidelity → sync path is owner-conf
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-08-03 | Docs/roadmap/README/AGENTS must describe shipped v2.0 + PERF acceptance, not pre-Phase-2 Ritual/Intelligence maps or fixture-era earnings copy | Status review found agents reading three eras of the project at once. Canonical program: Phase 1 done → Phase 2 event intelligence shipped → CURRENT is PERF-01 acceptance → Phase 3 unplanned. Consumer UX is PR #34 / UX map only. |
+| 2026-08-03 | Closed draft PRs #15, #27, #29, #30 as superseded/out of active queue; keep only #34 for the UX pass | #15 DeepSeek plan landed via BE-06; #27 docs redefine already in AGENTS/PROGRESS; #30 calendar truncation and most of #29's spirit are covered or superseded by #34's broader UX pass. One open product PR at a time after PERF. |
+| 2026-08-03 | Removed manual `DMYI` and SnapTrade `LGMK` holdings at the owner's direction; `DMYI` duplicated the live `IONQ` share count | dMY Technology Group III completed its merger into IonQ and began trading as `IONQ`; both stale rows blocked complete evidence coverage. The action is reversible only by re-adding/importing the positions, and SnapTrade may reintroduce LGMK if it still exists at the broker. |
+| 2026-08-03 | PR #36 is the only canonical performance contract; PR #35 is closed and its empty tables/function are retained temporarily as rollback artifacts | The two implementations used incompatible schemas. Production now matches `portfolio_snapshot_runs` + per-position `portfolio_snapshots` + `performance_briefings`; preserving empty legacy objects avoids destructive cleanup during acceptance. |
+| 2026-08-03 | Scheduled performance capture may use a service-only DB row containing only a SHA-256 secret hash | The connected tooling cannot set Edge Function secrets. RLS has no client policies/grants, the plaintext secret exists only in the pg_cron command, and the function still accepts hosted env secrets when available. |
+| 2026-08-02 | Performance dollars/returns/theme attribution come from complete daily position snapshots; DeepSeek supplies cached qualitative wording only and generated prose containing digits, `$`, or `%` is rejected | SnapTrade can provide whole-connection returns and beta total-value history, but not historical position-level theme attribution. Keeping every displayed number deterministic preserves the project's verified-vs-generated boundary and makes model failure harmless. |
+| 2026-08-02 | Existing owner-edited holding `tags` are the source of truth for custom themes; current tags reclassify historical snapshots for still-held tickers, while sold tickers retain captured tags | Finnhub industries are broad and thematic endpoints/provider classifications do not reliably encode owner concepts such as quantum, cybersecurity, or crypto. User-controlled tags are explicit, correctable, and already part of the holdings model. |
 | 2026-08-02 | `v2.0`'s `APP_RELEASE_NAME` is `"Portfolio Event Intelligence"`, not `"Phase 2 · Portfolio Event Intelligence"` — the "Phase" word is gone from Settings entirely, including the field label (`Phase` → `Release`) | Explicit owner request. "Phase N" is internal project-sequencing language for this file and `AGENTS.md` — useful for agents/owner coordinating work, not something that belongs in front of the app itself. `APP_PHASE` renamed to `APP_RELEASE_NAME` in `src/lib/appMeta.ts` to match; internal docs keep saying "Phase 2" freely, only the shipped UI changed. |
 | 2026-08-02 | Fixed stale "Earnings intelligence" copy in Settings (`"Interim fixture data"` / `"No live provider populates consensus…"`) while promoting `v2.0`, not as a separate task | Real bug, not just tidiness: this text was accurate when UX-02 wrote it, but `BE-01`/`BE-05` made it false without anyone updating the copy — an app telling the owner "no live provider" while live Finnhub data was already flowing is exactly the kind of dishonest-UI regression this project's whole truthful-states discipline (`UX-09`) exists to prevent. Caught it by rereading the Settings page while doing the release-metadata edit in the same file area, not by a dedicated audit — worth a real audit pass if more backend-queue items land without a matching UI-copy check. |
 | 2026-08-02 | Invoked `earnings-interpret` via `pg_net.http_post` (executed through the Supabase SQL/migration tooling) instead of `curl`/`fetch` from the agent sandbox | Direct HTTPS from this session to `*.supabase.co` returned a hard `403` from the sandbox's egress proxy (confirmed via `/__agentproxy/status` — a real organization policy block, not a transient error; the README is explicit: report it, don't route around it). `pg_net` is not a workaround — it's the exact mechanism `daily-sync-events`'s cron job already uses in this same project to call `sync-events`, so this reused an established, already-trusted call path rather than inventing a new one. Confirmed real, hallucination-free output this way: `epsSurprisePct`/`revenueSurprisePct` in all 5 generated summaries matched hand-computed values off the same `eps_estimate`/`eps_actual`/`revenue_estimate`/`revenue_actual` numbers exactly. |
@@ -311,6 +323,40 @@ None outstanding. The SnapTrade connect → Fidelity → sync path is owner-conf
 ## Session log
 
 Keep entries short — a few bullets, key files, PR/commit pointer for detail. Don't re-narrate the debugging journey; that's what Decisions is for.
+
+### 2026-08-03 — grok-build (session 25, status hygiene)
+- Full status review: Phase 1/2 + BE queues complete; only PERF-01 acceptance remains active.
+- Rewrote stale docs: `docs/ROADMAP.md`, `README.md`, `docs/UI.md`, `AGENTS.md` (Phase 2 shipped;
+  CURRENT = PERF acceptance; handoff points at Next up).
+- Harmonized this file's UX/BE queue headers so agents don't treat completed lists as NEXT_TASK.
+- Merged `main` into `develop` for branch hygiene; closed superseded draft PRs #15, #27, #29, #30
+  (comments on each). Left #34 open as the sole consumer UX pass.
+
+### 2026-08-03 — codex (session 24, performance data acceptance)
+- Confirmed DMYI was a duplicate manual row for the live IONQ position; official merger history supports IONQ.
+- Removed DMYI and owner-approved LGMK from holdings.
+- Scheduled refresh returned HTTP 200 with an ok 39/39 snapshot for 2026-07-31.
+- Remaining PERF-01 acceptance: capture a second market day and verify the authenticated period review.
+
+
+### 2026-08-03 — codex (session 23, PERF-01 production reconciliation)
+- Closed superseded PR #35 and made merged PR #36 the sole frontend/backend contract.
+- Reconciled the empty conflicting production schema without data loss; canonical owner-only tables,
+  `refresh-quotes` v22, and `performance-interpret` v1 are live.
+- Added a service-only hashed scheduler config and DST-safe 4:15 p.m. Eastern weekday cron.
+- Scheduled-path smoke test returned HTTP 200 and captured 39/41 positions for 2026-07-31; the
+  incomplete DMYI/LGMK coverage is now the only PERF-01 acceptance blocker.
+
+
+### 2026-08-02 — codex (session 22, `PERF-01`)
+- Researched current SnapTrade/Fidelity/Finnhub/DeepSeek/Supabase contracts; recorded the reliability
+  matrix and calculation boundary in `docs/PERFORMANCE-BRIEFINGS.md`.
+- Added complete daily snapshot storage/capture, deterministic daily/period/theme attribution,
+  Morning Desk weekday/weekend briefing, `/performance` date-range review, and theme-tag editor.
+- Added cached `performance-interpret`; generated prose is optional, separately labeled, and cannot
+  introduce numeric claims. No production schema/function deploy from the unmerged branch.
+- `npm run build` and `npm run lint` clean (existing warnings only); `TZ=UTC npm test -- --run`
+  passes 293/293. Draft PR contains deployment order and limitations.
 
 ### 2026-08-02 — codex (session 21, UX map consolidation)
 - Added `report/UX map.MD` to `develop`, preserving and attributing Claude's existing code-review notes from `claude/portlander-ux-improvements-s2fwcm`.

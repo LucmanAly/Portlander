@@ -4,6 +4,8 @@
 
 > What hits your portfolio next, how much weight is on the line, and why it matters.
 
+**Live:** [portlander.netlify.app](https://portlander.netlify.app) · **Current release:** `v2.0` “Portfolio Event Intelligence”
+
 ## Multi-agent workflow
 
 Before any work:
@@ -16,8 +18,11 @@ After every session, update **`PROGRESS.md`** (checklist + session log + next up
 ## Stack
 
 - React + Vite + TypeScript + Tailwind CSS v4
-- Supabase (schema ready; app runs in local mode until wired)
-- Netlify (`netlify.toml`)
+- Supabase (Postgres, Auth, Edge Functions)
+- Netlify (`netlify.toml`) — production branch is `main`
+- Market data: Finnhub (earnings + quotes via Edge Functions)
+- Brokerage: SnapTrade (Fidelity positions)
+- Optional narration: DeepSeek (labeled, structured; never computes portfolio math)
 
 ## Quick start
 
@@ -29,7 +34,7 @@ npm.cmd run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
-Demo holdings (CRWD, PANW, FTNT, MSFT, NVDA, META) and relative earnings/macro events seed on first load into `localStorage`.
+Demo holdings and relative earnings/macro events seed on first load into `localStorage` when Supabase is not configured.
 
 ## Scripts
 
@@ -38,21 +43,26 @@ Demo holdings (CRWD, PANW, FTNT, MSFT, NVDA, META) and relative earnings/macro e
 | `npm run dev` | Local dev server |
 | `npm run build` | Production build |
 | `npm run preview` | Preview production build |
+| `npm run lint` | oxlint |
+| `npm run test` | vitest |
 
-## Phase 1 features
+## What’s in the product
 
-- **Today** — next 14 days ranked by impact score
-- **Exposure strip** — 7d / 30d earnings portfolio %
-- **Calendar** — month grid color-coded by event type
-- **Portfolio** — holdings CRUD, CSV import/export, watchlist
-- **Settings** — local / Supabase mode, magic-link auth, reset demo
+| Area | What you get |
+|------|----------------|
+| **Today** | Morning Desk: portfolio value, daily move, D-1..D+1 earnings deck, needs attention, forward exposure |
+| **Earnings** | Workspace of report cards (consensus / actual / surprise / history), filters, detail drawer |
+| **Calendar** | Position-weighted month grid + selected-day detail + agenda |
+| **Portfolio** | Table-first book, CSV merge/replace, SnapTrade sync, search/sort/source filter |
+| **Settings** | Account, brokerage, data & sync, earnings disclosure, diagnostics, about this build |
+| **Performance** *(on `develop`, pending promotion)* | Daily/period briefings from complete position snapshots |
 
 ## Data modes
 
 | Mode | When | Behavior |
 |------|------|----------|
 | **Local / demo** | No Supabase env / not signed in | `localStorage` + demo seed |
-| **Supabase cloud** (live) | Env set + signed in | Holdings remote; events from Postgres, filled by the daily Edge cron |
+| **Supabase cloud** | Env set + signed in | Holdings remote; events from Postgres (daily Edge cron) |
 
 ### Cloud mode
 
@@ -62,15 +72,25 @@ cp .env.example .env.local
 # apply supabase/schema.sql
 ```
 
-Edge Functions (`sync-events`, `refresh-quotes`, `snaptrade-connect`, `snaptrade-sync`)
-and the daily cron are already deployed. See each function's README for its secrets.
+Edge Functions (`sync-events`, `refresh-quotes`, `snaptrade-connect`, `snaptrade-sync`,
+`earnings-interpret`, `performance-interpret`) and crons are deployed for the live project.
+See each function’s README for secrets.
 
 > **Never `supabase functions deploy` without diffing production first** — see `AGENTS.md`.
 
+## Branch workflow
+
+- **`main`** — production (Netlify). Promote only when ready to ship.
+- **`develop`** — integration branch. Feature PRs target `develop`.
+
 ## Project docs
 
-- `AGENTS.md` — protocol for Codex / Claude Code / Grok
-- `PROGRESS.md` — live status
-- `docs/UI.md` — design system
-- `docs/ROADMAP.md` — phases
-- `supabase/schema.sql` — database
+| File | Role |
+|------|------|
+| `AGENTS.md` | Protocol for Codex / Claude Code / Grok |
+| `PROGRESS.md` | Live status, checklists, next task |
+| `docs/ROADMAP.md` | Phase map |
+| `docs/UI.md` | Design system + UI contract |
+| `docs/PERFORMANCE-BRIEFINGS.md` | PERF reliability and calculation contract |
+| `report/UX map.MD` | Consumer UX backlog (PR #34 and follow-ons) |
+| `supabase/schema.sql` | Database source of truth |
